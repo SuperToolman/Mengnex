@@ -1,0 +1,11 @@
+/target
+/node_modules
+/apps/web/.next
+/apps/web/out
+/apps/desktop/src-tauri/target
+/data/dev/*.db
+/data/dev/*.db-shm
+/data/dev/*.db-wal
+/.DS_Store
+*.log
+
