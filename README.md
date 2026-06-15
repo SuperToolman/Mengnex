@@ -1,5 +1,7 @@
 # Mengnex
 
+Quick access: [Changelog](CHANGELOG.md) | [简体中文](docs/i18n/zh-CN/README.md) | [中文更新日志](docs/i18n/zh-CN/CHANGELOG.md)
+
 Mengnex is a media management project inspired by Emby, Quark, Steam, and local media library tools. The goal is to manage richer media types across multiple clients, including photos, games, manga, anime, movies, series, novels, and music.
 
 Current focus:
