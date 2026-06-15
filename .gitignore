@@ -1,11 +1,65 @@
-/target
-/node_modules
-/apps/web/.next
-/apps/web/out
-/apps/desktop/src-tauri/target
-/data/dev/*.db
-/data/dev/*.db-shm
-/data/dev/*.db-wal
-/.DS_Store
-*.log
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.pnpm-store/
 
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Rust
+target/
+api/target/
+**/*.rs.bk
+
+# Next.js / Web
+web/.next/
+web/out/
+web/build/
+web/coverage/
+coverage/
+web/next-env.d.ts
+*.tsbuildinfo
+
+# Tool caches
+.cache/
+.turbo/
+.parcel-cache/
+.idea/
+
+# Environment
+.env*
+!.env.example
+!.env.local.example
+
+# SQLite data
+api/data/*.db
+api/data/*.db-shm
+api/data/*.db-wal
+data/dev/*.db
+data/dev/*.db-shm
+data/dev/*.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Deployment
+.vercel/
+
+# OS / misc
+.DS_Store
+Thumbs.db
+*.pem
+
+# Legacy app paths
+apps/web/.next/
+apps/web/out/
+apps/desktop/src-tauri/target/
