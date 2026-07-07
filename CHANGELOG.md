@@ -1,32 +1,46 @@
-# Changelog
+# 更新日志
 
-## Unreleased
+本文档记录 Mengnex 的重要变更。
 
-### Added
+## 0.1a - 2026-07-08
 
-- Added application preferences storage and API endpoints for choosing whether photos should prefer derivative images or originals.
-- Added thumbnail and preview derivative generation for photo libraries, with cache files stored under `api/data/thumb` and `api/data/preview`.
-- Added derivative metadata fields to `photo_assets` so cache readiness and cache size can be tracked per asset.
-- Added manual cache generation and cache deletion actions to media library management.
-- Added a unified task center in the web app and a new `/api/tasks` API endpoint that aggregates scan tasks and cache generation tasks.
-- Added media library dialogs for settings, information, and deletion.
-- Added WebP derivative output for both `thumb` and `preview`.
-- Added placeholder-tracked cache directories with Git ignore rules so generated cache files are not committed.
+### 新增
 
-### Changed
+- 创建 Rust `api` 服务，包含 Axum、SeaORM、SQLite、`api/data` 数据目录、OpenAPI 输出、Swagger UI，以及面向 Web 客户端的 CORS 配置。
+- 增加媒体管理的基础数据结构：媒体库、扫描任务、共享媒体项/文件，以及专用照片资源表。
+- 增加照片媒体库的文件系统扫描能力，支持写入数据库并通过 API 端点流式读取本地媒体文件。
+- 在 Web 应用中增加首选项和媒体库管理设置页。
+- 增加 `@hey-api/openapi-ts` 生成流程与类型安全的前端 API 客户端。
+- 更新照片图库页面，通过 API 加载已扫描照片，并使用现有图库与查看器组件展示。
+- 新增应用级偏好设置存储与 API，可选择照片默认优先使用缩略图还是原图。
+- 新增照片媒体库的 `thumb` / `preview` 缓存生成能力，缓存文件存放在 `api/data/thumb` 和 `api/data/preview`。
+- 在 `photo_assets` 中新增缓存元数据字段，用于记录缓存路径、大小和生成时间。
+- 新增媒体库手动生成缓存、删除缓存的能力。
+- 新增统一任务中心页面，以及 `/api/tasks` 聚合接口，用于集中查看扫描任务和缓存生成任务。
+- 新增媒体库设置、信息、删除等弹窗交互。
+- 新增 WebP 缓存输出，`thumb` 与 `preview` 统一切换到 WebP 主格式。
+- 新增缓存目录占位文件与 Git 忽略规则，避免把实际生成缓存提交到仓库。
 
-- Changed photo browsing to support derivative-first rendering: gallery items can use `thumb`, while the viewer can prefer `preview`.
-- Changed manual cache generation to run as a background task with progress tracking instead of blocking the settings page.
-- Changed media library cards to focus on actions and cover previews, moving detailed library information into the info dialog.
-- Changed media library management to support re-scan, enable/disable, rename, root-path updates, and cache-generation settings from the UI.
-- Changed cache generation to skip already valid assets by default rather than forcing a full rebuild.
-- Changed derivative encoding from JPEG to WebP for better size and delivery characteristics.
-- Changed the global layout so the top header remains fixed and the main content area scrolls independently without stretching the sidebar.
+### 变更
 
-### Fixed
+- API 的 UUID 改为以文本字符串写入 SQLite，避免数据库查看时出现二进制 UUID 内容。
+- API 源码结构调整为 `core`、`infra` 和功能 `modules`。
+- 将仓库忽略规则集中到根目录 `.gitignore`。
+- 照片浏览逻辑改为支持缓存优先显示：列表可优先使用 `thumb`，查看器可优先使用 `preview`。
+- 手动生成缓存改为后台任务执行，并支持进度跟踪，而不是阻塞在设置页面中。
+- 媒体库卡片改为聚焦封面与操作，详细统计信息统一移动到“更多 -> 信息”弹窗中。
+- 媒体库管理能力扩展为支持重新扫描、启用或停用、重命名、修改根路径，以及配置扫描后自动补齐缓存。
+- 手动生成缓存默认只补齐缺失或过期资源，不再强制整库重建。
+- 缓存编码从 JPEG 迁移为 WebP，以获得更好的体积和传输表现。
+- 全局布局改为顶部头部固定、主内容区独立滚动，避免长内容把侧边栏一并拉伸。
 
-- Fixed settings-page text regressions by restoring Chinese UI labels.
-- Fixed media library card action alignment and hover states for action icons.
-- Fixed the media library "more" menu so it closes before opening dialogs such as settings or info.
-- Fixed sidebar bottom navigation placement so `任务` and `设置` stay pinned at the bottom.
-- Fixed content overflow behavior that previously caused long pages such as the gallery or task list to pull the sidebar and header out of place.
+### 修复
+
+- 通过允许本地 IP 图片优化，修复 Next Image 无法加载本地 API 图片的问题。
+- 修复前端对 hey-api 生成客户端响应的解包逻辑。
+- 将设置页移动到 `(setting)` 路由组下，修复设置路由布局残留问题。
+- 修复设置页文案回退为英文的问题，恢复中文界面文案。
+- 修复媒体库卡片上操作图标的对齐和悬停态表现。
+- 修复媒体库“更多”菜单在点击后打开弹窗时不自动收起的问题。
+- 修复侧边栏底部导航位置，使 `任务` 和 `设置` 始终固定在最底部。
+- 修复图库、任务列表等长内容页面会连带拉扯侧边栏和头部布局的问题。
