@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateLibraryData, CreateLibraryResponses, GetLibraryData, GetLibraryErrors, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, HealthData, HealthResponses, ListLibrariesData, ListLibrariesResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListScanTasksData, ListScanTasksResponses, StartScanData, StartScanErrors, StartScanResponses } from './types.gen';
+import type { CreateLibraryData, CreateLibraryResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryResponses, DeleteLibraryThumbnailAssetsData, DeleteLibraryThumbnailAssetsErrors, DeleteLibraryThumbnailAssetsResponses, GenerateLibraryThumbnailAssetsData, GenerateLibraryThumbnailAssetsErrors, GenerateLibraryThumbnailAssetsResponses, GetLibraryData, GetLibraryErrors, GetLibraryResponses, GetLibraryThumbnailGenerationTaskData, GetLibraryThumbnailGenerationTaskErrors, GetLibraryThumbnailGenerationTaskResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPreferencesData, GetPreferencesResponses, HealthData, HealthResponses, ListLibrariesData, ListLibrariesResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListScanTasksData, ListScanTasksResponses, ListTasksData, ListTasksResponses, StartScanData, StartScanErrors, StartScanResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryResponses, UpdateLibraryThumbnailConfigData, UpdateLibraryThumbnailConfigErrors, UpdateLibraryThumbnailConfigResponses, UpdatePreferencesData, UpdatePreferencesResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -29,7 +29,33 @@ export const createLibrary = <ThrowOnError extends boolean = false>(options: Opt
     }
 });
 
+export const deleteLibrary = <ThrowOnError extends boolean = false>(options: Options<DeleteLibraryData, ThrowOnError>): RequestResult<DeleteLibraryResponses, DeleteLibraryErrors, ThrowOnError> => (options.client ?? client).delete<DeleteLibraryResponses, DeleteLibraryErrors, ThrowOnError>({ url: '/api/libraries/{id}', ...options });
+
 export const getLibrary = <ThrowOnError extends boolean = false>(options: Options<GetLibraryData, ThrowOnError>): RequestResult<GetLibraryResponses, GetLibraryErrors, ThrowOnError> => (options.client ?? client).get<GetLibraryResponses, GetLibraryErrors, ThrowOnError>({ url: '/api/libraries/{id}', ...options });
+
+export const updateLibrary = <ThrowOnError extends boolean = false>(options: Options<UpdateLibraryData, ThrowOnError>): RequestResult<UpdateLibraryResponses, UpdateLibraryErrors, ThrowOnError> => (options.client ?? client).put<UpdateLibraryResponses, UpdateLibraryErrors, ThrowOnError>({
+    url: '/api/libraries/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteLibraryThumbnailAssets = <ThrowOnError extends boolean = false>(options: Options<DeleteLibraryThumbnailAssetsData, ThrowOnError>): RequestResult<DeleteLibraryThumbnailAssetsResponses, DeleteLibraryThumbnailAssetsErrors, ThrowOnError> => (options.client ?? client).delete<DeleteLibraryThumbnailAssetsResponses, DeleteLibraryThumbnailAssetsErrors, ThrowOnError>({ url: '/api/libraries/{id}/thumbnails', ...options });
+
+export const generateLibraryThumbnailAssets = <ThrowOnError extends boolean = false>(options: Options<GenerateLibraryThumbnailAssetsData, ThrowOnError>): RequestResult<GenerateLibraryThumbnailAssetsResponses, GenerateLibraryThumbnailAssetsErrors, ThrowOnError> => (options.client ?? client).post<GenerateLibraryThumbnailAssetsResponses, GenerateLibraryThumbnailAssetsErrors, ThrowOnError>({ url: '/api/libraries/{id}/thumbnails/generate', ...options });
+
+export const updateLibraryThumbnailConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateLibraryThumbnailConfigData, ThrowOnError>): RequestResult<UpdateLibraryThumbnailConfigResponses, UpdateLibraryThumbnailConfigErrors, ThrowOnError> => (options.client ?? client).put<UpdateLibraryThumbnailConfigResponses, UpdateLibraryThumbnailConfigErrors, ThrowOnError>({
+    url: '/api/libraries/{id}/thumbnails/settings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getLibraryThumbnailGenerationTask = <ThrowOnError extends boolean = false>(options: Options<GetLibraryThumbnailGenerationTaskData, ThrowOnError>): RequestResult<GetLibraryThumbnailGenerationTaskResponses, GetLibraryThumbnailGenerationTaskErrors, ThrowOnError> => (options.client ?? client).get<GetLibraryThumbnailGenerationTaskResponses, GetLibraryThumbnailGenerationTaskErrors, ThrowOnError>({ url: '/api/libraries/{id}/thumbnails/tasks/{task_id}', ...options });
 
 export const listMediaFiles = <ThrowOnError extends boolean = false>(options?: Options<ListMediaFilesData, ThrowOnError>): RequestResult<ListMediaFilesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListMediaFilesResponses, unknown, ThrowOnError>({ url: '/api/media/files', ...options });
 
@@ -38,6 +64,17 @@ export const getMediaFileContent = <ThrowOnError extends boolean = false>(option
 export const listMediaItems = <ThrowOnError extends boolean = false>(options?: Options<ListMediaItemsData, ThrowOnError>): RequestResult<ListMediaItemsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListMediaItemsResponses, unknown, ThrowOnError>({ url: '/api/media/items', ...options });
 
 export const listPhotos = <ThrowOnError extends boolean = false>(options?: Options<ListPhotosData, ThrowOnError>): RequestResult<ListPhotosResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListPhotosResponses, unknown, ThrowOnError>({ url: '/api/photos', ...options });
+
+export const getPreferences = <ThrowOnError extends boolean = false>(options?: Options<GetPreferencesData, ThrowOnError>): RequestResult<GetPreferencesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetPreferencesResponses, unknown, ThrowOnError>({ url: '/api/preferences', ...options });
+
+export const updatePreferences = <ThrowOnError extends boolean = false>(options: Options<UpdatePreferencesData, ThrowOnError>): RequestResult<UpdatePreferencesResponses, unknown, ThrowOnError> => (options.client ?? client).put<UpdatePreferencesResponses, unknown, ThrowOnError>({
+    url: '/api/preferences',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const listScanTasks = <ThrowOnError extends boolean = false>(options?: Options<ListScanTasksData, ThrowOnError>): RequestResult<ListScanTasksResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListScanTasksResponses, unknown, ThrowOnError>({ url: '/api/scans', ...options });
 
@@ -49,5 +86,7 @@ export const startScan = <ThrowOnError extends boolean = false>(options: Options
         ...options.headers
     }
 });
+
+export const listTasks = <ThrowOnError extends boolean = false>(options?: Options<ListTasksData, ThrowOnError>): RequestResult<ListTasksResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListTasksResponses, unknown, ThrowOnError>({ url: '/api/tasks', ...options });
 
 export const health = <ThrowOnError extends boolean = false>(options?: Options<HealthData, ThrowOnError>): RequestResult<HealthResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });

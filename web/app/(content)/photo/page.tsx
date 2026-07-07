@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getPhotos, type PhotoAssetResponse } from "@/src/api/client";
+import {
+    getPhotos,
+    getPreferences,
+    type PhotoAssetResponse,
+    type PreferencesResponse,
+} from "@/src/api/client";
 import GalleryGroup, { type GalleryGroupData } from "./components/GalleryGroup";
 import PhotoViewer from "./components/PhotoViewer";
 
@@ -19,7 +24,32 @@ function getBatchKey(value: string) {
     return `${year}-${month}-${day}`;
 }
 
-function buildGalleryGroups(photos: PhotoAssetResponse[]): GalleryGroupData[] {
+function getGridSource(
+    photo: PhotoAssetResponse,
+    photoDisplaySource: PreferencesResponse["photo_display_source"],
+) {
+    if (photoDisplaySource === "thumbnail") {
+        return photo.thumbnail_src ?? photo.preview_src ?? photo.original_src ?? photo.src;
+    }
+
+    return photo.original_src ?? photo.src;
+}
+
+function getViewerSource(
+    photo: PhotoAssetResponse,
+    photoDisplaySource: PreferencesResponse["photo_display_source"],
+) {
+    if (photoDisplaySource === "thumbnail") {
+        return photo.preview_src ?? photo.original_src ?? photo.src;
+    }
+
+    return photo.original_src ?? photo.src;
+}
+
+function buildGalleryGroups(
+    photos: PhotoAssetResponse[],
+    photoDisplaySource: PreferencesResponse["photo_display_source"],
+): GalleryGroupData[] {
     const groupMap = new Map<string, GalleryGroupData>();
 
     for (const photo of photos) {
@@ -33,7 +63,9 @@ function buildGalleryGroups(photos: PhotoAssetResponse[]): GalleryGroupData[] {
 
         group.items.push({
             id: photo.id,
-            src: photo.src,
+            src: getGridSource(photo, photoDisplaySource),
+            viewerSrc: getViewerSource(photo, photoDisplaySource),
+            originalSrc: photo.original_src ?? photo.src,
             alt: photo.title,
             width: photo.width ?? undefined,
             height: photo.height ?? undefined,
@@ -66,6 +98,7 @@ function getErrorMessage(error: unknown) {
 
 export default function PhotoPage() {
     const [photos, setPhotos] = useState<PhotoAssetResponse[]>([]);
+    const [preferences, setPreferences] = useState<PreferencesResponse | null>(null);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -77,10 +110,14 @@ export default function PhotoPage() {
             try {
                 setIsLoading(true);
                 setError(null);
-                const data = await getPhotos();
+                const [photoData, preferenceData] = await Promise.all([
+                    getPhotos(),
+                    getPreferences(),
+                ]);
 
                 if (!cancelled) {
-                    setPhotos(data);
+                    setPhotos(photoData);
+                    setPreferences(preferenceData);
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -100,7 +137,11 @@ export default function PhotoPage() {
         };
     }, []);
 
-    const galleryGroups = useMemo(() => buildGalleryGroups(photos), [photos]);
+    const photoDisplaySource = preferences?.photo_display_source ?? "thumbnail";
+    const galleryGroups = useMemo(
+        () => buildGalleryGroups(photos, photoDisplaySource),
+        [photoDisplaySource, photos],
+    );
     const galleryItems = useMemo(
         () => galleryGroups.flatMap((group) => group.items),
         [galleryGroups],

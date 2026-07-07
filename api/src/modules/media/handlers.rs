@@ -1,18 +1,26 @@
 use axum::{
     Json,
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use sea_orm::{EntityTrait, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use serde::Deserialize;
 use tokio::fs;
+use tokio_util::io::ReaderStream;
 
 use crate::{
     core::{app::AppState, error::ApiError},
-    infra::entities::{media_file, media_item},
+    infra::entities::{media_file, media_item, photo_asset},
+    modules::photos::service::resolve_derivative_path,
     modules::media::dto::{MediaFileResponse, MediaItemResponse},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct MediaContentQuery {
+    pub variant: Option<String>,
+}
 
 #[utoipa::path(
     get,
@@ -67,15 +75,51 @@ pub async fn list_media_files(
 pub async fn get_media_file_content(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    Query(query): Query<MediaContentQuery>,
 ) -> Result<Response, ApiError> {
     let file = media_file::Entity::find_by_id(id)
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("media file"))?;
-    let bytes = fs::read(&file.full_path).await?;
+    let requested_variant = query.variant.unwrap_or_else(|| "original".to_owned());
+
+    if requested_variant == "thumbnail" || requested_variant == "preview" {
+        let asset = photo_asset::Entity::find()
+            .filter(photo_asset::Column::FileId.eq(file.id.clone()))
+            .one(&state.db)
+            .await?
+            .ok_or(ApiError::NotFound("photo asset"))?;
+        let derivative_path = resolve_derivative_path(&asset, &requested_variant)
+            .ok_or(ApiError::NotFound("generated media variant"))?;
+        let bytes = fs::read(derivative_path).await?;
+        let content_type = asset
+            .thumb_rel_path
+            .as_deref()
+            .filter(|_| requested_variant == "thumbnail")
+            .or_else(|| {
+                asset.preview_rel_path
+                    .as_deref()
+                    .filter(|_| requested_variant == "preview")
+            })
+            .map(derivative_content_type)
+            .unwrap_or("application/octet-stream");
+
+        return Ok((
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, content_type.to_owned()),
+                (header::CACHE_CONTROL, "public, max-age=3600".to_owned()),
+            ],
+            Body::from(bytes),
+        )
+            .into_response());
+    }
+
+    let source_file = fs::File::open(&file.full_path).await?;
     let content_type = file
         .mime_type
         .unwrap_or_else(|| "application/octet-stream".to_owned());
+    let stream = ReaderStream::new(source_file);
 
     Ok((
         StatusCode::OK,
@@ -83,7 +127,19 @@ pub async fn get_media_file_content(
             (header::CONTENT_TYPE, content_type),
             (header::CACHE_CONTROL, "public, max-age=3600".to_owned()),
         ],
-        Body::from(bytes),
+        Body::from_stream(stream),
     )
         .into_response())
+}
+
+fn derivative_content_type(relative_path: &str) -> &'static str {
+    if relative_path.ends_with(".webp") {
+        return "image/webp";
+    }
+
+    if relative_path.ends_with(".jpg") || relative_path.ends_with(".jpeg") {
+        return "image/jpeg";
+    }
+
+    "application/octet-stream"
 }

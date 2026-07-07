@@ -2,7 +2,9 @@ use std::{env, fs, path::PathBuf};
 
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, DbErr, Schema, Statement};
 
-use crate::infra::entities::{media_file, media_item, media_library, photo_asset, scan_task};
+use crate::infra::entities::{
+    app_setting, media_file, media_item, media_library, photo_asset, scan_task,
+};
 
 pub async fn connect() -> Result<DatabaseConnection, DbErr> {
     let database_url = match env::var("DATABASE_URL") {
@@ -29,11 +31,31 @@ fn default_database_url() -> Result<String, DbErr> {
 }
 
 async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
+    create_table(db, app_setting::Entity).await?;
     create_table(db, media_library::Entity).await?;
     create_table(db, scan_task::Entity).await?;
     create_table(db, media_item::Entity).await?;
     create_table(db, media_file::Entity).await?;
     create_table(db, photo_asset::Entity).await?;
+    ensure_schema_columns(db).await?;
+
+    Ok(())
+}
+
+async fn ensure_schema_columns(db: &DatabaseConnection) -> Result<(), DbErr> {
+    add_column_if_missing(
+        db,
+        "media_libraries",
+        "thumbnails_enabled",
+        "BOOLEAN NOT NULL DEFAULT 1",
+    )
+    .await?;
+    add_column_if_missing(db, "photo_assets", "thumb_rel_path", "TEXT").await?;
+    add_column_if_missing(db, "photo_assets", "preview_rel_path", "TEXT").await?;
+    add_column_if_missing(db, "photo_assets", "thumb_file_size", "BIGINT").await?;
+    add_column_if_missing(db, "photo_assets", "preview_file_size", "BIGINT").await?;
+    add_column_if_missing(db, "photo_assets", "thumb_generated_at", "TEXT").await?;
+    add_column_if_missing(db, "photo_assets", "preview_generated_at", "TEXT").await?;
 
     Ok(())
 }
@@ -104,6 +126,38 @@ where
 
     db.execute(db.get_database_backend().build(&statement))
         .await?;
+
+    Ok(())
+}
+
+async fn add_column_if_missing(
+    db: &DatabaseConnection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<(), DbErr> {
+    let rows = db
+        .query_all(Statement::from_string(
+            DbBackend::Sqlite,
+            format!("PRAGMA table_info({table})"),
+        ))
+        .await?;
+
+    let exists = rows.into_iter().any(|row| {
+        row.try_get::<String>("", "name")
+            .map(|name| name == column)
+            .unwrap_or(false)
+    });
+
+    if exists {
+        return Ok(());
+    }
+
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+    ))
+    .await?;
 
     Ok(())
 }

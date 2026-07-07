@@ -2,7 +2,7 @@
 
 import { Modal, useOverlayState } from "@heroui/react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import type { GalleryItemData } from "./GalleryItem";
 
 type PhotoViewerProps = {
@@ -13,6 +13,22 @@ type PhotoViewerProps = {
 };
 
 const INFO_IDLE_DELAY = 3000;
+const MIN_SCALE = 1;
+const MAX_SCALE = 8;
+const WHEEL_ZOOM_STEP = 1.14;
+
+type ViewportPosition = {
+    x: number;
+    y: number;
+};
+
+type DragState = {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+};
 
 function getSafeIndex(index: number, length: number) {
     if (length === 0) {
@@ -73,6 +89,24 @@ function formatTakenAt(value?: Date | string | number) {
     }).format(date);
 }
 
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function constrainPosition(position: ViewportPosition, scale: number, rect?: DOMRect | null) {
+    if (scale <= MIN_SCALE || !rect) {
+        return { x: 0, y: 0 };
+    }
+
+    const maxX = ((scale - 1) * rect.width) / 2;
+    const maxY = ((scale - 1) * rect.height) / 2;
+
+    return {
+        x: clamp(position.x, -maxX, maxX),
+        y: clamp(position.y, -maxY, maxY),
+    };
+}
+
 export default function PhotoViewer({
     items,
     activeIndex,
@@ -80,6 +114,11 @@ export default function PhotoViewer({
     onClose,
 }: PhotoViewerProps) {
     const [isInfoVisible, setIsInfoVisible] = useState(true);
+    const [scale, setScale] = useState(1);
+    const [position, setPosition] = useState<ViewportPosition>({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const viewportRef = useRef<HTMLDivElement | null>(null);
+    const dragStateRef = useRef<DragState | null>(null);
     const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activeItem = activeIndex === null ? null : items[activeIndex] ?? null;
     const isOpen = activeIndex !== null && !!activeItem;
@@ -119,6 +158,103 @@ export default function PhotoViewer({
         onChange(getSafeIndex(activeIndex + offset, items.length));
     }
 
+    function resetViewport() {
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
+        setIsDragging(false);
+        dragStateRef.current = null;
+    }
+
+    function handleWheel(event: WheelEvent<HTMLDivElement>) {
+        event.preventDefault();
+        showInfoTemporarily();
+
+        const rect = viewportRef.current?.getBoundingClientRect();
+
+        if (!rect) {
+            return;
+        }
+
+        const nextScale = clamp(
+            scale * (event.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP),
+            MIN_SCALE,
+            MAX_SCALE,
+        );
+
+        if (nextScale === scale) {
+            return;
+        }
+
+        const cursorX = event.clientX - rect.left - rect.width / 2;
+        const cursorY = event.clientY - rect.top - rect.height / 2;
+        const scaleRatio = nextScale / scale;
+        const nextPosition = constrainPosition(
+            {
+                x: cursorX - (cursorX - position.x) * scaleRatio,
+                y: cursorY - (cursorY - position.y) * scaleRatio,
+            },
+            nextScale,
+            rect,
+        );
+
+        setScale(nextScale);
+        setPosition(nextPosition);
+    }
+
+    function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+        showInfoTemporarily();
+
+        if (event.button !== 0 || scale <= MIN_SCALE) {
+            return;
+        }
+
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        dragStateRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: position.x,
+            originY: position.y,
+        };
+        setIsDragging(true);
+    }
+
+    function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+        showInfoTemporarily();
+
+        const dragState = dragStateRef.current;
+
+        if (!dragState || dragState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        const rect = viewportRef.current?.getBoundingClientRect();
+        setPosition(
+            constrainPosition(
+                {
+                    x: dragState.originX + event.clientX - dragState.startX,
+                    y: dragState.originY + event.clientY - dragState.startY,
+                },
+                scale,
+                rect,
+            ),
+        );
+    }
+
+    function stopDragging(event?: PointerEvent<HTMLDivElement>) {
+        if (
+            event &&
+            dragStateRef.current?.pointerId === event.pointerId &&
+            event.currentTarget.hasPointerCapture(event.pointerId)
+        ) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+
+        dragStateRef.current = null;
+        setIsDragging(false);
+    }
+
     useEffect(() => {
         if (!isOpen) {
             clearIdleTimer();
@@ -127,6 +263,7 @@ export default function PhotoViewer({
 
         setIsInfoVisible(true);
         scheduleInfoHide();
+        resetViewport();
 
         return clearIdleTimer;
     }, [isOpen, activeIndex]);
@@ -207,16 +344,39 @@ export default function PhotoViewer({
                                 </>
                             )}
 
-                            <div className="relative h-screen w-screen">
-                                <Image
-                                    key={activeItem.id}
-                                    src={activeItem.src}
-                                    alt={activeItem.alt ?? getFileName(activeItem)}
-                                    fill
-                                    priority
-                                    sizes="100vw"
-                                    className="object-contain"
-                                />
+                            <div
+                                ref={viewportRef}
+                                className={`relative h-screen w-screen touch-none select-none overflow-hidden ${
+                                    scale > MIN_SCALE
+                                        ? isDragging
+                                            ? "cursor-grabbing"
+                                            : "cursor-grab"
+                                        : "cursor-zoom-in"
+                                }`}
+                                onPointerCancel={stopDragging}
+                                onPointerDown={handlePointerDown}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={stopDragging}
+                                onWheel={handleWheel}
+                            >
+                                <div
+                                    className="absolute inset-0 origin-center will-change-transform"
+                                    style={{
+                                        transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
+                                    }}
+                                >
+                                    <Image
+                                        key={activeItem.id}
+                                        src={activeItem.viewerSrc ?? activeItem.src}
+                                        alt={activeItem.alt ?? getFileName(activeItem)}
+                                        fill
+                                        priority
+                                        draggable={false}
+                                        sizes="100vw"
+                                        unoptimized
+                                        className="object-contain"
+                                    />
+                                </div>
                             </div>
 
                             <div

@@ -3,13 +3,13 @@ import Link from "next/link";
 const settingNavItems = [
     {
         href: "/settings/preferences",
-        label: "首选项",
-        description: "应用行为与通用偏好",
+        label: "偏好设置",
+        description: "应用默认行为与照片显示来源",
     },
     {
         href: "/settings/libraries",
         label: "媒体库",
-        description: "管理扫码路径与媒体类型",
+        description: "扫描目录、缓存生成与库配置",
     },
 ];
 
@@ -23,7 +23,7 @@ export default function SettingsLayout({
             <aside className="w-56 shrink-0 rounded-3xl border border-slate-200/70 bg-white/70 p-3 shadow-sm">
                 <div className="px-3 py-2">
                     <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">
-                        Settings
+                        设置
                     </p>
                     <h1 className="mt-1 text-xl font-semibold text-slate-950">设置</h1>
                 </div>

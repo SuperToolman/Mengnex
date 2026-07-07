@@ -13,6 +13,9 @@ pub struct PhotoAssetResponse {
     pub title: String,
     pub file_name: String,
     pub src: String,
+    pub original_src: String,
+    pub thumbnail_src: Option<String>,
+    pub preview_src: Option<String>,
     pub source_path: String,
     pub mime_type: Option<String>,
     pub file_size: i64,
@@ -26,6 +29,8 @@ pub struct PhotoAssetResponse {
 
 impl From<photo_asset::Model> for PhotoAssetResponse {
     fn from(value: photo_asset::Model) -> Self {
+        let original_src = format!("/api/media/files/{}/content", value.file_id);
+
         Self {
             id: value.id,
             item_id: value.item_id,
@@ -33,7 +38,14 @@ impl From<photo_asset::Model> for PhotoAssetResponse {
             library_id: value.library_id,
             title: value.title,
             file_name: value.file_name,
-            src: format!("/api/media/files/{}/content", value.file_id),
+            src: original_src.clone(),
+            original_src: original_src.clone(),
+            thumbnail_src: value.thumb_rel_path.as_ref().map(|_| {
+                format!("/api/media/files/{}/content?variant=thumbnail", value.file_id)
+            }),
+            preview_src: value.preview_rel_path.as_ref().map(|_| {
+                format!("/api/media/files/{}/content?variant=preview", value.file_id)
+            }),
             source_path: value.source_path,
             mime_type: value.mime_type,
             file_size: value.file_size,

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
+image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 sea-orm = { version = "1.1", default-features = false, features = [
     "macros",
     "runtime-tokio-rustls",
@@ -16,6 +17,8 @@ sea-orm = { version = "1.1", default-features = false, features = [
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-util = { version = "0.7", features = ["io"] }
 tower-http = { version = "0.6", features = ["cors"] }
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 uuid = { version = "1", features = ["serde", "v4"] }
+webp = "0.3"

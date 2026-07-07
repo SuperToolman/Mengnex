@@ -489,11 +489,11 @@ export default function SideBar() {
 
     return (
         <aside
-            className={`flex flex-col justify-between py-2 backdrop-blur-sm transition-[width] duration-300 ${
+            className={`flex h-full min-h-0 shrink-0 flex-col justify-between overflow-hidden py-2 backdrop-blur-sm transition-[width] duration-300 ${
                 expanded ? "w-[168px]" : "w-[64px]"
             }`}
         >
-            <div className={expanded ? "w-full" : "w-fit"}>
+            <div className={`min-h-0 flex-1 ${expanded ? "w-full" : "w-fit"}`}>
                 <div className={`px-2 pb-1 ${expanded ? "w-full" : "w-fit"}`}>
                     <SidebarRow
                         expanded={expanded}

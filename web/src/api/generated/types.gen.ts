@@ -8,10 +8,15 @@ export type CreateLibraryRequest = {
     media_type: MediaType;
     name: string;
     root_path: string;
+    thumbnails_enabled: boolean;
 };
 
 export type CreateScanTaskRequest = {
     library_id: string;
+};
+
+export type DeleteLibraryResponse = {
+    id: string;
 };
 
 export type HealthResponse = {
@@ -25,7 +30,30 @@ export type LibraryResponse = {
     media_type: string;
     name: string;
     root_path: string;
+    thumbnail_status: LibraryThumbnailStatusResponse;
+    thumbnails_enabled: boolean;
     updated_at: string;
+};
+
+export type LibraryThumbnailJobResponse = {
+    deleted_previews: number;
+    deleted_thumbnails: number;
+    generated_previews: number;
+    generated_thumbnails: number;
+    library_id: string;
+    processed_assets: number;
+    reclaimed_bytes: number;
+    skipped_assets: number;
+};
+
+export type LibraryThumbnailStatusResponse = {
+    last_generated_at?: string | null;
+    pending_assets: number;
+    preview_ready_assets: number;
+    preview_total_bytes: number;
+    thumb_ready_assets: number;
+    thumb_total_bytes: number;
+    total_assets: number;
 };
 
 export type MediaFileResponse = {
@@ -68,11 +96,22 @@ export type PhotoAssetResponse = {
     item_id: string;
     library_id: string;
     mime_type?: string | null;
+    original_src: string;
+    preview_src?: string | null;
     source_path: string;
     src: string;
     taken_at?: string | null;
+    thumbnail_src?: string | null;
     title: string;
     width?: number | null;
+};
+
+export type PhotoDisplaySource = 'thumbnail' | 'original';
+
+export type PreferencesResponse = {
+    created_at: string;
+    photo_display_source: string;
+    updated_at: string;
 };
 
 export type ScanTaskResponse = {
@@ -90,6 +129,56 @@ export type ScanTaskResponse = {
 };
 
 export type ScanTaskStatus = 'running' | 'completed' | 'failed';
+
+export type TaskResponse = {
+    created_at: string;
+    detail?: string | null;
+    error_message?: string | null;
+    finished_at?: string | null;
+    id: string;
+    kind: string;
+    library_id?: string | null;
+    library_name?: string | null;
+    processed_items: number;
+    progress_percent: number;
+    status: string;
+    title: string;
+    total_items: number;
+    updated_at: string;
+};
+
+export type ThumbnailGenerationTaskResponse = {
+    created_at: string;
+    error_message?: string | null;
+    finished_at?: string | null;
+    generated_previews: number;
+    generated_thumbnails: number;
+    library_id: string;
+    processed_assets: number;
+    progress_percent: number;
+    skipped_assets: number;
+    status: string;
+    task_id: string;
+    total_assets: number;
+    updated_at: string;
+};
+
+export type ThumbnailGenerationTaskStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export type UpdateLibraryRequest = {
+    enabled?: boolean | null;
+    name?: string | null;
+    root_path?: string | null;
+    thumbnails_enabled?: boolean | null;
+};
+
+export type UpdateLibraryThumbnailConfigRequest = {
+    thumbnails_enabled: boolean;
+};
+
+export type UpdatePreferencesRequest = {
+    photo_display_source: PhotoDisplaySource;
+};
 
 export type ListLibrariesData = {
     body?: never;
@@ -123,6 +212,34 @@ export type CreateLibraryResponses = {
 
 export type CreateLibraryResponse = CreateLibraryResponses[keyof CreateLibraryResponses];
 
+export type DeleteLibraryData = {
+    body?: never;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}';
+};
+
+export type DeleteLibraryErrors = {
+    /**
+     * Media library not found
+     */
+    404: unknown;
+};
+
+export type DeleteLibraryResponses = {
+    /**
+     * Deleted media library
+     */
+    200: DeleteLibraryResponse;
+};
+
+export type DeleteLibraryResponse2 = DeleteLibraryResponses[keyof DeleteLibraryResponses];
+
 export type GetLibraryData = {
     body?: never;
     path: {
@@ -150,6 +267,150 @@ export type GetLibraryResponses = {
 };
 
 export type GetLibraryResponse = GetLibraryResponses[keyof GetLibraryResponses];
+
+export type UpdateLibraryData = {
+    body: UpdateLibraryRequest;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}';
+};
+
+export type UpdateLibraryErrors = {
+    /**
+     * Media library not found
+     */
+    404: unknown;
+};
+
+export type UpdateLibraryResponses = {
+    /**
+     * Updated media library
+     */
+    200: LibraryResponse;
+};
+
+export type UpdateLibraryResponse = UpdateLibraryResponses[keyof UpdateLibraryResponses];
+
+export type DeleteLibraryThumbnailAssetsData = {
+    body?: never;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}/thumbnails';
+};
+
+export type DeleteLibraryThumbnailAssetsErrors = {
+    /**
+     * Media library not found
+     */
+    404: unknown;
+};
+
+export type DeleteLibraryThumbnailAssetsResponses = {
+    /**
+     * Deleted thumbnails for library
+     */
+    200: LibraryThumbnailJobResponse;
+};
+
+export type DeleteLibraryThumbnailAssetsResponse = DeleteLibraryThumbnailAssetsResponses[keyof DeleteLibraryThumbnailAssetsResponses];
+
+export type GenerateLibraryThumbnailAssetsData = {
+    body?: never;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}/thumbnails/generate';
+};
+
+export type GenerateLibraryThumbnailAssetsErrors = {
+    /**
+     * Media library not found
+     */
+    404: unknown;
+};
+
+export type GenerateLibraryThumbnailAssetsResponses = {
+    /**
+     * Started thumbnail generation task for library
+     */
+    200: ThumbnailGenerationTaskResponse;
+};
+
+export type GenerateLibraryThumbnailAssetsResponse = GenerateLibraryThumbnailAssetsResponses[keyof GenerateLibraryThumbnailAssetsResponses];
+
+export type UpdateLibraryThumbnailConfigData = {
+    body: UpdateLibraryThumbnailConfigRequest;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}/thumbnails/settings';
+};
+
+export type UpdateLibraryThumbnailConfigErrors = {
+    /**
+     * Media library not found
+     */
+    404: unknown;
+};
+
+export type UpdateLibraryThumbnailConfigResponses = {
+    /**
+     * Updated media library thumbnail config
+     */
+    200: LibraryResponse;
+};
+
+export type UpdateLibraryThumbnailConfigResponse = UpdateLibraryThumbnailConfigResponses[keyof UpdateLibraryThumbnailConfigResponses];
+
+export type GetLibraryThumbnailGenerationTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Library id
+         */
+        id: string;
+        /**
+         * Thumbnail generation task id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{id}/thumbnails/tasks/{task_id}';
+};
+
+export type GetLibraryThumbnailGenerationTaskErrors = {
+    /**
+     * Thumbnail generation task not found
+     */
+    404: unknown;
+};
+
+export type GetLibraryThumbnailGenerationTaskResponses = {
+    /**
+     * Thumbnail generation task status
+     */
+    200: ThumbnailGenerationTaskResponse;
+};
+
+export type GetLibraryThumbnailGenerationTaskResponse = GetLibraryThumbnailGenerationTaskResponses[keyof GetLibraryThumbnailGenerationTaskResponses];
 
 export type ListMediaFilesData = {
     body?: never;
@@ -225,6 +486,38 @@ export type ListPhotosResponses = {
 
 export type ListPhotosResponse = ListPhotosResponses[keyof ListPhotosResponses];
 
+export type GetPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/preferences';
+};
+
+export type GetPreferencesResponses = {
+    /**
+     * Application preferences
+     */
+    200: PreferencesResponse;
+};
+
+export type GetPreferencesResponse = GetPreferencesResponses[keyof GetPreferencesResponses];
+
+export type UpdatePreferencesData = {
+    body: UpdatePreferencesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/preferences';
+};
+
+export type UpdatePreferencesResponses = {
+    /**
+     * Updated application preferences
+     */
+    200: PreferencesResponse;
+};
+
+export type UpdatePreferencesResponse = UpdatePreferencesResponses[keyof UpdatePreferencesResponses];
+
 export type ListScanTasksData = {
     body?: never;
     path?: never;
@@ -263,6 +556,22 @@ export type StartScanResponses = {
 };
 
 export type StartScanResponse = StartScanResponses[keyof StartScanResponses];
+
+export type ListTasksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tasks';
+};
+
+export type ListTasksResponses = {
+    /**
+     * List application tasks
+     */
+    200: Array<TaskResponse>;
+};
+
+export type ListTasksResponse = ListTasksResponses[keyof ListTasksResponses];
 
 export type HealthData = {
     body?: never;

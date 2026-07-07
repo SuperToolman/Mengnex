@@ -6,6 +6,8 @@ import Image from "next/image";
 export type GalleryItemData = {
     id: string;
     src: string;
+    viewerSrc?: string;
+    originalSrc?: string;
     alt?: string;
     width?: number;
     height?: number;
@@ -54,6 +56,7 @@ export default function GalleryItem({
                         alt={item.alt ?? ""}
                         fill
                         sizes={styleWidth ?? "168px"}
+                        unoptimized
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                 </div>

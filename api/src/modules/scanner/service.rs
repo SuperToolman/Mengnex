@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     core::error::ApiError,
     infra::entities::{media_file, media_item, media_library, photo_asset},
+    modules::photos::service::generate_library_thumbnails,
 };
 
 #[derive(Debug, Default)]
@@ -130,6 +131,10 @@ pub async fn scan_library(
         summary.inserted_items += 1;
     }
 
+    if library.media_type == "photo" && library.thumbnails_enabled {
+        generate_library_thumbnails(db, library, false).await?;
+    }
+
     Ok(summary)
 }
 
@@ -235,6 +240,12 @@ async fn upsert_photo_asset(
         file_size: Set(file.file_size),
         width: Set(None),
         height: Set(None),
+        thumb_rel_path: Set(None),
+        preview_rel_path: Set(None),
+        thumb_file_size: Set(None),
+        preview_file_size: Set(None),
+        thumb_generated_at: Set(None),
+        preview_generated_at: Set(None),
         taken_at: Set(taken_at),
         batch_time: Set(batch_time),
         created_at: Set(now),

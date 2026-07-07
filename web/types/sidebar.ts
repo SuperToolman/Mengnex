@@ -7,6 +7,7 @@ import {
     MusicNote,
     Picture,
     Snail,
+    Stopwatch,
 } from "@gravity-ui/icons";
 import type { ComponentType, SVGProps } from "react";
 
@@ -63,6 +64,12 @@ export const SIDEBAR_CONFIG: SidebarItem[] = [
 ];
 
 export const SIDEBAR_BOTTOM_CONFIG: SidebarItem[] = [
+    {
+        id: "tasks",
+        icon: Stopwatch,
+        label: "任务",
+        href: "/tasks",
+    },
     {
         id: "settings",
         icon: Gear,

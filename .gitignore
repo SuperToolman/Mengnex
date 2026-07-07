@@ -40,6 +40,10 @@ web/next-env.d.ts
 api/data/*.db
 api/data/*.db-shm
 api/data/*.db-wal
+api/data/thumb/*
+!api/data/thumb/.gitkeep
+api/data/preview/*
+!api/data/preview/.gitkeep
 data/dev/*.db
 data/dev/*.db-shm
 data/dev/*.db-wal
