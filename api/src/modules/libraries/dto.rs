@@ -88,7 +88,9 @@ pub struct LibraryThumbnailJobResponse {
 pub enum ThumbnailGenerationTaskStatus {
     Queued,
     Running,
+    Paused,
     Completed,
+    Canceled,
     Failed,
 }
 
@@ -97,7 +99,9 @@ impl std::fmt::Display for ThumbnailGenerationTaskStatus {
         let value = match self {
             Self::Queued => "queued",
             Self::Running => "running",
+            Self::Paused => "paused",
             Self::Completed => "completed",
+            Self::Canceled => "canceled",
             Self::Failed => "failed",
         };
 
@@ -143,26 +147,6 @@ pub struct LibraryResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DeleteLibraryResponse {
     pub id: String,
-}
-
-impl ThumbnailGenerationTaskResponse {
-    pub fn new(task_id: String, library_id: String, created_at: DateTime<Utc>) -> Self {
-        Self {
-            task_id,
-            library_id,
-            status: ThumbnailGenerationTaskStatus::Queued.to_string(),
-            total_assets: 0,
-            processed_assets: 0,
-            generated_thumbnails: 0,
-            generated_previews: 0,
-            skipped_assets: 0,
-            progress_percent: 0,
-            error_message: None,
-            created_at,
-            updated_at: created_at,
-            finished_at: None,
-        }
-    }
 }
 
 impl LibraryResponse {

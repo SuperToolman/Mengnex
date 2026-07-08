@@ -155,7 +155,7 @@ export default function MediaLibrariesPage() {
             if (
                 task.kind === "generate_cache" &&
                 task.library_id &&
-                (task.status === "queued" || task.status === "running")
+                (task.status === "queued" || task.status === "running" || task.status === "paused")
             ) {
                 next.add(task.library_id);
             }
@@ -179,7 +179,7 @@ export default function MediaLibrariesPage() {
             setError(null);
             const [libraryData, photoData, preferenceData, taskData] = await Promise.all([
                 getMediaLibraries(),
-                getPhotos(),
+                getPhotos({ limit: 200 }),
                 getPreferences(),
                 getTasks(),
             ]);
@@ -275,8 +275,8 @@ export default function MediaLibrariesPage() {
                 setLatestScan(scanTask);
                 setNotice(
                     createForm.thumbnailsEnabled
-                        ? "媒体库已创建，首次扫描完成，后续扫描会自动补齐 Thumb / Preview。"
-                        : "媒体库已创建，首次扫描完成；缓存自动生成未开启，可稍后手动生成。",
+                        ? "媒体库已创建，首次扫描任务已启动，后续扫描会自动补齐 Thumb / Preview。"
+                        : "媒体库已创建，首次扫描任务已启动；缓存自动生成未开启，可稍后手动生成。",
                 );
                 setCreateForm(initialCreateForm);
                 createModalState.close();
@@ -409,8 +409,8 @@ export default function MediaLibrariesPage() {
 
             {latestScan ? (
                 <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-                    最近一次扫描完成：发现 {latestScan.discovered_files} 个文件，新增{" "}
-                    {latestScan.inserted_items} 个条目，更新 {latestScan.updated_files} 个文件。
+                    最近一次扫描任务已启动：当前状态 {latestScan.status}，已处理{" "}
+                    {latestScan.processed_files} / {latestScan.discovered_files}。
                 </div>
             ) : null}
 
@@ -440,7 +440,7 @@ export default function MediaLibrariesPage() {
                                             });
                                             setLatestScan(scanTask);
 
-                                            return `媒体库“${library.name}”重新扫描完成：发现 ${scanTask.discovered_files} 个文件，新增 ${scanTask.inserted_items} 个条目，更新 ${scanTask.updated_files} 个文件。`;
+                                            return `媒体库“${library.name}”重新扫描任务已启动，请到任务页查看进度。`;
                                         })
                                     }
                                     onGenerateThumbnails={() => void startGenerateTask(library)}

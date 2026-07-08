@@ -122,13 +122,15 @@ export type ScanTaskResponse = {
     id: string;
     inserted_items: number;
     library_id: string;
+    processed_files: number;
+    removed_files: number;
     started_at: string;
     status: string;
     updated_at: string;
     updated_files: number;
 };
 
-export type ScanTaskStatus = 'running' | 'completed' | 'failed';
+export type ScanTaskStatus = 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
 
 export type TaskResponse = {
     created_at: string;
@@ -147,6 +149,8 @@ export type TaskResponse = {
     updated_at: string;
 };
 
+export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
+
 export type ThumbnailGenerationTaskResponse = {
     created_at: string;
     error_message?: string | null;
@@ -163,7 +167,7 @@ export type ThumbnailGenerationTaskResponse = {
     updated_at: string;
 };
 
-export type ThumbnailGenerationTaskStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type ThumbnailGenerationTaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
 
 export type UpdateLibraryRequest = {
     enabled?: boolean | null;
@@ -550,7 +554,7 @@ export type StartScanErrors = {
 
 export type StartScanResponses = {
     /**
-     * Finished scan task
+     * Started scan task
      */
     200: ScanTaskResponse;
 };
@@ -572,6 +576,90 @@ export type ListTasksResponses = {
 };
 
 export type ListTasksResponse = ListTasksResponses[keyof ListTasksResponses];
+
+export type CancelTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{id}/cancel';
+};
+
+export type CancelTaskErrors = {
+    /**
+     * Task not found
+     */
+    404: unknown;
+};
+
+export type CancelTaskResponses = {
+    /**
+     * Canceled task
+     */
+    200: TaskResponse;
+};
+
+export type CancelTaskResponse = CancelTaskResponses[keyof CancelTaskResponses];
+
+export type PauseTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{id}/pause';
+};
+
+export type PauseTaskErrors = {
+    /**
+     * Task not found
+     */
+    404: unknown;
+};
+
+export type PauseTaskResponses = {
+    /**
+     * Paused task
+     */
+    200: TaskResponse;
+};
+
+export type PauseTaskResponse = PauseTaskResponses[keyof PauseTaskResponses];
+
+export type ResumeTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Task id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{id}/resume';
+};
+
+export type ResumeTaskErrors = {
+    /**
+     * Task not found
+     */
+    404: unknown;
+};
+
+export type ResumeTaskResponses = {
+    /**
+     * Resumed task
+     */
+    200: TaskResponse;
+};
+
+export type ResumeTaskResponse = ResumeTaskResponses[keyof ResumeTaskResponses];
 
 export type HealthData = {
     body?: never;

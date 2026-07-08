@@ -32,8 +32,10 @@ export type ScanTaskResponse = {
     library_id: string;
     status: string;
     discovered_files: number;
+    processed_files: number;
     inserted_items: number;
     updated_files: number;
+    removed_files: number;
     error_message?: string | null;
     started_at: string;
     finished_at?: string | null;
@@ -129,6 +131,11 @@ export type PhotoAssetResponse = {
     height?: number | null;
     taken_at?: string | null;
     batch_time: string;
+};
+
+export type ListPhotosParams = {
+    limit?: number;
+    offset?: number;
 };
 
 export type PreferencesResponse = {
@@ -281,8 +288,37 @@ export async function getTasks() {
     return requestJson<TaskResponse[]>("/api/tasks");
 }
 
-export async function getPhotos() {
-    const photos = await requestJson<PhotoAssetResponse[]>("/api/photos");
+export async function pauseTask(taskId: string) {
+    return requestJson<TaskResponse>(`/api/tasks/${taskId}/pause`, {
+        method: "POST",
+    });
+}
+
+export async function resumeTask(taskId: string) {
+    return requestJson<TaskResponse>(`/api/tasks/${taskId}/resume`, {
+        method: "POST",
+    });
+}
+
+export async function cancelTask(taskId: string) {
+    return requestJson<TaskResponse>(`/api/tasks/${taskId}/cancel`, {
+        method: "POST",
+    });
+}
+
+export async function getPhotos(params?: ListPhotosParams) {
+    const query = new URLSearchParams();
+
+    if (typeof params?.limit === "number") {
+        query.set("limit", String(params.limit));
+    }
+
+    if (typeof params?.offset === "number") {
+        query.set("offset", String(params.offset));
+    }
+
+    const path = query.size > 0 ? `/api/photos?${query.toString()}` : "/api/photos";
+    const photos = await requestJson<PhotoAssetResponse[]>(path);
     return photos.map(normalizePhoto);
 }
 

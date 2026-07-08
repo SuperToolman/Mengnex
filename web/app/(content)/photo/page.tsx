@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     getPhotos,
     getPreferences,
+    type ListPhotosParams,
     type PhotoAssetResponse,
     type PreferencesResponse,
 } from "@/src/api/client";
@@ -97,27 +98,43 @@ function getErrorMessage(error: unknown) {
 }
 
 export default function PhotoPage() {
+    const pageSize = 200;
     const [photos, setPhotos] = useState<PhotoAssetResponse[]>([]);
     const [preferences, setPreferences] = useState<PreferencesResponse | null>(null);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
 
-        async function loadPhotos() {
+        async function loadPhotos(params?: ListPhotosParams) {
+            const offset = params?.offset ?? 0;
+            const limit = params?.limit ?? pageSize;
+
             try {
-                setIsLoading(true);
+                if (offset === 0) {
+                    setIsLoading(true);
+                } else {
+                    setIsLoadingMore(true);
+                }
                 setError(null);
                 const [photoData, preferenceData] = await Promise.all([
-                    getPhotos(),
+                    getPhotos({
+                        limit,
+                        offset,
+                    }),
                     getPreferences(),
                 ]);
 
                 if (!cancelled) {
-                    setPhotos(photoData);
+                    setPhotos((currentPhotos) => (
+                        offset === 0 ? photoData : [...currentPhotos, ...photoData]
+                    ));
                     setPreferences(preferenceData);
+                    setHasMore(photoData.length === limit);
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -125,12 +142,16 @@ export default function PhotoPage() {
                 }
             } finally {
                 if (!cancelled) {
-                    setIsLoading(false);
+                    if (offset === 0) {
+                        setIsLoading(false);
+                    } else {
+                        setIsLoadingMore(false);
+                    }
                 }
             }
         }
 
-        loadPhotos();
+        void loadPhotos();
 
         return () => {
             cancelled = true;
@@ -185,6 +206,33 @@ export default function PhotoPage() {
                     />
                 ))}
             </div>
+            {hasMore ? (
+                <div className="flex justify-center pb-8">
+                    <button
+                        type="button"
+                        className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isLoadingMore}
+                        onClick={async () => {
+                            try {
+                                setIsLoadingMore(true);
+                                setError(null);
+                                const nextPhotos = await getPhotos({
+                                    limit: pageSize,
+                                    offset: photos.length,
+                                });
+                                setPhotos((currentPhotos) => [...currentPhotos, ...nextPhotos]);
+                                setHasMore(nextPhotos.length === pageSize);
+                            } catch (loadError) {
+                                setError(getErrorMessage(loadError));
+                            } finally {
+                                setIsLoadingMore(false);
+                            }
+                        }}
+                    >
+                        {isLoadingMore ? "Loading..." : "Load More"}
+                    </button>
+                </div>
+            ) : null}
             <PhotoViewer
                 items={galleryItems}
                 activeIndex={activeIndex >= 0 ? activeIndex : null}

@@ -25,7 +25,7 @@ use crate::{
             dto::{CreateScanTaskRequest, ScanTaskResponse, ScanTaskStatus},
             handlers as scanner_handlers,
         },
-        tasks::{dto::TaskResponse, handlers as task_handlers},
+        tasks::{dto::{TaskResponse, TaskStatus}, handlers as task_handlers},
     },
 };
 
@@ -51,6 +51,9 @@ use crate::{
         scanner_handlers::list_scan_tasks,
         scanner_handlers::start_scan,
         task_handlers::list_tasks,
+        task_handlers::pause_task,
+        task_handlers::resume_task,
+        task_handlers::cancel_task,
     ),
     components(schemas(
         HealthResponse,
@@ -73,6 +76,7 @@ use crate::{
         ScanTaskStatus,
         CreateScanTaskRequest,
         ScanTaskResponse,
+        TaskStatus,
         TaskResponse
     )),
     tags(

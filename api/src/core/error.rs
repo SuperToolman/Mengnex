@@ -12,6 +12,7 @@ pub enum ApiError {
     Database(DbErr),
     Io(std::io::Error),
     NotFound(&'static str),
+    TaskCanceled,
 }
 
 #[derive(Serialize)]
@@ -38,6 +39,7 @@ impl IntoResponse for ApiError {
             Self::Database(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             Self::Io(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             Self::NotFound(resource) => (StatusCode::NOT_FOUND, format!("{resource} not found")),
+            Self::TaskCanceled => (StatusCode::CONFLICT, "task was canceled".to_owned()),
         };
 
         (status, Json(ErrorResponse { message })).into_response()

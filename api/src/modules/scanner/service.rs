@@ -1,31 +1,66 @@
 use std::{
+    collections::HashMap,
+    future::Future,
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
 use chrono::{DateTime, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    QueryFilter, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 use crate::{
     core::error::ApiError,
     infra::entities::{media_file, media_item, media_library, photo_asset},
-    modules::photos::service::generate_library_thumbnails,
+    modules::{
+        photos::service::{delete_asset_derivatives, generate_library_thumbnails_with_progress},
+        tasks::service::wait_for_task_permit,
+    },
 };
 
 #[derive(Debug, Default)]
 pub struct ScanSummary {
     pub discovered_files: i64,
+    pub processed_files: i64,
     pub inserted_items: i64,
     pub updated_files: i64,
+    pub removed_files: i64,
 }
 
-pub async fn scan_library(
+#[derive(Debug, Clone, Default)]
+pub struct ScanProgress {
+    pub discovered_files: i64,
+    pub processed_files: i64,
+    pub inserted_items: i64,
+    pub updated_files: i64,
+    pub removed_files: i64,
+}
+
+impl From<&ScanSummary> for ScanProgress {
+    fn from(value: &ScanSummary) -> Self {
+        Self {
+            discovered_files: value.discovered_files,
+            processed_files: value.processed_files,
+            inserted_items: value.inserted_items,
+            updated_files: value.updated_files,
+            removed_files: value.removed_files,
+        }
+    }
+}
+
+pub async fn scan_library<F>(
     db: &DatabaseConnection,
     library: &media_library::Model,
     scan_task_id: String,
-) -> Result<ScanSummary, ApiError> {
+    mut on_progress: F,
+) -> Result<ScanSummary, ApiError>
+where
+    F: FnMut(&ScanProgress) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ApiError>> + Send + '_>>,
+{
     let root = PathBuf::from(&library.root_path);
 
     if !root.exists() {
@@ -47,30 +82,51 @@ pub async fn scan_library(
         discovered_files: files.len() as i64,
         ..ScanSummary::default()
     };
+    let mut existing_files = media_file::Entity::find()
+        .filter(media_file::Column::LibraryId.eq(library.id.clone()))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|file| (file.full_path.clone(), file))
+        .collect::<HashMap<_, _>>();
+    let mut existing_assets = photo_asset::Entity::find()
+        .filter(photo_asset::Column::LibraryId.eq(library.id.clone()))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|asset| (asset.file_id.clone(), asset))
+        .collect::<HashMap<_, _>>();
+
+    on_progress(&ScanProgress::from(&summary)).await?;
 
     for path in files {
+        wait_for_task_permit(db, &scan_task_id).await?;
         let metadata = fs::metadata(&path)?;
         let full_path = normalize_path(&path);
-        let existing_file = media_file::Entity::find()
-            .filter(media_file::Column::FullPath.eq(full_path.clone()))
-            .one(db)
-            .await?;
         let now = Utc::now();
 
-        if let Some(existing_file) = existing_file {
+        if let Some(existing_file) = existing_files.remove(&full_path) {
             let modified_at = modified_at(&metadata);
-            let mut active_file: media_file::ActiveModel = existing_file.into();
-            active_file.scan_task_id = Set(Some(scan_task_id.clone()));
-            active_file.file_size = Set(metadata.len() as i64);
-            active_file.modified_at = Set(modified_at);
-            active_file.updated_at = Set(now);
-            let file = active_file.update(db).await?;
+            {
+                let txn = db.begin().await?;
+                let mut active_file: media_file::ActiveModel = existing_file.into();
+                active_file.scan_task_id = Set(Some(scan_task_id.clone()));
+                active_file.file_size = Set(metadata.len() as i64);
+                active_file.modified_at = Set(modified_at);
+                active_file.updated_at = Set(now);
+                let file = active_file.update(&txn).await?;
 
-            if library.media_type == "photo" && is_image_mime(file.mime_type.as_deref()) {
-                upsert_photo_asset(db, library, &file, modified_at, now).await?;
+                if library.media_type == "photo" && is_image_mime(file.mime_type.as_deref()) {
+                    let existing_asset = existing_assets.remove(&file.id);
+                    upsert_photo_asset(&txn, library, &file, existing_asset, modified_at, now).await?;
+                }
+
+                txn.commit().await?;
             }
 
+            summary.processed_files += 1;
             summary.updated_files += 1;
+            on_progress(&ScanProgress::from(&summary)).await?;
             continue;
         }
 
@@ -90,49 +146,72 @@ pub async fn scan_library(
             .map(|value| value.to_ascii_lowercase());
         let mime_type = extension.as_deref().and_then(infer_mime_type);
 
-        let item_id = Uuid::new_v4().to_string();
-        let item = media_item::ActiveModel {
-            id: Set(item_id),
-            library_id: Set(library.id.clone()),
-            media_type: Set(library.media_type.clone()),
-            title: Set(title.clone()),
-            sort_title: Set(Some(title.to_ascii_lowercase())),
-            original_path: Set(full_path.clone()),
-            year: Set(None),
-            metadata_json: Set(None),
-            created_at: Set(now),
-            updated_at: Set(now),
-        }
-        .insert(db)
-        .await?;
-
         let modified_at = modified_at(&metadata);
-        let file = media_file::ActiveModel {
-            id: Set(Uuid::new_v4().to_string()),
-            item_id: Set(item.id.clone()),
-            library_id: Set(library.id.clone()),
-            scan_task_id: Set(Some(scan_task_id.clone())),
-            full_path: Set(full_path),
-            file_name: Set(file_name),
-            extension: Set(extension),
-            mime_type: Set(mime_type.map(str::to_owned)),
-            file_size: Set(metadata.len() as i64),
-            modified_at: Set(modified_at),
-            created_at: Set(now),
-            updated_at: Set(now),
-        }
-        .insert(db)
-        .await?;
+        {
+            let txn = db.begin().await?;
+            let item_id = Uuid::new_v4().to_string();
+            let item = media_item::ActiveModel {
+                id: Set(item_id),
+                library_id: Set(library.id.clone()),
+                media_type: Set(library.media_type.clone()),
+                title: Set(title.clone()),
+                sort_title: Set(Some(title.to_ascii_lowercase())),
+                original_path: Set(full_path.clone()),
+                year: Set(None),
+                metadata_json: Set(None),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&txn)
+            .await?;
 
-        if library.media_type == "photo" && is_image_mime(file.mime_type.as_deref()) {
-            upsert_photo_asset(db, library, &file, modified_at, now).await?;
+            let file = media_file::ActiveModel {
+                id: Set(Uuid::new_v4().to_string()),
+                item_id: Set(item.id.clone()),
+                library_id: Set(library.id.clone()),
+                scan_task_id: Set(Some(scan_task_id.clone())),
+                full_path: Set(full_path),
+                file_name: Set(file_name),
+                extension: Set(extension),
+                mime_type: Set(mime_type.map(str::to_owned)),
+                file_size: Set(metadata.len() as i64),
+                modified_at: Set(modified_at),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(&txn)
+            .await?;
+
+            if library.media_type == "photo" && is_image_mime(file.mime_type.as_deref()) {
+                upsert_photo_asset(&txn, library, &file, None, modified_at, now).await?;
+            }
+
+            txn.commit().await?;
         }
 
+        summary.processed_files += 1;
         summary.inserted_items += 1;
+        on_progress(&ScanProgress::from(&summary)).await?;
     }
 
+    summary.removed_files = delete_missing_library_files(
+        db,
+        existing_files.into_values().collect(),
+        existing_assets,
+    )
+    .await?;
+    on_progress(&ScanProgress::from(&summary)).await?;
+
     if library.media_type == "photo" && library.thumbnails_enabled {
-        generate_library_thumbnails(db, library, false).await?;
+        wait_for_task_permit(db, &scan_task_id).await?;
+        generate_library_thumbnails_with_progress(
+            db,
+            library,
+            false,
+            Some(&scan_task_id),
+            |_| Box::pin(async { Ok(()) }),
+        )
+        .await?;
     }
 
     Ok(summary)
@@ -196,9 +275,10 @@ fn is_image_mime(mime_type: Option<&str>) -> bool {
 }
 
 async fn upsert_photo_asset(
-    db: &DatabaseConnection,
+    db: &DatabaseTransaction,
     library: &media_library::Model,
     file: &media_file::Model,
+    existing_asset: Option<photo_asset::Model>,
     taken_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> Result<(), ApiError> {
@@ -208,11 +288,6 @@ async fn upsert_photo_asset(
         .and_then(|value| value.to_str())
         .unwrap_or(&file.file_name)
         .to_owned();
-    let existing_asset = photo_asset::Entity::find()
-        .filter(photo_asset::Column::FileId.eq(file.id.clone()))
-        .one(db)
-        .await?;
-
     if let Some(existing_asset) = existing_asset {
         let mut active_asset: photo_asset::ActiveModel = existing_asset.into();
         active_asset.title = Set(title);
@@ -255,4 +330,46 @@ async fn upsert_photo_asset(
     .await?;
 
     Ok(())
+}
+
+async fn delete_missing_library_files(
+    db: &DatabaseConnection,
+    stale_files: Vec<media_file::Model>,
+    stale_assets: HashMap<String, photo_asset::Model>,
+) -> Result<i64, ApiError> {
+    if stale_files.is_empty() {
+        return Ok(0);
+    }
+
+    let stale_file_ids = stale_files
+        .iter()
+        .map(|file| file.id.clone())
+        .collect::<Vec<_>>();
+    let stale_item_ids = stale_files
+        .iter()
+        .map(|file| file.item_id.clone())
+        .collect::<Vec<_>>();
+
+    for file_id in &stale_file_ids {
+        if let Some(asset) = stale_assets.get(file_id) {
+            delete_asset_derivatives(asset)?;
+        }
+    }
+
+    let txn = db.begin().await?;
+    photo_asset::Entity::delete_many()
+        .filter(photo_asset::Column::FileId.is_in(stale_file_ids.iter().cloned()))
+        .exec(&txn)
+        .await?;
+    media_file::Entity::delete_many()
+        .filter(media_file::Column::Id.is_in(stale_file_ids.iter().cloned()))
+        .exec(&txn)
+        .await?;
+    media_item::Entity::delete_many()
+        .filter(media_item::Column::Id.is_in(stale_item_ids.iter().cloned()))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+
+    Ok(stale_file_ids.len() as i64)
 }

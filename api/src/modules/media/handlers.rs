@@ -5,7 +5,7 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::Deserialize;
 use tokio::fs;
 use tokio_util::io::ReaderStream;
@@ -22,6 +22,12 @@ pub struct MediaContentQuery {
     pub variant: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ListMediaQuery {
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
 #[utoipa::path(
     get,
     path = "/api/media/items",
@@ -30,9 +36,19 @@ pub struct MediaContentQuery {
 )]
 pub async fn list_media_items(
     State(state): State<AppState>,
+    Query(query): Query<ListMediaQuery>,
 ) -> Result<Json<Vec<MediaItemResponse>>, ApiError> {
-    let items = media_item::Entity::find()
-        .order_by_desc(media_item::Column::CreatedAt)
+    let mut select = media_item::Entity::find().order_by_desc(media_item::Column::CreatedAt);
+
+    if let Some(limit) = query.limit {
+        select = select.limit(limit);
+    }
+
+    if let Some(offset) = query.offset {
+        select = select.offset(offset);
+    }
+
+    let items = select
         .all(&state.db)
         .await?
         .into_iter()
@@ -50,9 +66,19 @@ pub async fn list_media_items(
 )]
 pub async fn list_media_files(
     State(state): State<AppState>,
+    Query(query): Query<ListMediaQuery>,
 ) -> Result<Json<Vec<MediaFileResponse>>, ApiError> {
-    let files = media_file::Entity::find()
-        .order_by_desc(media_file::Column::CreatedAt)
+    let mut select = media_file::Entity::find().order_by_desc(media_file::Column::CreatedAt);
+
+    if let Some(limit) = query.limit {
+        select = select.limit(limit);
+    }
+
+    if let Some(offset) = query.offset {
+        select = select.offset(offset);
+    }
+
+    let files = select
         .all(&state.db)
         .await?
         .into_iter()

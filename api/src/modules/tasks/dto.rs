@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Copy, Serialize, ToSchema)]
@@ -7,6 +7,32 @@ use utoipa::ToSchema;
 pub enum TaskKind {
     ScanLibrary,
     GenerateCache,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    Queued,
+    Running,
+    Paused,
+    Completed,
+    Canceled,
+    Failed,
+}
+
+impl std::fmt::Display for TaskStatus {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Paused => "paused",
+            Self::Completed => "completed",
+            Self::Canceled => "canceled",
+            Self::Failed => "failed",
+        };
+
+        formatter.write_str(value)
+    }
 }
 
 impl std::fmt::Display for TaskKind {

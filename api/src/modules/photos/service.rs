@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     collections::VecDeque,
     env, fs,
+    future::Future,
     path::{Path, PathBuf},
 };
 
@@ -16,12 +17,13 @@ use webp::Encoder as WebpEncoder;
 use crate::{
     core::error::ApiError,
     infra::entities::{media_library, photo_asset},
+    modules::tasks::service::wait_for_task_permit,
 };
 
-const THUMB_MAX_DIMENSION: u32 = 384;
-const PREVIEW_MAX_DIMENSION: u32 = 1920;
-const THUMB_QUALITY: f32 = 80.0;
-const PREVIEW_QUALITY: f32 = 85.0;
+const THUMB_MAX_DIMENSION: u32 = 256;
+const PREVIEW_MAX_DIMENSION: u32 = 960;
+const THUMB_QUALITY: f32 = 50.0;
+const PREVIEW_QUALITY: f32 = 55.0;
 const THUMB_RENDER_CONCURRENCY: usize = 4;
 
 #[derive(Debug, Clone, Default)]
@@ -153,22 +155,15 @@ pub async fn compute_library_status_map(
     Ok(status_map)
 }
 
-pub async fn generate_library_thumbnails(
-    db: &DatabaseConnection,
-    library: &media_library::Model,
-    force: bool,
-) -> Result<ThumbnailOperationSummary, ApiError> {
-    generate_library_thumbnails_with_progress(db, library, force, |_| {}).await
-}
-
 pub async fn generate_library_thumbnails_with_progress<F>(
     db: &DatabaseConnection,
     library: &media_library::Model,
     force: bool,
+    control_task_id: Option<&str>,
     mut on_progress: F,
 ) -> Result<ThumbnailOperationSummary, ApiError>
 where
-    F: FnMut(&ThumbnailGenerationProgress),
+    F: FnMut(&ThumbnailGenerationProgress) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ApiError>> + Send + '_>>,
 {
     let assets = photo_asset::Entity::find()
         .filter(photo_asset::Column::LibraryId.eq(library.id.clone()))
@@ -178,15 +173,21 @@ where
     let mut summary = ThumbnailOperationSummary::default();
     let total_assets = assets.len() as i64;
     let mut pending_candidates = VecDeque::new();
-    on_progress(&build_progress(total_assets, &summary));
+    if let Some(task_id) = control_task_id {
+        wait_for_task_permit(db, task_id).await?;
+    }
+    on_progress(&build_progress(total_assets, &summary)).await?;
 
     for asset in assets {
+        if let Some(task_id) = control_task_id {
+            wait_for_task_permit(db, task_id).await?;
+        }
         let source_exists = Path::new(&asset.source_path).exists();
 
         if !source_exists || !is_supported_image(asset.mime_type.as_deref(), &asset.file_name) {
             summary.skipped_assets += 1;
             summary.processed_assets += 1;
-            on_progress(&build_progress(total_assets, &summary));
+            on_progress(&build_progress(total_assets, &summary)).await?;
             continue;
         }
 
@@ -218,7 +219,7 @@ where
         if !force && !thumb_missing && !preview_missing {
             summary.skipped_assets += 1;
             summary.processed_assets += 1;
-            on_progress(&build_progress(total_assets, &summary));
+            on_progress(&build_progress(total_assets, &summary)).await?;
             continue;
         }
         
@@ -232,6 +233,9 @@ where
     let mut render_jobs = JoinSet::new();
 
     while !pending_candidates.is_empty() || !render_jobs.is_empty() {
+        if let Some(task_id) = control_task_id {
+            wait_for_task_permit(db, task_id).await?;
+        }
         while render_jobs.len() < THUMB_RENDER_CONCURRENCY {
             let Some(candidate) = pending_candidates.pop_front() else {
                 break;
@@ -281,7 +285,7 @@ where
 
         active_asset.update(db).await?;
         summary.processed_assets += 1;
-        on_progress(&build_progress(total_assets, &summary));
+        on_progress(&build_progress(total_assets, &summary)).await?;
     }
 
     Ok(summary)
@@ -348,6 +352,18 @@ pub fn resolve_derivative_path(asset: &photo_asset::Model, variant: &str) -> Opt
     Some(data_dir().join(relative_path))
 }
 
+pub fn delete_asset_derivatives(asset: &photo_asset::Model) -> Result<(), ApiError> {
+    if let Some(relative_path) = asset.thumb_rel_path.as_deref() {
+        delete_derivative_file(relative_path)?;
+    }
+
+    if let Some(relative_path) = asset.preview_rel_path.as_deref() {
+        delete_derivative_file(relative_path)?;
+    }
+
+    Ok(())
+}
+
 fn is_supported_image(mime_type: Option<&str>, file_name: &str) -> bool {
     if mime_type
         .map(|value| value.starts_with("image/"))
@@ -378,7 +394,7 @@ async fn render_derivatives(
         let generated_at = Utc::now();
 
         let thumb = if generate_thumb {
-            let relative_path = format!("thumb/{file_id}.webp");
+            let relative_path = format!("thumb/{file_id}_thumb_{THUMB_MAX_DIMENSION}.webp");
             let target_path = data_dir().join(&relative_path);
             let resized = image.resize(
                 THUMB_MAX_DIMENSION,
@@ -398,7 +414,7 @@ async fn render_derivatives(
         };
 
         let preview = if generate_preview {
-            let relative_path = format!("preview/{file_id}.webp");
+            let relative_path = format!("preview/{file_id}_preview_{PREVIEW_MAX_DIMENSION}.webp");
             let target_path = data_dir().join(&relative_path);
             let resized = image.resize(
                 PREVIEW_MAX_DIMENSION,

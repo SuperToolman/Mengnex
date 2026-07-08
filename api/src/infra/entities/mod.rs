@@ -1,3 +1,4 @@
+pub mod app_task;
 pub mod app_setting;
 pub mod media_file;
 pub mod media_item;
