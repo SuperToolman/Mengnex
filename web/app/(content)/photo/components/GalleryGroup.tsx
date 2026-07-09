@@ -72,7 +72,7 @@ export default function GalleryGroup({
                 maxWidth: "100%",
             }}
         >
-            <h2 className="mb-3 text-lg font-medium text-slate-800">
+            <h2 className="mb-3 text-lg font-medium text-slate-800 dark:text-slate-200">
                 {formatBatchTitle(group.batchTime)}
             </h2>
             <div className="flex flex-wrap items-start gap-1">

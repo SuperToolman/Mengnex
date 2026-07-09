@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -302,7 +302,7 @@ function SidebarRow({
 }) {
     const baseClass = `origin-left flex h-12 items-center justify-start overflow-hidden rounded-[20px] px-[14px] text-sm font-medium transition-[color,width,gap,background-color] duration-300 ${
         expanded ? "w-full gap-3" : "w-12 gap-0"
-    } ${active ? "text-slate-950" : "text-slate-500 hover:text-slate-900"}`;
+    } ${active ? "text-slate-950 dark:text-slate-100" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"}`;
 
     if (!href) {
         return (
@@ -311,7 +311,7 @@ function SidebarRow({
                 aria-label={title}
                 title={title}
                 onClick={onClick}
-                className={`${baseClass} hover:bg-white/60`}
+                className={`${baseClass} hover:bg-white/60 dark:hover:bg-white/10`}
             >
                 {children}
             </button>

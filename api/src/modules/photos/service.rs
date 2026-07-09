@@ -16,15 +16,12 @@ use webp::Encoder as WebpEncoder;
 
 use crate::{
     core::error::ApiError,
-    infra::entities::{media_library, photo_asset},
+    infra::entities::{app_setting, media_library, photo_asset},
     modules::tasks::service::wait_for_task_permit,
 };
 
-const THUMB_MAX_DIMENSION: u32 = 256;
-const PREVIEW_MAX_DIMENSION: u32 = 960;
-const THUMB_QUALITY: f32 = 50.0;
-const PREVIEW_QUALITY: f32 = 55.0;
 const THUMB_RENDER_CONCURRENCY: usize = 4;
+const SETTINGS_ID: &str = "global";
 
 #[derive(Debug, Clone, Default)]
 pub struct ThumbnailStatus {
@@ -83,6 +80,14 @@ struct ThumbnailRenderCandidate {
 struct ThumbnailRenderResult {
     asset: photo_asset::Model,
     rendered: RenderedDerivatives,
+}
+
+#[derive(Debug, Clone)]
+struct ScanRenderSettings {
+    thumb_max_dimension: u32,
+    preview_max_dimension: u32,
+    thumb_quality: f32,
+    preview_quality: f32,
 }
 
 pub async fn compute_library_status_map(
@@ -165,6 +170,7 @@ pub async fn generate_library_thumbnails_with_progress<F>(
 where
     F: FnMut(&ThumbnailGenerationProgress) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ApiError>> + Send + '_>>,
 {
+    let settings = load_scan_render_settings(db).await?;
     let assets = photo_asset::Entity::find()
         .filter(photo_asset::Column::LibraryId.eq(library.id.clone()))
         .all(db)
@@ -240,11 +246,13 @@ where
             let Some(candidate) = pending_candidates.pop_front() else {
                 break;
             };
+            let render_settings = settings.clone();
 
             render_jobs.spawn(async move {
                 let rendered = render_derivatives(
                     candidate.asset.source_path.clone(),
                     candidate.asset.file_id.clone(),
+                    render_settings,
                     candidate.generate_thumb,
                     candidate.generate_preview,
                 )
@@ -382,6 +390,7 @@ fn is_supported_image(mime_type: Option<&str>, file_name: &str) -> bool {
 async fn render_derivatives(
     source_path: String,
     file_id: String,
+    settings: ScanRenderSettings,
     generate_thumb: bool,
     generate_preview: bool,
 ) -> Result<RenderedDerivatives, ApiError> {
@@ -394,14 +403,17 @@ async fn render_derivatives(
         let generated_at = Utc::now();
 
         let thumb = if generate_thumb {
-            let relative_path = format!("thumb/{file_id}_thumb_{THUMB_MAX_DIMENSION}.webp");
+            let relative_path = format!(
+                "thumb/{file_id}_thumb_{}.webp",
+                settings.thumb_max_dimension
+            );
             let target_path = data_dir().join(&relative_path);
             let resized = image.resize(
-                THUMB_MAX_DIMENSION,
-                THUMB_MAX_DIMENSION,
+                settings.thumb_max_dimension,
+                settings.thumb_max_dimension,
                 FilterType::Triangle,
             );
-            encode_as_webp(&resized, &target_path, THUMB_QUALITY)?;
+            encode_as_webp(&resized, &target_path, settings.thumb_quality)?;
             let file_size = fs::metadata(&target_path)?.len() as i64;
 
             Some(DerivativeFile {
@@ -414,14 +426,17 @@ async fn render_derivatives(
         };
 
         let preview = if generate_preview {
-            let relative_path = format!("preview/{file_id}_preview_{PREVIEW_MAX_DIMENSION}.webp");
+            let relative_path = format!(
+                "preview/{file_id}_preview_{}.webp",
+                settings.preview_max_dimension
+            );
             let target_path = data_dir().join(&relative_path);
             let resized = image.resize(
-                PREVIEW_MAX_DIMENSION,
-                PREVIEW_MAX_DIMENSION,
+                settings.preview_max_dimension,
+                settings.preview_max_dimension,
                 FilterType::Lanczos3,
             );
-            encode_as_webp(&resized, &target_path, PREVIEW_QUALITY)?;
+            encode_as_webp(&resized, &target_path, settings.preview_quality)?;
             let file_size = fs::metadata(&target_path)?.len() as i64;
 
             Some(DerivativeFile {
@@ -500,4 +515,20 @@ fn is_webp_derivative_path(relative_path: &str) -> bool {
         .and_then(|value| value.to_str())
         .map(|extension| extension.eq_ignore_ascii_case("webp"))
         .unwrap_or(false)
+}
+
+async fn load_scan_render_settings(
+    db: &DatabaseConnection,
+) -> Result<ScanRenderSettings, ApiError> {
+    let settings = app_setting::Entity::find_by_id(SETTINGS_ID)
+        .one(db)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("application settings"))?;
+
+    Ok(ScanRenderSettings {
+        thumb_max_dimension: settings.thumb_max_dimension.max(64) as u32,
+        preview_max_dimension: settings.preview_max_dimension.max(128) as u32,
+        thumb_quality: settings.thumb_quality.clamp(1, 100) as f32,
+        preview_quality: settings.preview_quality.clamp(1, 100) as f32,
+    })
 }

@@ -5,9 +5,7 @@ use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::app_setting,
-    modules::preferences::dto::{
-        PhotoDisplaySource, PreferencesResponse, UpdatePreferencesRequest,
-    },
+    modules::preferences::dto::{PreferencesResponse, UpdatePreferencesRequest},
 };
 
 const SETTINGS_ID: &str = "global";
@@ -21,7 +19,11 @@ const SETTINGS_ID: &str = "global";
 pub async fn get_preferences(
     State(state): State<AppState>,
 ) -> Result<Json<PreferencesResponse>, ApiError> {
-    let settings = ensure_settings(&state).await?;
+    let settings = app_setting::Entity::find_by_id(SETTINGS_ID)
+        .one(&state.db)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Preferences not found".into()))?;
+
     Ok(Json(PreferencesResponse::from(settings)))
 }
 
@@ -36,32 +38,43 @@ pub async fn update_preferences(
     State(state): State<AppState>,
     Json(payload): Json<UpdatePreferencesRequest>,
 ) -> Result<Json<PreferencesResponse>, ApiError> {
-    let settings = ensure_settings(&state).await?;
-    let now = Utc::now();
-    let mut active_settings: app_setting::ActiveModel = settings.into();
-    active_settings.photo_display_source = Set(payload.photo_display_source.to_string());
-    active_settings.updated_at = Set(now);
-    let settings = active_settings.update(&state.db).await?;
-
-    Ok(Json(PreferencesResponse::from(settings)))
-}
-
-async fn ensure_settings(state: &AppState) -> Result<app_setting::Model, ApiError> {
-    if let Some(settings) = app_setting::Entity::find_by_id(SETTINGS_ID)
+    let settings = app_setting::Entity::find_by_id(SETTINGS_ID)
         .one(&state.db)
         .await?
-    {
-        return Ok(settings);
+        .ok_or_else(|| ApiError::NotFound("Preferences not found".into()))?;
+
+    let mut active_settings: app_setting::ActiveModel = settings.into();
+
+    if let Some(value) = payload.thumb_max_dimension {
+        if !(64..=2048).contains(&value) {
+            return Err(ApiError::BadRequest("thumb_max_dimension must be between 64 and 2048".into()));
+        }
+        active_settings.thumb_max_dimension = Set(value);
     }
 
-    let now = Utc::now();
-
-    Ok(app_setting::ActiveModel {
-        id: Set(SETTINGS_ID.to_owned()),
-        photo_display_source: Set(PhotoDisplaySource::Thumbnail.to_string()),
-        created_at: Set(now),
-        updated_at: Set(now),
+    if let Some(value) = payload.preview_max_dimension {
+        if !(128..=4096).contains(&value) {
+            return Err(ApiError::BadRequest("preview_max_dimension must be between 128 and 4096".into()));
+        }
+        active_settings.preview_max_dimension = Set(value);
     }
-    .insert(&state.db)
-    .await?)
+
+    if let Some(value) = payload.thumb_quality {
+        if !(1..=100).contains(&value) {
+            return Err(ApiError::BadRequest("thumb_quality must be between 1 and 100".into()));
+        }
+        active_settings.thumb_quality = Set(value);
+    }
+
+    if let Some(value) = payload.preview_quality {
+        if !(1..=100).contains(&value) {
+            return Err(ApiError::BadRequest("preview_quality must be between 1 and 100".into()));
+        }
+        active_settings.preview_quality = Set(value);
+    }
+
+    active_settings.updated_at = Set(Utc::now());
+    let saved = active_settings.update(&state.db).await?;
+
+    Ok(Json(PreferencesResponse::from(saved)))
 }

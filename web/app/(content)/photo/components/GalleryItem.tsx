@@ -36,7 +36,7 @@ export default function GalleryItem({
         <Card
             role="button"
             tabIndex={0}
-            className={`group shrink-0 cursor-zoom-in overflow-hidden rounded-sm bg-slate-100 p-0 outline-none ring-slate-900/10 transition-shadow focus-visible:ring-2 ${className ?? ""}`}
+            className={`group shrink-0 cursor-zoom-in overflow-hidden rounded-sm bg-slate-100 p-0 outline-none ring-slate-900/10 transition-shadow focus-visible:ring-2 dark:bg-slate-700 ${className ?? ""}`}
             style={{
                 aspectRatio,
                 width: styleWidth,

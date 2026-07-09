@@ -1,12 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
     getPhotos,
-    getPreferences,
     type ListPhotosParams,
     type PhotoAssetResponse,
-    type PreferencesResponse,
 } from "@/src/api/client";
 import GalleryGroup, { type GalleryGroupData } from "./components/GalleryGroup";
 import PhotoViewer from "./components/PhotoViewer";
@@ -27,29 +25,18 @@ function getBatchKey(value: string) {
 
 function getGridSource(
     photo: PhotoAssetResponse,
-    photoDisplaySource: PreferencesResponse["photo_display_source"],
 ) {
-    if (photoDisplaySource === "thumbnail") {
-        return photo.thumbnail_src ?? photo.preview_src ?? photo.original_src ?? photo.src;
-    }
-
-    return photo.original_src ?? photo.src;
+    return photo.thumbnail_src ?? photo.preview_src ?? photo.original_src ?? photo.src;
 }
 
 function getViewerSource(
     photo: PhotoAssetResponse,
-    photoDisplaySource: PreferencesResponse["photo_display_source"],
 ) {
-    if (photoDisplaySource === "thumbnail") {
-        return photo.preview_src ?? photo.original_src ?? photo.src;
-    }
-
-    return photo.original_src ?? photo.src;
+    return photo.preview_src ?? photo.thumbnail_src ?? photo.original_src ?? photo.src;
 }
 
 function buildGalleryGroups(
     photos: PhotoAssetResponse[],
-    photoDisplaySource: PreferencesResponse["photo_display_source"],
 ): GalleryGroupData[] {
     const groupMap = new Map<string, GalleryGroupData>();
 
@@ -64,8 +51,8 @@ function buildGalleryGroups(
 
         group.items.push({
             id: photo.id,
-            src: getGridSource(photo, photoDisplaySource),
-            viewerSrc: getViewerSource(photo, photoDisplaySource),
+            src: getGridSource(photo),
+            viewerSrc: getViewerSource(photo),
             originalSrc: photo.original_src ?? photo.src,
             alt: photo.title,
             width: photo.width ?? undefined,
@@ -100,7 +87,6 @@ function getErrorMessage(error: unknown) {
 export default function PhotoPage() {
     const pageSize = 200;
     const [photos, setPhotos] = useState<PhotoAssetResponse[]>([]);
-    const [preferences, setPreferences] = useState<PreferencesResponse | null>(null);
     const [activeItemId, setActiveItemId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -121,19 +107,15 @@ export default function PhotoPage() {
                     setIsLoadingMore(true);
                 }
                 setError(null);
-                const [photoData, preferenceData] = await Promise.all([
-                    getPhotos({
-                        limit,
-                        offset,
-                    }),
-                    getPreferences(),
-                ]);
+                const photoData = await getPhotos({
+                    limit,
+                    offset,
+                });
 
                 if (!cancelled) {
                     setPhotos((currentPhotos) => (
                         offset === 0 ? photoData : [...currentPhotos, ...photoData]
                     ));
-                    setPreferences(preferenceData);
                     setHasMore(photoData.length === limit);
                 }
             } catch (loadError) {
@@ -158,10 +140,9 @@ export default function PhotoPage() {
         };
     }, []);
 
-    const photoDisplaySource = preferences?.photo_display_source ?? "thumbnail";
     const galleryGroups = useMemo(
-        () => buildGalleryGroups(photos, photoDisplaySource),
-        [photoDisplaySource, photos],
+        () => buildGalleryGroups(photos),
+        [photos],
     );
     const galleryItems = useMemo(
         () => galleryGroups.flatMap((group) => group.items),
@@ -173,7 +154,7 @@ export default function PhotoPage() {
 
     if (isLoading) {
         return (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500">
+        <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 正在加载照片...
             </div>
         );
@@ -181,7 +162,7 @@ export default function PhotoPage() {
 
     if (error) {
         return (
-            <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-400">
                 {error}
             </div>
         );
@@ -189,7 +170,7 @@ export default function PhotoPage() {
 
     if (galleryGroups.length === 0) {
         return (
-            <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500">
+        <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400">
                 暂无照片。请先在设置的媒体库中添加照片目录并完成扫码。
             </div>
         );
@@ -210,7 +191,7 @@ export default function PhotoPage() {
                 <div className="flex justify-center pb-8">
                     <button
                         type="button"
-                        className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800"
                         disabled={isLoadingMore}
                         onClick={async () => {
                             try {

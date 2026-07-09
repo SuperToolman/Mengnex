@@ -139,13 +139,19 @@ export type ListPhotosParams = {
 };
 
 export type PreferencesResponse = {
-    photo_display_source: "thumbnail" | "original";
+    thumb_max_dimension: number;
+    preview_max_dimension: number;
+    thumb_quality: number;
+    preview_quality: number;
     created_at: string;
     updated_at: string;
 };
 
 export type UpdatePreferencesRequest = {
-    photo_display_source: PreferencesResponse["photo_display_source"];
+    thumb_max_dimension?: number;
+    preview_max_dimension?: number;
+    thumb_quality?: number;
+    preview_quality?: number;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3001";
@@ -327,14 +333,9 @@ export async function getPreferences() {
 }
 
 export async function updatePreferences(payload: UpdatePreferencesRequest) {
-    try {
-        return await requestJson<PreferencesResponse>("/api/preferences", {
-            method: "PUT",
-            body: JSON.stringify(payload),
-        });
-    } catch (error) {
-        throw new Error(getErrorMessage(error));
-    }
+    return requestJson<PreferencesResponse>("/api/preferences", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
 }
-
 export { API_BASE_URL };

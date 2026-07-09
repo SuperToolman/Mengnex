@@ -18,7 +18,7 @@ use crate::{
         },
         photos::{dto::PhotoAssetResponse, handlers as photo_handlers},
         preferences::{
-            dto::{PhotoDisplaySource, PreferencesResponse, UpdatePreferencesRequest},
+            dto::{PreferencesResponse, UpdatePreferencesRequest},
             handlers as preference_handlers,
         },
         scanner::{
@@ -70,7 +70,6 @@ use crate::{
         MediaItemResponse,
         MediaFileResponse,
         PhotoAssetResponse,
-        PhotoDisplaySource,
         PreferencesResponse,
         UpdatePreferencesRequest,
         ScanTaskStatus,

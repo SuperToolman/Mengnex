@@ -1,56 +1,113 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* 同时支持 html.dark 和 html[data-theme="dark"] 两种切换方式 */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── 主题色 ─────────────────────────────────────────── */
+
+:root {
+  --theme-app-background: linear-gradient(
+    to bottom right,
+    #eef3d5 0%,
+    #e3efc9 24%,
+    #f3d8df 62%,
+    #ecc8d6 100%
+  );
+  --theme-bg-app: transparent;
+  --theme-bg-card: #ffffff;
+  --theme-bg-card-alt: #f6f1ea;
+  --theme-bg-overlay: rgba(255, 255, 255, 0.28);
+  --theme-bg-overlay-heavy: rgba(255, 255, 255, 0.40);
+  --theme-bg-header: rgba(255, 255, 255, 0.20);
+  --theme-bg-sidebar-hover: rgba(255, 255, 255, 0.60);
+  --theme-sidebar-blob-base: linear-gradient(140deg, rgba(244, 225, 255, 0.92), rgba(226, 233, 255, 0.88) 58%, rgba(214, 247, 229, 0.84));
+  --theme-sidebar-blob-lead: linear-gradient(135deg, rgba(255, 242, 247, 0.98), rgba(228, 241, 255, 0.92) 54%, rgba(215, 244, 228, 0.88));
+  --theme-sidebar-blob-source: linear-gradient(180deg, rgba(246, 236, 255, 0.84), rgba(224, 235, 255, 0.76));
+  --theme-sidebar-blob-bridge: linear-gradient(90deg, rgba(237, 228, 255, 0.82), rgba(226, 240, 255, 0.78), rgba(225, 244, 234, 0.8));
+  --theme-sidebar-blob-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -10px 18px rgba(182, 166, 255, 0.10);
+  --theme-sidebar-glow: radial-gradient(circle at 50% 50%, rgba(203, 162, 255, 0.18), rgba(203, 162, 255, 0));
+  --theme-text-primary: #0f172a;
+  --theme-text-secondary: #64748b;
+  --theme-text-muted: #94a3b8;
+  --theme-border-light: rgba(255, 255, 255, 0.28);
+  --theme-border: rgba(203, 213, 225, 0.55);
+  --theme-border-heavy: rgba(255, 255, 255, 0.32);
+}
+
+:root.dark,
+:root[data-theme="dark"] {
+  --theme-app-background: linear-gradient(
+    to bottom right,
+    #0b0816 0%,
+    #18102c 30%,
+    #261646 68%,
+    #341b5a 100%
+  );
+  --theme-bg-app: transparent;
+  --theme-bg-card: #1e293b;
+  --theme-bg-card-alt: #334155;
+  --theme-bg-overlay: rgba(10, 16, 31, 0.34);
+  --theme-bg-overlay-heavy: rgba(10, 16, 31, 0.48);
+  --theme-bg-header: rgba(10, 16, 31, 0.22);
+  --theme-bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --theme-sidebar-blob-base: linear-gradient(140deg, rgba(86, 52, 150, 0.72), rgba(63, 43, 120, 0.76) 56%, rgba(40, 31, 86, 0.80));
+  --theme-sidebar-blob-lead: linear-gradient(135deg, rgba(118, 71, 194, 0.76), rgba(83, 55, 156, 0.78) 56%, rgba(56, 40, 114, 0.82));
+  --theme-sidebar-blob-source: linear-gradient(180deg, rgba(92, 58, 164, 0.70), rgba(60, 44, 118, 0.76));
+  --theme-sidebar-blob-bridge: linear-gradient(90deg, rgba(98, 63, 172, 0.72), rgba(76, 50, 142, 0.76), rgba(56, 40, 114, 0.80));
+  --theme-sidebar-blob-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -10px 18px rgba(5, 2, 20, 0.26);
+  --theme-sidebar-glow: radial-gradient(circle at 50% 50%, rgba(168, 103, 255, 0.24), rgba(168, 103, 255, 0));
+  --theme-text-primary: #f1f5f9;
+  --theme-text-secondary: #94a3b8;
+  --theme-text-muted: #64748b;
+  --theme-border-light: rgba(148, 163, 184, 0.14);
+  --theme-border: rgba(71, 85, 105, 0.50);
+  --theme-border-heavy: rgba(148, 163, 184, 0.18);
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  background-color: #0b1120;
+  background-image: var(--theme-app-background);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-attachment: fixed;
+  background-position: center;
+  color: var(--theme-text-primary);
 }
+
+/* ── 侧边栏流体特效 ─────────────────────────────────── */
 
 .sidebar-fluid-blob {
   position: absolute;
   left: 0;
   top: 0;
   border-radius: 20px;
-  background:
-    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(210, 232, 255, 0.94) 60%, rgba(157, 204, 255, 0.92));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    inset 0 -10px 18px rgba(90, 160, 255, 0.08);
+  background: var(--theme-sidebar-blob-base);
+  box-shadow: var(--theme-sidebar-blob-shadow);
   will-change: transform, width, height, opacity;
 }
 
 .sidebar-fluid-blob-lead {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.99), rgba(216, 236, 255, 0.96) 58%, rgba(142, 198, 255, 0.95));
+  background: var(--theme-sidebar-blob-lead);
 }
 
 .sidebar-fluid-blob-source {
-  background:
-    linear-gradient(180deg, rgba(240, 248, 255, 0.92), rgba(177, 217, 255, 0.88));
+  background: var(--theme-sidebar-blob-source);
 }
 
 .sidebar-fluid-blob-bridge {
-  background:
-    linear-gradient(90deg, rgba(224, 240, 255, 0.92), rgba(159, 207, 255, 0.9), rgba(224, 240, 255, 0.92));
+  background: var(--theme-sidebar-blob-bridge);
 }
 
 .sidebar-fluid-blob-trail {
@@ -61,7 +118,7 @@ body {
 .sidebar-fluid-glow {
   left: 0;
   top: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(93, 168, 255, 0.24), rgba(93, 168, 255, 0));
+  background: var(--theme-sidebar-glow);
   filter: blur(14px);
   will-change: transform, width, height, opacity;
 }

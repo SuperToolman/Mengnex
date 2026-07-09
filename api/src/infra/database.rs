@@ -42,11 +42,40 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_table(db, photo_asset::Entity).await?;
     ensure_schema_columns(db).await?;
     create_indexes(db).await?;
+    ensure_default_app_settings(db).await?;
 
     Ok(())
 }
 
 async fn ensure_schema_columns(db: &DatabaseConnection) -> Result<(), DbErr> {
+    add_column_if_missing(
+        db,
+        "app_settings",
+        "thumb_max_dimension",
+        "INTEGER NOT NULL DEFAULT 256",
+    )
+    .await?;
+    add_column_if_missing(
+        db,
+        "app_settings",
+        "preview_max_dimension",
+        "INTEGER NOT NULL DEFAULT 960",
+    )
+    .await?;
+    add_column_if_missing(
+        db,
+        "app_settings",
+        "thumb_quality",
+        "INTEGER NOT NULL DEFAULT 50",
+    )
+    .await?;
+    add_column_if_missing(
+        db,
+        "app_settings",
+        "preview_quality",
+        "INTEGER NOT NULL DEFAULT 55",
+    )
+    .await?;
     add_column_if_missing(db, "scan_tasks", "processed_files", "BIGINT NOT NULL DEFAULT 0").await?;
     add_column_if_missing(db, "scan_tasks", "removed_files", "BIGINT NOT NULL DEFAULT 0").await?;
     add_column_if_missing(
@@ -62,6 +91,27 @@ async fn ensure_schema_columns(db: &DatabaseConnection) -> Result<(), DbErr> {
     add_column_if_missing(db, "photo_assets", "preview_file_size", "BIGINT").await?;
     add_column_if_missing(db, "photo_assets", "thumb_generated_at", "TEXT").await?;
     add_column_if_missing(db, "photo_assets", "preview_generated_at", "TEXT").await?;
+
+    Ok(())
+}
+
+async fn ensure_default_app_settings(db: &DatabaseConnection) -> Result<(), DbErr> {
+    if app_setting::Entity::find_by_id("global").one(db).await?.is_some() {
+        return Ok(());
+    }
+
+    let now = chrono::Utc::now();
+    app_setting::ActiveModel {
+        id: Set("global".to_owned()),
+        thumb_max_dimension: Set(256),
+        preview_max_dimension: Set(960),
+        thumb_quality: Set(50),
+        preview_quality: Set(55),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await?;
 
     Ok(())
 }

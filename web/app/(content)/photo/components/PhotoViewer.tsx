@@ -117,6 +117,8 @@ export default function PhotoViewer({
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState<ViewportPosition>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    const [isOriginalLoaded, setIsOriginalLoaded] = useState(false);
+    const [isOriginalRevealActive, setIsOriginalRevealActive] = useState(false);
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const dragStateRef = useRef<DragState | null>(null);
     const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,6 +164,8 @@ export default function PhotoViewer({
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setIsDragging(false);
+        setIsOriginalLoaded(false);
+        setIsOriginalRevealActive(false);
         dragStateRef.current = null;
     }
 
@@ -300,6 +304,9 @@ export default function PhotoViewer({
     const dimensions = activeItem.width && activeItem.height
         ? `${activeItem.width} x ${activeItem.height}`
         : "未知尺寸";
+    const previewSrc = activeItem.viewerSrc ?? activeItem.src;
+    const originalSrc = activeItem.originalSrc ?? activeItem.src;
+    const shouldProgressivelyReveal = Boolean(previewSrc && originalSrc && previewSrc !== originalSrc);
 
     return (
         <Modal state={overlayState}>
@@ -366,8 +373,8 @@ export default function PhotoViewer({
                                     }}
                                 >
                                     <Image
-                                        key={activeItem.id}
-                                        src={activeItem.viewerSrc ?? activeItem.src}
+                                        key={`${activeItem.id}-preview`}
+                                        src={previewSrc}
                                         alt={activeItem.alt ?? getFileName(activeItem)}
                                         fill
                                         priority
@@ -376,6 +383,37 @@ export default function PhotoViewer({
                                         unoptimized
                                         className="object-contain"
                                     />
+                                    {shouldProgressivelyReveal ? (
+                                        <div
+                                            className="absolute inset-0 transition-[clip-path,opacity] duration-700 ease-out"
+                                            style={{
+                                                clipPath: isOriginalRevealActive
+                                                    ? "inset(0 0 0 0)"
+                                                    : "inset(0 0 100% 0)",
+                                                opacity: isOriginalLoaded ? 1 : 0,
+                                            }}
+                                        >
+                                            <Image
+                                                key={`${activeItem.id}-original`}
+                                                src={originalSrc}
+                                                alt={activeItem.alt ?? getFileName(activeItem)}
+                                                fill
+                                                priority
+                                                draggable={false}
+                                                sizes="100vw"
+                                                unoptimized
+                                                className="object-contain"
+                                                onLoad={() => {
+                                                    setIsOriginalLoaded(true);
+                                                    requestAnimationFrame(() => {
+                                                        requestAnimationFrame(() => {
+                                                            setIsOriginalRevealActive(true);
+                                                        });
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
 

@@ -19,12 +19,12 @@ function getErrorMessage(error: unknown) {
         return String(error.message);
     }
 
-    return "Request failed. Make sure the API service is running.";
+    return "请求失败，请确认 API 服务已启动。";
 }
 
 function formatDate(value?: string | null) {
     if (!value) {
-        return "N/A";
+        return "暂无";
     }
 
     return new Intl.DateTimeFormat("zh-CN", {
@@ -40,36 +40,36 @@ function formatDate(value?: string | null) {
 function getStatusStyle(status: string) {
     switch (status) {
         case "running":
-            return "bg-sky-100 text-sky-700";
+            return "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300";
         case "queued":
-            return "bg-amber-100 text-amber-700";
+            return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
         case "paused":
-            return "bg-violet-100 text-violet-700";
+            return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
         case "completed":
-            return "bg-emerald-100 text-emerald-700";
+            return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
         case "canceled":
-            return "bg-slate-200 text-slate-700";
+            return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
         case "failed":
-            return "bg-red-100 text-red-700";
+            return "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300";
         default:
-            return "bg-slate-100 text-slate-600";
+            return "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300";
     }
 }
 
 function getStatusLabel(status: string) {
     switch (status) {
         case "running":
-            return "Running";
+            return "运行中";
         case "queued":
-            return "Queued";
+            return "排队中";
         case "paused":
-            return "Paused";
+            return "已暂停";
         case "completed":
-            return "Completed";
+            return "已完成";
         case "canceled":
-            return "Canceled";
+            return "已取消";
         case "failed":
-            return "Failed";
+            return "失败";
         default:
             return status;
     }
@@ -78,9 +78,9 @@ function getStatusLabel(status: string) {
 function getKindLabel(kind: TaskResponse["kind"]) {
     switch (kind) {
         case "scan_library":
-            return "Library Scan";
+            return "媒体库扫描";
         case "generate_cache":
-            return "Thumbnail Build";
+            return "缓存生成";
         default:
             return kind;
     }
@@ -153,46 +153,46 @@ export default function TasksPage() {
         <div className="flex h-full min-h-0 flex-col">
             <div>
                 <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">
-                    Tasks
+                    任务
                 </p>
-                <h1 className="mt-2 text-2xl font-semibold text-slate-950">Task Center</h1>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
-                    Monitor library scans, thumbnail generation, and other background work in one place.
+                <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-100">任务中心</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    在这里统一查看媒体库扫描、缓存生成以及其他后台任务的进度。
                 </p>
             </div>
 
             {error ? (
-                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-300">
                     {error}
                 </div>
             ) : null}
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500">Total Tasks</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{summary.total}</p>
+                <div className="rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 shadow-sm backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/30">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">任务总数</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-100">{summary.total}</p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500">Active</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{summary.active}</p>
+                <div className="rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 shadow-sm backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/30">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">进行中</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-100">{summary.active}</p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                    <p className="text-xs font-medium text-slate-500">Failed</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{summary.failed}</p>
+                <div className="rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 shadow-sm backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/30">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">失败任务</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-100">{summary.failed}</p>
                 </div>
             </div>
 
             <div className="mt-6 min-h-0 flex-1 overflow-auto">
                 {isLoading && tasks.length === 0 ? (
-                    <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500">
-                        Loading tasks...
+                    <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-900/25 dark:text-slate-400">
+                        正在加载任务...
                     </div>
                 ) : tasks.length === 0 ? (
-                    <div className="flex h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 px-6 text-center">
-                        <Stopwatch className="h-7 w-7 text-slate-400" />
-                        <p className="mt-4 text-sm font-medium text-slate-700">No tasks yet</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
-                            Scans and thumbnail builds will appear here once they start running.
+                    <div className="flex h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 px-6 text-center dark:border-slate-600 dark:bg-slate-900/25">
+                        <Stopwatch className="h-7 w-7 text-slate-400 dark:text-slate-500" />
+                        <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-200">暂时还没有任务</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                            当扫描或缓存生成任务开始后，会显示在这里。
                         </p>
                     </div>
                 ) : (
@@ -200,12 +200,12 @@ export default function TasksPage() {
                         {tasks.map((task) => (
                             <div
                                 key={task.id}
-                                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                                className="rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/30"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                                 {getKindLabel(task.kind)}
                                             </span>
                                             <span
@@ -214,20 +214,20 @@ export default function TasksPage() {
                                                 {getStatusLabel(task.status)}
                                             </span>
                                         </div>
-                                        <h2 className="mt-3 text-base font-semibold text-slate-950">
+                                        <h2 className="mt-3 text-base font-semibold text-slate-950 dark:text-slate-100">
                                             {task.title}
                                         </h2>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            {task.library_name ?? "No linked library"}
+                                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            {task.library_name ?? "未关联媒体库"}
                                         </p>
                                     </div>
-                                    <div className="text-right text-xs text-slate-400">
-                                        <p>Updated</p>
+                                    <div className="text-right text-xs text-slate-400 dark:text-slate-500">
+                                        <p>更新时间</p>
                                         <p className="mt-1">{formatDate(task.updated_at)}</p>
                                     </div>
                                 </div>
 
-                                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                                     <div
                                         className={`h-full rounded-full transition-[width] duration-300 ${
                                             task.status === "failed"
@@ -242,35 +242,35 @@ export default function TasksPage() {
                                     />
                                 </div>
 
-                                <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
+                                <div className="mt-3 grid gap-3 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-3">
                                     <div>
-                                        <p className="text-xs text-slate-400">Progress</p>
-                                        <p className="mt-1 font-medium text-slate-900">
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">进度</p>
+                                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                                             {task.progress_percent}%
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-400">Processed</p>
-                                        <p className="mt-1 font-medium text-slate-900">
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">已处理</p>
+                                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                                             {task.processed_items} / {task.total_items}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-slate-400">Finished</p>
-                                        <p className="mt-1 font-medium text-slate-900">
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">完成时间</p>
+                                        <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
                                             {formatDate(task.finished_at)}
                                         </p>
                                     </div>
                                 </div>
 
                                 {task.detail ? (
-                                    <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                                    <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
                                         {task.detail}
                                     </div>
                                 ) : null}
 
                                 {task.error_message ? (
-                                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/70 dark:bg-red-950/40 dark:text-red-300">
                                         <div className="flex items-start gap-2">
                                             <CircleInfo className="mt-0.5 h-4 w-4 shrink-0" />
                                             <span>{task.error_message}</span>
@@ -283,30 +283,30 @@ export default function TasksPage() {
                                         {(task.status === "queued" || task.status === "running") ? (
                                             <button
                                                 type="button"
-                                                className="rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800"
                                                 disabled={actingTaskId === task.id}
                                                 onClick={() => void runTaskAction(task.id, "pause")}
                                             >
-                                                Pause
+                                                暂停
                                             </button>
                                         ) : null}
                                         {task.status === "paused" ? (
                                             <button
                                                 type="button"
-                                                className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="rounded-full border border-sky-300 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 transition hover:border-sky-400 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-700 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:border-sky-600 dark:hover:bg-sky-500/20"
                                                 disabled={actingTaskId === task.id}
                                                 onClick={() => void runTaskAction(task.id, "resume")}
                                             >
-                                                Resume
+                                                恢复
                                             </button>
                                         ) : null}
                                         <button
                                             type="button"
-                                            className="rounded-full border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            className="rounded-full border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-700 dark:text-red-300 dark:hover:border-red-600 dark:hover:bg-red-500/10"
                                             disabled={actingTaskId === task.id}
                                             onClick={() => void runTaskAction(task.id, "cancel")}
                                         >
-                                            Cancel
+                                            取消
                                         </button>
                                     </div>
                                 ) : null}

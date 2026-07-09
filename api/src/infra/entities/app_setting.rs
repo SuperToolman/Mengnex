@@ -6,7 +6,10 @@ use serde::Serialize;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub photo_display_source: String,
+    pub thumb_max_dimension: i32,
+    pub preview_max_dimension: i32,
+    pub thumb_quality: i32,
+    pub preview_quality: i32,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }
