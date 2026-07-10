@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
 };
 use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
@@ -8,7 +8,10 @@ use serde::Deserialize;
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::photo_asset,
-    modules::photos::dto::PhotoAssetResponse,
+    modules::photos::{
+        dto::{DeletePhotoResponse, PhotoAssetResponse},
+        service::delete_photo_asset,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -45,4 +48,27 @@ pub async fn list_photos(
         .collect();
 
     Ok(Json(photos))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/photos/{photo_id}",
+    params(
+        ("photo_id" = String, Path, description = "Photo asset ID")
+    ),
+    responses((status = 200, description = "Delete photo asset and source file", body = DeletePhotoResponse)),
+    tag = "photos"
+)]
+pub async fn delete_photo(
+    State(state): State<AppState>,
+    Path(photo_id): Path<String>,
+) -> Result<Json<DeletePhotoResponse>, ApiError> {
+    let asset = delete_photo_asset(&state.db, &photo_id).await?;
+
+    Ok(Json(DeletePhotoResponse {
+        id: asset.id,
+        file_id: asset.file_id,
+        item_id: asset.item_id,
+        source_path: asset.source_path,
+    }))
 }

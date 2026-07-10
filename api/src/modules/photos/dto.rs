@@ -27,6 +27,14 @@ pub struct PhotoAssetResponse {
     pub batch_time: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DeletePhotoResponse {
+    pub id: String,
+    pub file_id: String,
+    pub item_id: String,
+    pub source_path: String,
+}
+
 impl From<photo_asset::Model> for PhotoAssetResponse {
     fn from(value: photo_asset::Model) -> Self {
         let original_src = format!("/api/media/files/{}/content", value.file_id);

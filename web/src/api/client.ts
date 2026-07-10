@@ -133,6 +133,13 @@ export type PhotoAssetResponse = {
     batch_time: string;
 };
 
+export type DeletePhotoResponse = {
+    id: string;
+    file_id: string;
+    item_id: string;
+    source_path: string;
+};
+
 export type ListPhotosParams = {
     limit?: number;
     offset?: number;
@@ -155,14 +162,6 @@ export type UpdatePreferencesRequest = {
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3001";
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return "Request failed";
-}
 
 async function requestJson<T>(
     path: string,
@@ -326,6 +325,12 @@ export async function getPhotos(params?: ListPhotosParams) {
     const path = query.size > 0 ? `/api/photos?${query.toString()}` : "/api/photos";
     const photos = await requestJson<PhotoAssetResponse[]>(path);
     return photos.map(normalizePhoto);
+}
+
+export async function deletePhoto(photoId: string) {
+    return requestJson<DeletePhotoResponse>(`/api/photos/${photoId}`, {
+        method: "DELETE",
+    });
 }
 
 export async function getPreferences() {

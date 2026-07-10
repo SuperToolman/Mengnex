@@ -10,13 +10,14 @@ use chrono::{DateTime, Utc};
 use image::{GenericImageView, imageops::FilterType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
 };
 use tokio::task::{self, JoinSet};
 use webp::Encoder as WebpEncoder;
 
 use crate::{
     core::error::ApiError,
-    infra::entities::{app_setting, media_library, photo_asset},
+    infra::entities::{app_setting, media_file, media_item, media_library, photo_asset},
     modules::tasks::service::wait_for_task_permit,
 };
 
@@ -358,6 +359,30 @@ pub fn resolve_derivative_path(asset: &photo_asset::Model, variant: &str) -> Opt
     }?;
 
     Some(data_dir().join(relative_path))
+}
+
+pub async fn delete_photo_asset(
+    db: &DatabaseConnection,
+    photo_id: &str,
+) -> Result<photo_asset::Model, ApiError> {
+    let asset = photo_asset::Entity::find_by_id(photo_id.to_owned())
+        .one(db)
+        .await?
+        .ok_or(ApiError::NotFound("photo"))?;
+
+    if Path::new(&asset.source_path).exists() {
+        fs::remove_file(&asset.source_path)?;
+    }
+
+    delete_asset_derivatives(&asset)?;
+
+    let txn = db.begin().await?;
+    photo_asset::Entity::delete_by_id(asset.id.clone()).exec(&txn).await?;
+    media_file::Entity::delete_by_id(asset.file_id.clone()).exec(&txn).await?;
+    media_item::Entity::delete_by_id(asset.item_id.clone()).exec(&txn).await?;
+    txn.commit().await?;
+
+    Ok(asset)
 }
 
 pub fn delete_asset_derivatives(asset: &photo_asset::Model) -> Result<(), ApiError> {

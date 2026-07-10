@@ -12,9 +12,9 @@ type GalleryGroupProps = {
     group: GalleryGroupData;
     className?: string;
     onItemOpen?: (item: GalleryItemData) => void;
+    itemHeight?: number;
 };
 
-const ITEM_HEIGHT = 168;
 const ITEM_GAP = 4;
 const MIN_ITEM_WIDTH = 160;
 const MAX_ITEM_WIDTH = 360;
@@ -33,19 +33,22 @@ function formatBatchTitle(value: Date | string | number) {
     return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekdayFormatter.format(date)}`;
 }
 
-export function getGalleryItemWidthValue(item: GalleryItemData) {
+export function getGalleryItemWidthValue(item: GalleryItemData, itemHeight: number) {
     if (!item.width || !item.height) {
-        return ITEM_HEIGHT;
+        return itemHeight;
     }
 
     const ratio = item.width / item.height;
-    const width = Math.round(ITEM_HEIGHT * ratio);
+    const width = Math.round(itemHeight * ratio);
 
     return Math.min(Math.max(width, MIN_ITEM_WIDTH), MAX_ITEM_WIDTH);
 }
 
-function getGroupBasis(items: GalleryItemData[]) {
-    const contentWidth = items.reduce((total, item) => total + getGalleryItemWidthValue(item), 0);
+function getGroupBasis(items: GalleryItemData[], itemHeight: number) {
+    const contentWidth = items.reduce(
+        (total, item) => total + getGalleryItemWidthValue(item, itemHeight),
+        0,
+    );
     const gapWidth = Math.max(items.length - 1, 0) * ITEM_GAP;
     const groupWidth = contentWidth + gapWidth;
 
@@ -56,12 +59,13 @@ export default function GalleryGroup({
     group,
     className,
     onItemOpen,
+    itemHeight = 168,
 }: GalleryGroupProps) {
     if (group.items.length === 0) {
         return null;
     }
 
-    const groupBasis = getGroupBasis(group.items);
+    const groupBasis = getGroupBasis(group.items, itemHeight);
 
     return (
         <section
@@ -80,8 +84,9 @@ export default function GalleryGroup({
                     <GalleryItem
                         key={item.id}
                         item={item}
-                        className="h-[168px]"
-                        styleWidth={`${getGalleryItemWidthValue(item)}px`}
+                        className="shrink-0"
+                        styleWidth={`${getGalleryItemWidthValue(item, itemHeight)}px`}
+                        styleHeight={`${itemHeight}px`}
                         onOpen={() => onItemOpen?.(item)}
                     />
                 ))}

@@ -8,6 +8,8 @@ export type GalleryItemData = {
     src: string;
     viewerSrc?: string;
     originalSrc?: string;
+    thumbnailSrc?: string;
+    previewSrc?: string;
     alt?: string;
     width?: number;
     height?: number;
@@ -15,12 +17,14 @@ export type GalleryItemData = {
     fileSize?: number;
     mimeType?: string;
     takenAt?: Date | string | number;
+    sourcePath?: string;
 };
 
 type GalleryItemProps = {
     item: GalleryItemData;
     className?: string;
     styleWidth?: string;
+    styleHeight?: string;
     onOpen?: () => void;
 };
 
@@ -28,6 +32,7 @@ export default function GalleryItem({
     item,
     className,
     styleWidth,
+    styleHeight,
     onOpen,
 }: GalleryItemProps) {
     const aspectRatio = item.width && item.height ? `${item.width} / ${item.height}` : "1 / 1";
@@ -39,6 +44,7 @@ export default function GalleryItem({
             className={`group shrink-0 cursor-zoom-in overflow-hidden rounded-sm bg-slate-100 p-0 outline-none ring-slate-900/10 transition-shadow focus-visible:ring-2 dark:bg-slate-700 ${className ?? ""}`}
             style={{
                 aspectRatio,
+                height: styleHeight,
                 width: styleWidth,
             }}
             onClick={onOpen}
@@ -55,7 +61,7 @@ export default function GalleryItem({
                         src={item.src}
                         alt={item.alt ?? ""}
                         fill
-                        sizes={styleWidth ?? "168px"}
+                        sizes={styleWidth ?? styleHeight ?? "168px"}
                         unoptimized
                         className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />

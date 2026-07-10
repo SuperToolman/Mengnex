@@ -1,18 +1,33 @@
 "use client";
 
-import { Modal, useOverlayState } from "@heroui/react";
+import {
+    ArrowDownToLine,
+    CircleInfo,
+    TrashBin,
+    Xmark,
+} from "@gravity-ui/icons";
+import { Button, Modal, Spinner, useOverlayState } from "@heroui/react";
 import Image from "next/image";
-import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type PointerEvent,
+    type ReactNode,
+    type WheelEvent,
+} from "react";
 import type { GalleryItemData } from "./GalleryItem";
 
 type PhotoViewerProps = {
     items: GalleryItemData[];
     activeIndex: number | null;
     onChange: (index: number) => void;
+    onDelete?: (photoId: string) => Promise<void>;
     onClose: () => void;
 };
 
-const INFO_IDLE_DELAY = 3000;
+const CONTROLS_IDLE_DELAY = 2000;
 const MIN_SCALE = 1;
 const MAX_SCALE = 8;
 const WHEEL_ZOOM_STEP = 1.14;
@@ -46,7 +61,6 @@ function getFileName(item: GalleryItemData) {
     try {
         const url = new URL(item.src, "http://localhost");
         const pathname = url.pathname.split("/").filter(Boolean).at(-1);
-
         return pathname ? decodeURIComponent(pathname) : item.id;
     } catch {
         return item.src.split("/").filter(Boolean).at(-1) ?? item.id;
@@ -55,7 +69,7 @@ function getFileName(item: GalleryItemData) {
 
 function formatFileSize(size?: number) {
     if (!size) {
-        return "未知大小";
+        return "Unknown";
     }
 
     if (size < 1024) {
@@ -71,7 +85,7 @@ function formatFileSize(size?: number) {
 
 function formatTakenAt(value?: Date | string | number) {
     if (!value) {
-        return "未知时间";
+        return "Unknown";
     }
 
     const date = value instanceof Date ? value : new Date(value);
@@ -107,21 +121,82 @@ function constrainPosition(position: ViewportPosition, scale: number, rect?: DOM
     };
 }
 
+async function downloadPhoto(url: string, fileName: string) {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+}
+
+function ViewerActionButton({
+    label,
+    icon,
+    onPress,
+    tone = "default",
+    isDisabled = false,
+}: {
+    label: string;
+    icon: ReactNode;
+    onPress?: () => void;
+    tone?: "default" | "danger";
+    isDisabled?: boolean;
+}) {
+    return (
+        <Button
+            isIconOnly
+            aria-label={label}
+            variant="ghost"
+            isDisabled={isDisabled}
+            className={[
+                "h-11 w-11 min-w-11 rounded-full border p-0",
+                "backdrop-blur-xl transition-colors duration-200",
+                "[&>span]:flex [&>span]:h-full [&>span]:w-full [&>span]:items-center [&>span]:justify-center",
+                tone === "danger"
+                    ? "border-red-400/20 bg-red-500/12 text-red-100 hover:bg-red-500/20"
+                    : "border-white/10 bg-black/35 text-white hover:bg-white/15",
+            ].join(" ")}
+            onPress={onPress}
+        >
+            <span className="flex h-full w-full items-center justify-center">
+                {icon}
+            </span>
+        </Button>
+    );
+}
+
 export default function PhotoViewer({
     items,
     activeIndex,
     onChange,
+    onDelete,
     onClose,
 }: PhotoViewerProps) {
-    const [isInfoVisible, setIsInfoVisible] = useState(true);
+    const [areControlsVisible, setAreControlsVisible] = useState(true);
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState<ViewportPosition>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [isOriginalLoaded, setIsOriginalLoaded] = useState(false);
     const [isOriginalRevealActive, setIsOriginalRevealActive] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const dragStateRef = useRef<DragState | null>(null);
     const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isInfoOpenRef = useRef(false);
+    const isDeleteDialogOpenRef = useRef(false);
     const activeItem = activeIndex === null ? null : items[activeIndex] ?? null;
     const isOpen = activeIndex !== null && !!activeItem;
     const overlayState = useOverlayState({
@@ -133,45 +208,59 @@ export default function PhotoViewer({
         },
     });
 
-    function clearIdleTimer() {
+    const clearIdleTimer = useCallback(() => {
         if (idleTimerRef.current) {
             clearTimeout(idleTimerRef.current);
             idleTimerRef.current = null;
         }
-    }
+    }, []);
 
-    function scheduleInfoHide() {
+    useEffect(() => {
+        isInfoOpenRef.current = isInfoOpen;
+    }, [isInfoOpen]);
+
+    useEffect(() => {
+        isDeleteDialogOpenRef.current = isDeleteDialogOpen;
+    }, [isDeleteDialogOpen]);
+
+    const scheduleControlsHide = useCallback(() => {
         clearIdleTimer();
         idleTimerRef.current = setTimeout(() => {
-            setIsInfoVisible(false);
-        }, INFO_IDLE_DELAY);
-    }
+            if (!isInfoOpenRef.current && !isDeleteDialogOpenRef.current) {
+                setAreControlsVisible(false);
+            }
+        }, CONTROLS_IDLE_DELAY);
+    }, [clearIdleTimer]);
 
-    function showInfoTemporarily() {
-        setIsInfoVisible(true);
-        scheduleInfoHide();
-    }
+    const revealControls = useCallback(() => {
+        setAreControlsVisible(true);
+        setActionError(null);
 
-    function goTo(offset: number) {
+        if (!isInfoOpenRef.current && !isDeleteDialogOpenRef.current) {
+            scheduleControlsHide();
+        }
+    }, [scheduleControlsHide]);
+
+    const goTo = useCallback((offset: number) => {
         if (activeIndex === null || items.length === 0) {
             return;
         }
 
         onChange(getSafeIndex(activeIndex + offset, items.length));
-    }
+    }, [activeIndex, items.length, onChange]);
 
-    function resetViewport() {
+    const resetViewport = useCallback(() => {
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setIsDragging(false);
         setIsOriginalLoaded(false);
         setIsOriginalRevealActive(false);
         dragStateRef.current = null;
-    }
+    }, []);
 
     function handleWheel(event: WheelEvent<HTMLDivElement>) {
         event.preventDefault();
-        showInfoTemporarily();
+        revealControls();
 
         const rect = viewportRef.current?.getBoundingClientRect();
 
@@ -206,7 +295,7 @@ export default function PhotoViewer({
     }
 
     function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-        showInfoTemporarily();
+        revealControls();
 
         if (event.button !== 0 || scale <= MIN_SCALE) {
             return;
@@ -225,7 +314,7 @@ export default function PhotoViewer({
     }
 
     function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-        showInfoTemporarily();
+        revealControls();
 
         const dragState = dragStateRef.current;
 
@@ -265,12 +354,45 @@ export default function PhotoViewer({
             return;
         }
 
-        setIsInfoVisible(true);
-        scheduleInfoHide();
-        resetViewport();
+        const timer = window.setTimeout(() => {
+            setAreControlsVisible(true);
+            setIsInfoOpen(false);
+            setIsDeleteDialogOpen(false);
+            setActionError(null);
+            scheduleControlsHide();
+            resetViewport();
+        }, 0);
 
-        return clearIdleTimer;
-    }, [isOpen, activeIndex]);
+        return () => {
+            window.clearTimeout(timer);
+            clearIdleTimer();
+        };
+    }, [activeIndex, clearIdleTimer, isOpen, resetViewport, scheduleControlsHide]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        if (isInfoOpen || isDeleteDialogOpen) {
+            clearIdleTimer();
+            const timer = window.setTimeout(() => {
+                setAreControlsVisible(true);
+            }, 0);
+
+            return () => {
+                window.clearTimeout(timer);
+            };
+        }
+
+        const timer = window.setTimeout(() => {
+            scheduleControlsHide();
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [clearIdleTimer, isDeleteDialogOpen, isInfoOpen, isOpen, scheduleControlsHide]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -287,6 +409,12 @@ export default function PhotoViewer({
             if (event.key === "ArrowRight") {
                 event.preventDefault();
                 goTo(1);
+                return;
+            }
+
+            if (event.key === "Escape" && isDeleteDialogOpen) {
+                event.preventDefault();
+                setIsDeleteDialogOpen(false);
             }
         }
 
@@ -295,7 +423,7 @@ export default function PhotoViewer({
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [isOpen, activeIndex, items.length, onChange]);
+    }, [goTo, isDeleteDialogOpen, isOpen]);
 
     if (!activeItem || activeIndex === null) {
         return null;
@@ -303,150 +431,290 @@ export default function PhotoViewer({
 
     const dimensions = activeItem.width && activeItem.height
         ? `${activeItem.width} x ${activeItem.height}`
-        : "未知尺寸";
+        : "Unknown";
     const previewSrc = activeItem.viewerSrc ?? activeItem.src;
     const originalSrc = activeItem.originalSrc ?? activeItem.src;
     const shouldProgressivelyReveal = Boolean(previewSrc && originalSrc && previewSrc !== originalSrc);
+    const fileName = getFileName(activeItem);
+    const infoRows = [
+        { label: "文件名", value: fileName },
+        { label: "拍摄时间", value: formatTakenAt(activeItem.takenAt) },
+        { label: "尺寸", value: dimensions },
+        { label: "类型", value: activeItem.mimeType ?? "Unknown" },
+        { label: "大小", value: formatFileSize(activeItem.fileSize) },
+        { label: "缩略图", value: activeItem.thumbnailSrc ? "已生成" : "未生成" },
+        { label: "预览图", value: activeItem.previewSrc ? "已生成" : "未生成" },
+        { label: "源路径", value: activeItem.sourcePath ?? "Unknown" },
+    ];
 
     return (
-        <Modal state={overlayState}>
-            <Modal.Backdrop
-                isDismissable
-                className="fixed inset-0 z-50 h-screen w-screen bg-black/95 p-0 text-white"
-                onMouseMove={showInfoTemporarily}
-                onPointerDown={showInfoTemporarily}
-            >
-                <Modal.Container
-                    placement="center"
-                    size="full"
-                    className="m-0 h-screen max-h-screen w-screen max-w-none overflow-hidden rounded-none border-0 bg-transparent p-0 shadow-none"
+        <>
+            <Modal state={overlayState}>
+                <Modal.Backdrop
+                    isDismissable
+                    className="fixed inset-0 z-50 h-screen w-screen bg-black/95 p-0 text-white"
+                    onMouseMove={revealControls}
+                    onPointerDown={revealControls}
                 >
-                    <Modal.Dialog className="relative h-screen w-screen overflow-hidden bg-transparent p-0 text-white outline-none">
-                        <Modal.Body className="relative flex h-screen w-screen items-center justify-center overflow-hidden p-0">
-                            <Modal.CloseTrigger
-                                aria-label="关闭图片查看器"
-                                className="absolute right-5 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl leading-none text-white transition hover:bg-white/20"
-                            >
-                                x
-                            </Modal.CloseTrigger>
-
-                            {items.length > 1 && (
-                                <>
-                                    <button
-                                        type="button"
-                                        aria-label="上一张图片"
-                                        className="absolute left-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-3xl text-white transition hover:bg-white/20"
-                                        onClick={() => goTo(-1)}
-                                    >
-                                        {"<"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-label="下一张图片"
-                                        className="absolute right-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-3xl text-white transition hover:bg-white/20"
-                                        onClick={() => goTo(1)}
-                                    >
-                                        {">"}
-                                    </button>
-                                </>
-                            )}
-
-                            <div
-                                ref={viewportRef}
-                                className={`relative h-screen w-screen touch-none select-none overflow-hidden ${
-                                    scale > MIN_SCALE
-                                        ? isDragging
-                                            ? "cursor-grabbing"
-                                            : "cursor-grab"
-                                        : "cursor-zoom-in"
-                                }`}
-                                onPointerCancel={stopDragging}
-                                onPointerDown={handlePointerDown}
-                                onPointerMove={handlePointerMove}
-                                onPointerUp={stopDragging}
-                                onWheel={handleWheel}
-                            >
+                    <Modal.Container
+                        placement="center"
+                        size="full"
+                        className="m-0 h-screen max-h-screen w-screen max-w-none overflow-hidden rounded-none border-0 bg-transparent p-0 shadow-none"
+                    >
+                        <Modal.Dialog className="relative h-screen w-screen overflow-hidden bg-transparent p-0 text-white outline-none">
+                            <Modal.Body className="relative flex h-screen w-screen items-center justify-center overflow-hidden p-0">
                                 <div
-                                    className="absolute inset-0 origin-center will-change-transform"
-                                    style={{
-                                        transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
+                                    className={`absolute right-5 top-5 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/28 p-2 backdrop-blur-2xl transition-all duration-300 ${
+                                        areControlsVisible
+                                            ? "translate-y-0 opacity-100"
+                                            : "pointer-events-none -translate-y-3 opacity-0"
+                                    }`}
+                                >
+                                    <ViewerActionButton
+                                        label="显示图片信息"
+                                        icon={<CircleInfo className="h-5 w-5" />}
+                                        onPress={() => setIsInfoOpen((current) => !current)}
+                                    />
+
+                                    <ViewerActionButton
+                                        label="下载原图"
+                                        icon={<ArrowDownToLine className="h-5 w-5" />}
+                                        onPress={() => {
+                                            void downloadPhoto(originalSrc, fileName).catch((error: unknown) => {
+                                                setActionError(
+                                                    error instanceof Error ? error.message : "下载失败",
+                                                );
+                                                setAreControlsVisible(true);
+                                            });
+                                        }}
+                                    />
+
+                                    <ViewerActionButton
+                                        label="删除图片"
+                                        tone="danger"
+                                        icon={<TrashBin className="h-5 w-5" />}
+                                        isDisabled={!onDelete}
+                                        onPress={() => setIsDeleteDialogOpen(true)}
+                                    />
+
+                                    <ViewerActionButton
+                                        label="关闭图片查看器"
+                                        icon={<Xmark className="h-5 w-5" />}
+                                        onPress={onClose}
+                                    />
+                                </div>
+
+                                {actionError ? (
+                                    <div className="absolute right-5 top-[5.5rem] z-30 max-w-[min(360px,calc(100vw-40px))] rounded-2xl border border-red-400/20 bg-red-500/12 px-4 py-3 text-sm text-red-100 backdrop-blur-xl">
+                                        {actionError}
+                                    </div>
+                                ) : null}
+
+                                <div
+                                    className={`absolute right-5 top-[5.5rem] z-40 w-[min(420px,calc(100vw-40px))] rounded-[28px] border border-white/10 bg-slate-950/92 text-white shadow-2xl backdrop-blur-2xl transition-all duration-200 ${
+                                        isInfoOpen
+                                            ? "translate-y-0 opacity-100"
+                                            : "pointer-events-none -translate-y-2 opacity-0"
+                                    }`}
+                                    onMouseMove={revealControls}
+                                    onPointerDown={(event) => {
+                                        event.stopPropagation();
+                                        revealControls();
                                     }}
                                 >
-                                    <Image
-                                        key={`${activeItem.id}-preview`}
-                                        src={previewSrc}
-                                        alt={activeItem.alt ?? getFileName(activeItem)}
-                                        fill
-                                        priority
-                                        draggable={false}
-                                        sizes="100vw"
-                                        unoptimized
-                                        className="object-contain"
-                                    />
-                                    {shouldProgressivelyReveal ? (
-                                        <div
-                                            className="absolute inset-0 transition-[clip-path,opacity] duration-700 ease-out"
-                                            style={{
-                                                clipPath: isOriginalRevealActive
-                                                    ? "inset(0 0 0 0)"
-                                                    : "inset(0 0 100% 0)",
-                                                opacity: isOriginalLoaded ? 1 : 0,
-                                            }}
-                                        >
-                                            <Image
-                                                key={`${activeItem.id}-original`}
-                                                src={originalSrc}
-                                                alt={activeItem.alt ?? getFileName(activeItem)}
-                                                fill
-                                                priority
-                                                draggable={false}
-                                                sizes="100vw"
-                                                unoptimized
-                                                className="object-contain"
-                                                onLoad={() => {
-                                                    setIsOriginalLoaded(true);
-                                                    requestAnimationFrame(() => {
-                                                        requestAnimationFrame(() => {
-                                                            setIsOriginalRevealActive(true);
-                                                        });
-                                                    });
-                                                }}
-                                            />
+                                    <div className="border-b border-white/10 px-5 py-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h3 className="text-base font-semibold text-white">
+                                                    图片信息
+                                                </h3>
+                                                <p className="mt-1 text-sm text-white/55">
+                                                    {fileName}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                aria-label="关闭信息面板"
+                                                className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+                                                onClick={() => setIsInfoOpen(false)}
+                                            >
+                                                <Xmark className="h-4 w-4" />
+                                            </button>
                                         </div>
-                                    ) : null}
+                                    </div>
+                                    <div className="space-y-2 px-5 py-4">
+                                        {infoRows.map((row) => (
+                                            <div
+                                                key={row.label}
+                                                className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 text-sm"
+                                            >
+                                                <span className="text-white/45">
+                                                    {row.label}
+                                                </span>
+                                                <span className="break-all text-white/85">
+                                                    {row.value}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div
-                                className={`absolute bottom-5 left-1/2 z-20 w-[min(720px,calc(100vw-40px))] -translate-x-1/2 rounded-2xl border border-white/10 bg-black/55 px-5 py-4 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
-                                    isInfoVisible
-                                        ? "translate-y-0 opacity-100"
-                                        : "pointer-events-none translate-y-4 opacity-0"
-                                }`}
-                            >
-                                <div className="flex items-start justify-between gap-5">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium text-white">
-                                            {getFileName(activeItem)}
-                                        </p>
-                                        <p className="mt-1 text-xs text-white/60">
-                                            {formatTakenAt(activeItem.takenAt)}
-                                        </p>
-                                    </div>
-                                    <div className="flex shrink-0 gap-4 text-right text-xs text-white/70">
-                                        <span>{dimensions}</span>
-                                        <span>{activeItem.mimeType ?? "未知类型"}</span>
-                                        <span>{formatFileSize(activeItem.fileSize)}</span>
-                                        <span>
-                                            {activeIndex + 1} / {items.length}
-                                        </span>
+                                {items.length > 1 ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            aria-label="上一张图片"
+                                            className="absolute left-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-3xl text-white transition hover:bg-white/20"
+                                            onClick={() => goTo(-1)}
+                                        >
+                                            {"<"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-label="下一张图片"
+                                            className="absolute right-5 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-3xl text-white transition hover:bg-white/20"
+                                            onClick={() => goTo(1)}
+                                        >
+                                            {">"}
+                                        </button>
+                                    </>
+                                ) : null}
+
+                                <div
+                                    ref={viewportRef}
+                                    className={`relative h-screen w-screen touch-none select-none overflow-hidden ${
+                                        scale > MIN_SCALE
+                                            ? isDragging
+                                                ? "cursor-grabbing"
+                                                : "cursor-grab"
+                                            : "cursor-zoom-in"
+                                    }`}
+                                    onPointerCancel={stopDragging}
+                                    onPointerDown={handlePointerDown}
+                                    onPointerMove={handlePointerMove}
+                                    onPointerUp={stopDragging}
+                                    onWheel={handleWheel}
+                                >
+                                    <div
+                                        className="absolute inset-0 origin-center will-change-transform"
+                                        style={{
+                                            transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
+                                        }}
+                                    >
+                                        <Image
+                                            key={`${activeItem.id}-preview`}
+                                            src={previewSrc}
+                                            alt={activeItem.alt ?? fileName}
+                                            fill
+                                            priority
+                                            draggable={false}
+                                            sizes="100vw"
+                                            unoptimized
+                                            className="object-contain"
+                                        />
+                                        {shouldProgressivelyReveal ? (
+                                            <div
+                                                className="absolute inset-0 transition-[clip-path,opacity] duration-700 ease-out"
+                                                style={{
+                                                    clipPath: isOriginalRevealActive
+                                                        ? "inset(0 0 0 0)"
+                                                        : "inset(0 0 100% 0)",
+                                                    opacity: isOriginalLoaded ? 1 : 0,
+                                                }}
+                                            >
+                                                <Image
+                                                    key={`${activeItem.id}-original`}
+                                                    src={originalSrc}
+                                                    alt={activeItem.alt ?? fileName}
+                                                    fill
+                                                    priority
+                                                    draggable={false}
+                                                    sizes="100vw"
+                                                    unoptimized
+                                                    className="object-contain"
+                                                    onLoad={() => {
+                                                        setIsOriginalLoaded(true);
+                                                        requestAnimationFrame(() => {
+                                                            requestAnimationFrame(() => {
+                                                                setIsOriginalRevealActive(true);
+                                                            });
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
+                            </Modal.Body>
+                        </Modal.Dialog>
+                    </Modal.Container>
+                </Modal.Backdrop>
+            </Modal>
+
+            <Modal isOpen={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <Modal.Backdrop className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" />
+                <Modal.Container
+                    placement="center"
+                    className="z-[61] w-[min(460px,calc(100vw-32px))] rounded-[28px] border border-white/10 bg-slate-950/96 p-0 text-white shadow-2xl"
+                >
+                    <Modal.Dialog className="outline-none">
+                        <Modal.Header className="border-b border-white/10 px-6 py-5">
+                            <Modal.Heading className="text-lg font-semibold text-white">
+                                确认删除
+                            </Modal.Heading>
+                            <p className="mt-1 text-sm text-white/55">
+                                该操作会真实删除原始文件，并移除缩略图、预览图和数据库记录。
+                            </p>
+                        </Modal.Header>
+                        <Modal.Body className="space-y-3 px-6 py-5">
+                            <div className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                                <p className="font-medium">{fileName}</p>
+                                <p className="mt-1 break-all text-red-100/75">
+                                    {activeItem.sourcePath ?? "Unknown"}
+                                </p>
                             </div>
                         </Modal.Body>
+                        <Modal.Footer className="flex justify-end gap-3 border-t border-white/10 px-6 py-5">
+                            <Button
+                                variant="ghost"
+                                className="rounded-2xl text-white/70 hover:bg-white/10 hover:text-white"
+                                isDisabled={isDeleting}
+                                onPress={() => setIsDeleteDialogOpen(false)}
+                            >
+                                取消
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                className="rounded-2xl bg-red-500/14 text-red-100 hover:bg-red-500/22"
+                                isDisabled={!onDelete || isDeleting}
+                                onPress={() => {
+                                    if (!onDelete) {
+                                        return;
+                                    }
+
+                                    setIsDeleting(true);
+                                    setActionError(null);
+                                    void onDelete(activeItem.id)
+                                        .then(() => {
+                                            setIsDeleteDialogOpen(false);
+                                        })
+                                        .catch((error: unknown) => {
+                                            setActionError(
+                                                error instanceof Error ? error.message : "删除失败",
+                                            );
+                                        })
+                                        .finally(() => {
+                                            setIsDeleting(false);
+                                        });
+                                }}
+                            >
+                                {isDeleting ? <Spinner size="sm" color="current" /> : "确认删除"}
+                            </Button>
+                        </Modal.Footer>
                     </Modal.Dialog>
                 </Modal.Container>
-            </Modal.Backdrop>
-        </Modal>
+            </Modal>
+
+        </>
     );
 }
