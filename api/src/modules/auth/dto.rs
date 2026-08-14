@@ -18,6 +18,13 @@ pub struct CredentialsRequest {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct SetupRequest {
+    pub display_name: String,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateUserRequest {
     pub display_name: String,
     pub username: String,
@@ -25,11 +32,8 @@ pub struct CreateUserRequest {
     pub avatar_url: Option<String>,
     #[schema(value_type = AuthRole)]
     pub role: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateRolePermissionsRequest {
-    pub permissions: Vec<String>,
+    #[serde(default)]
+    pub library_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -45,6 +49,7 @@ pub struct UserResponse {
     pub avatar_url: Option<String>,
     #[schema(value_type = AuthRole)]
     pub role: String,
+    pub library_ids: Vec<String>,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<Utc>,
 }

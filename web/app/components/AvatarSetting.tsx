@@ -102,6 +102,7 @@ export default function AvatarSetting({ onSave, history, onUseHistory, onDeleteH
         <>
             <Button size="sm" isDisabled={isDisabled} onPress={() => modal.open()}>{label}</Button>
             <Modal state={modal}>
+                <Modal.Trigger aria-label="打开头像设置对话框" className="sr-only"><span /></Modal.Trigger>
                 <Modal.Backdrop className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm">
                     <Modal.Container placement="center" className="z-[61] w-[min(460px,calc(100vw-32px))] max-w-none">
                         <Modal.Dialog>

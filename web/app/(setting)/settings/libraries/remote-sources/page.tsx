@@ -6,7 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createWebdavConnection, getWebdavConnections, type WebdavConnectionResponse } from "@/src/api/client";
 import SettingsPage from "../../components/SettingsPage";
 
-const inputClass = "w-full rounded-xl border border-border bg-white/10 px-3 py-2.5 text-sm text-foreground outline-none focus:border-focus";
+const inputClass = "w-full rounded-field border border-border bg-field px-3 py-2.5 text-sm text-field-foreground outline-none focus:border-focus";
 
 export default function RemoteSourcesPage() {
     const modal = useOverlayState({});

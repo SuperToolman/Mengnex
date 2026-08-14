@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAuthorData, GetAuthorResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetSeriesData, GetSeriesResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ListAuthorsData, ListAuthorsResponses, ListData, ListFolderContentsData, ListFolderContentsResponses, ListLibrariesData, ListLibrariesResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, StartCoverGenerationData, StartCoverGenerationResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateRolePermissionsData, UpdateRolePermissionsResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses } from './types.gen';
+import type { CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAuthorData, GetAuthorResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetSeriesData, GetSeriesResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ListAuthorsData, ListAuthorsResponses, ListData, ListFolderContentsData, ListFolderContentsResponses, ListLibrariesData, ListLibrariesResponses, ListLibraryCoversData, ListLibraryCoversResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, SetupData, SetupResponses, StartAnalysisData, StartAnalysisResponses, StartCoverGenerationData, StartCoverGenerationResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, TaskSummaryData, TaskSummaryResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -46,9 +46,9 @@ export const listRolePermissions = <ThrowOnError extends boolean = false>(option
     ...options
 });
 
-export const updateRolePermissions = <ThrowOnError extends boolean = false>(options: Options<UpdateRolePermissionsData, ThrowOnError>): RequestResult<UpdateRolePermissionsResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdateRolePermissionsResponses, unknown, ThrowOnError, 'data'>({
+export const setup = <ThrowOnError extends boolean = false>(options: Options<SetupData, ThrowOnError>): RequestResult<SetupResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).post<SetupResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
-    url: '/api/auth/roles/{role}/permissions',
+    url: '/api/auth/setup',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -104,6 +104,12 @@ export const createLibrary = <ThrowOnError extends boolean = false>(options: Opt
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const listLibraryCovers = <ThrowOnError extends boolean = false>(options?: Options<ListLibraryCoversData, ThrowOnError>): RequestResult<ListLibraryCoversResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListLibraryCoversResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/libraries/covers',
+    ...options
 });
 
 export const deleteLibrary = <ThrowOnError extends boolean = false>(options: Options<DeleteLibraryData, ThrowOnError>): RequestResult<DeleteLibraryResponses, DeleteLibraryErrors, ThrowOnError, 'data'> => (options.client ?? client).delete<DeleteLibraryResponses, DeleteLibraryErrors, ThrowOnError, 'data'>({
@@ -332,6 +338,12 @@ export const clearCompletedTasks = <ThrowOnError extends boolean = false>(option
     ...options
 });
 
+export const taskSummary = <ThrowOnError extends boolean = false>(options?: Options<TaskSummaryData, ThrowOnError>): RequestResult<TaskSummaryResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<TaskSummaryResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/tasks/summary',
+    ...options
+});
+
 export const deleteTask = <ThrowOnError extends boolean = false>(options: Options<DeleteTaskData, ThrowOnError>): RequestResult<DeleteTaskResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).delete<DeleteTaskResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/tasks/{id}',
@@ -359,6 +371,12 @@ export const resumeTask = <ThrowOnError extends boolean = false>(options: Option
 export const listVideos = <ThrowOnError extends boolean = false>(options?: Options<ListVideosData, ThrowOnError>): RequestResult<ListVideosResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListVideosResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/videos',
+    ...options
+});
+
+export const startAnalysis = <ThrowOnError extends boolean = false>(options: Options<StartAnalysisData, ThrowOnError>): RequestResult<StartAnalysisResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).post<StartAnalysisResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/videos/analyze/{library_id}',
     ...options
 });
 

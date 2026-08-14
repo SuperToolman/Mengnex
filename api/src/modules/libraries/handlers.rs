@@ -1,13 +1,12 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, Set, TransactionTrait,
 };
-use uuid::Uuid;
 
 use crate::{
     core::{app::AppState, error::ApiError},
@@ -17,27 +16,83 @@ use crate::{
         webdav_connection,
     },
     modules::{
+        auth::service::CurrentUser,
+        libraries::cache::start_cache_generation,
         libraries::dto::{
-            CreateLibraryRequest, DeleteLibraryResponse, LibraryPreviewJobResponse,
-            LibraryPreviewStatusResponse, LibraryResponse, PreviewGenerationTaskResponse,
-            PreviewGenerationTaskStatus, UpdateLibraryPreviewConfigRequest, UpdateLibraryRequest,
+            CreateLibraryRequest, DeleteLibraryResponse, LibraryCoversResponse,
+            LibraryPreviewJobResponse, LibraryPreviewStatusResponse, LibraryResponse,
+            PreviewGenerationTaskResponse, UpdateLibraryPreviewConfigRequest, UpdateLibraryRequest,
             normalize_scan_extensions, serialize_scan_extensions,
         },
+        photos::dto::PhotoAssetResponse,
         photos::service::{
-            PreviewGenerationProgress, PreviewOperationSummary, compute_library_status_map,
-            delete_library_previews, generate_library_previews_with_progress,
+            PreviewOperationSummary, compute_library_status_map, delete_library_previews,
         },
         tasks::{
             dto::TaskKind,
-            service::{
-                CreateAppTaskParams, PreviewTaskMetadata, UpdateAppTaskParams, create_app_task,
-                find_running_library_task, preview_task_response_from_model,
-                serialize_preview_metadata, update_app_task,
-            },
+            service::{find_running_library_background_task, preview_task_response_from_model},
         },
-        videos::service::delete_library_covers,
+        videos::{dto::VideoAssetResponse, service::delete_library_covers},
     },
 };
+
+#[utoipa::path(get, path = "/api/libraries/covers", responses((status = 200, body = LibraryCoversResponse)), tag = "libraries")]
+pub async fn list_library_covers(
+    Extension(current): Extension<CurrentUser>,
+    State(state): State<AppState>,
+) -> Result<Json<LibraryCoversResponse>, ApiError> {
+    let mut library_select = media_library::Entity::find();
+    if let Some(library_ids) = current.library_ids {
+        library_select = library_select.filter(media_library::Column::Id.is_in(library_ids));
+    }
+    let libraries = library_select.all(&state.db).await?;
+    let active_items = media_item::Entity::find()
+        .select_only()
+        .column(media_item::Column::Id)
+        .filter(media_item::Column::DeletedAt.is_null())
+        .filter(media_item::Column::SourceMissingAt.is_null())
+        .into_query();
+    let mut photos = Vec::new();
+    let mut videos = Vec::new();
+    for library in libraries {
+        match library.media_type.as_str() {
+            "photo" => {
+                photos.extend(
+                    photo_asset::Entity::find()
+                        .filter(photo_asset::Column::LibraryId.eq(&library.id))
+                        .filter(
+                            sea_orm::sea_query::Expr::col(photo_asset::Column::ItemId)
+                                .in_subquery(active_items.clone()),
+                        )
+                        .order_by_desc(photo_asset::Column::BatchTime)
+                        .limit(5)
+                        .all(&state.db)
+                        .await?
+                        .into_iter()
+                        .map(PhotoAssetResponse::from),
+                );
+            }
+            "video" | "mixed_video" => {
+                videos.extend(
+                    video_asset::Entity::find()
+                        .filter(video_asset::Column::LibraryId.eq(&library.id))
+                        .filter(
+                            sea_orm::sea_query::Expr::col(video_asset::Column::ItemId)
+                                .in_subquery(active_items.clone()),
+                        )
+                        .order_by_desc(video_asset::Column::CreatedAt)
+                        .limit(3)
+                        .all(&state.db)
+                        .await?
+                        .into_iter()
+                        .map(VideoAssetResponse::from),
+                );
+            }
+            _ => {}
+        }
+    }
+    Ok(Json(LibraryCoversResponse { photos, videos }))
+}
 
 #[utoipa::path(
     get,
@@ -46,9 +101,14 @@ use crate::{
     tag = "libraries"
 )]
 pub async fn list_libraries(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<LibraryResponse>>, ApiError> {
-    let libraries = media_library::Entity::find()
+    let mut select = media_library::Entity::find();
+    if let Some(library_ids) = current.library_ids {
+        select = select.filter(media_library::Column::Id.is_in(library_ids));
+    }
+    let libraries = select
         .order_by_desc(media_library::Column::CreatedAt)
         .all(&state.db)
         .await?;
@@ -183,15 +243,20 @@ pub async fn create_library(
     tag = "libraries"
 )]
 pub async fn get_library(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<LibraryResponse>, ApiError> {
+    if !current.can_access_library(&id) {
+        return Err(ApiError::NotFound("media library"));
+    }
     let library = media_library::Entity::find_by_id(id)
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("media library"))?;
 
-    let status_map = compute_library_status_map(&state.db, &[library.id.clone()]).await?;
+    let status_map =
+        compute_library_status_map(&state.db, std::slice::from_ref(&library.id)).await?;
     let preview_status = status_map
         .get(&library.id)
         .cloned()
@@ -284,20 +349,20 @@ pub async fn update_library(
         }
         active_library.collection_type = Set(Some(collection_type));
     }
-    if active_library.source_type.as_ref() == "webdav" {
-        if let sea_orm::ActiveValue::Set(path) = &active_library.root_path {
-            if path.contains("://") || path.contains('\\') {
-                return Err(ApiError::BadRequest(
-                    "WebDAV path must be relative to the selected connection".to_owned(),
-                ));
-            }
-        }
+    if active_library.source_type.as_ref() == "webdav"
+        && let sea_orm::ActiveValue::Set(path) = &active_library.root_path
+        && (path.contains("://") || path.contains('\\'))
+    {
+        return Err(ApiError::BadRequest(
+            "WebDAV path must be relative to the selected connection".to_owned(),
+        ));
     }
 
     active_library.updated_at = Set(now);
     let library = active_library.update(&state.db).await?;
 
-    let status_map = compute_library_status_map(&state.db, &[library.id.clone()]).await?;
+    let status_map =
+        compute_library_status_map(&state.db, std::slice::from_ref(&library.id)).await?;
     let preview_status = status_map
         .get(&library.id)
         .cloned()
@@ -342,7 +407,8 @@ pub async fn update_library_preview_config(
     active_library.updated_at = Set(now);
     let library = active_library.update(&state.db).await?;
 
-    let status_map = compute_library_status_map(&state.db, &[library.id.clone()]).await?;
+    let status_map =
+        compute_library_status_map(&state.db, std::slice::from_ref(&library.id)).await?;
     let preview_status = status_map
         .get(&library.id)
         .cloned()
@@ -380,15 +446,9 @@ pub async fn delete_library(
         .await?
         .ok_or(ApiError::NotFound("media library"))?;
 
-    if find_running_library_task(&state.db, &library.id, TaskKind::GenerateCache)
+    if find_running_library_background_task(&state.db, &library.id)
         .await?
         .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::ScanLibrary)
-            .await?
-            .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::VideoCoverGenerate)
-            .await?
-            .is_some()
     {
         return Err(ApiError::BadRequest(
             "library still has a running background task".to_owned(),
@@ -480,79 +540,8 @@ pub async fn generate_library_preview_assets(
         .await?
         .ok_or(ApiError::NotFound("media library"))?;
 
-    if find_running_library_task(&state.db, &library.id, TaskKind::GenerateCache)
-        .await?
-        .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::ScanLibrary)
-            .await?
-            .is_some()
-    {
-        return Err(ApiError::BadRequest(
-            "library already has a running background task".to_owned(),
-        ));
-    }
-
-    let now = Utc::now();
-    let task_id = Uuid::new_v4().to_string();
-    let task_model = create_app_task(
-        &state.db,
-        CreateAppTaskParams {
-            id: task_id.clone(),
-            kind: TaskKind::GenerateCache.to_string(),
-            title: "Generate previews".to_owned(),
-            library_id: Some(library.id.clone()),
-            status: PreviewGenerationTaskStatus::Queued.to_string(),
-            progress_percent: 0,
-            processed_items: 0,
-            total_items: 0,
-            detail: Some("generated 0 previews, skipped 0".to_owned()),
-            error_message: None,
-            metadata_json: Some(serialize_preview_metadata(&PreviewTaskMetadata::default())?),
-            created_at: now,
-            finished_at: None,
-        },
-    )
-    .await?;
+    let task_model = start_cache_generation(&state.db, library, false).await?;
     let task = preview_task_response_from_model(task_model);
-
-    let state_for_task = state.clone();
-    tokio::spawn(async move {
-        let _ = set_task_status(
-            &state_for_task.db,
-            &task_id,
-            PreviewGenerationTaskStatus::Running,
-            None,
-        )
-        .await;
-
-        let result = generate_library_previews_with_progress(
-            &state_for_task.db,
-            &library,
-            false,
-            Some(&task_id),
-            |progress| {
-                let db = state_for_task.db.clone();
-                let task_id = task_id.clone();
-                let progress = progress.clone();
-
-                Box::pin(async move { update_task_progress(&db, &task_id, &progress).await })
-            },
-        )
-        .await;
-
-        match result {
-            Ok(summary) => {
-                let _ = complete_task_success(&state_for_task.db, &task_id, summary).await;
-            }
-            Err(ApiError::TaskCanceled) => {
-                let _ = complete_task_canceled(&state_for_task.db, &task_id).await;
-            }
-            Err(err) => {
-                let _ =
-                    complete_task_failure(&state_for_task.db, &task_id, format!("{err:?}")).await;
-            }
-        }
-    });
 
     Ok(Json(task))
 }
@@ -571,9 +560,13 @@ pub async fn generate_library_preview_assets(
     tag = "libraries"
 )]
 pub async fn get_library_preview_generation_task(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path((library_id, task_id)): Path<(String, String)>,
 ) -> Result<Json<PreviewGenerationTaskResponse>, ApiError> {
+    if !current.can_access_library(&library_id) {
+        return Err(ApiError::NotFound("preview generation task"));
+    }
     let task = app_task::Entity::find_by_id(task_id)
         .filter(app_task::Column::LibraryId.eq(library_id))
         .filter(app_task::Column::Kind.eq(TaskKind::GenerateCache.to_string()))
@@ -633,144 +626,4 @@ impl LibraryPreviewJobResponse {
             reclaimed_bytes: value.reclaimed_bytes,
         }
     }
-}
-
-async fn update_task_progress(
-    db: &sea_orm::DatabaseConnection,
-    task_id: &str,
-    progress: &PreviewGenerationProgress,
-) -> Result<(), ApiError> {
-    let detail = format!(
-        "已生成预览图 {}，已跳过 {}",
-        progress.generated_previews, progress.skipped_assets
-    );
-    let metadata_json = serialize_preview_metadata(&PreviewTaskMetadata {
-        generated_previews: progress.generated_previews,
-        skipped_assets: progress.skipped_assets,
-    })?;
-
-    let _ = update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            progress_percent: Some(calculate_progress_percent(
-                progress.processed_assets,
-                progress.total_assets,
-            )),
-            processed_items: Some(progress.processed_assets),
-            total_items: Some(progress.total_assets),
-            detail: Some(Some(detail)),
-            metadata_json: Some(Some(metadata_json)),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn set_task_status(
-    db: &sea_orm::DatabaseConnection,
-    task_id: &str,
-    status: PreviewGenerationTaskStatus,
-    error_message: Option<String>,
-) -> Result<(), ApiError> {
-    let _ = update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            status: Some(status.to_string()),
-            error_message: Some(error_message),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn complete_task_success(
-    db: &sea_orm::DatabaseConnection,
-    task_id: &str,
-    summary: PreviewOperationSummary,
-) -> Result<(), ApiError> {
-    let now = Utc::now();
-    let detail = format!(
-        "已生成预览图 {}，已跳过 {}",
-        summary.generated_previews, summary.skipped_assets
-    );
-    let metadata_json = serialize_preview_metadata(&PreviewTaskMetadata {
-        generated_previews: summary.generated_previews,
-        skipped_assets: summary.skipped_assets,
-    })?;
-
-    let _ = update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            status: Some(PreviewGenerationTaskStatus::Completed.to_string()),
-            progress_percent: Some(100),
-            processed_items: Some(summary.processed_assets),
-            detail: Some(Some(detail)),
-            error_message: Some(None),
-            metadata_json: Some(Some(metadata_json)),
-            finished_at: Some(Some(now)),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn complete_task_canceled(
-    db: &sea_orm::DatabaseConnection,
-    task_id: &str,
-) -> Result<(), ApiError> {
-    let now = Utc::now();
-    let _ = update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            status: Some(PreviewGenerationTaskStatus::Canceled.to_string()),
-            error_message: Some(None),
-            finished_at: Some(Some(now)),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn complete_task_failure(
-    db: &sea_orm::DatabaseConnection,
-    task_id: &str,
-    error_message: String,
-) -> Result<(), ApiError> {
-    let now = Utc::now();
-
-    let _ = update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            status: Some(PreviewGenerationTaskStatus::Failed.to_string()),
-            error_message: Some(Some(error_message)),
-            finished_at: Some(Some(now)),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-
-    Ok(())
-}
-
-fn calculate_progress_percent(processed_assets: i64, total_assets: i64) -> i32 {
-    if total_assets <= 0 {
-        return 100;
-    }
-
-    ((processed_assets as f64 / total_assets as f64) * 100.0)
-        .round()
-        .clamp(0.0, 100.0) as i32
 }

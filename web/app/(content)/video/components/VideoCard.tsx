@@ -3,7 +3,6 @@
 import { Check, PlayFill, Video } from "@gravity-ui/icons";
 import { Button, Card, Chip, Tooltip } from "@heroui/react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
 import type { VideoAssetResponse } from "@/src/api/client";
 
 function formatDuration(seconds?: number | null) {
@@ -14,35 +13,17 @@ function formatDuration(seconds?: number | null) {
 }
 
 export default function VideoCard({ video, onOpen }: { video: VideoAssetResponse; onOpen: () => void }) {
-    const preview = useRef<HTMLVideoElement>(null);
-    const [isPreviewing, setIsPreviewing] = useState(false);
     const progress = video.duration_seconds && video.duration_seconds > 0
         ? Math.min(100, Math.max(0, (video.playback_position_seconds / video.duration_seconds) * 100))
         : 0;
 
-    useEffect(() => {
-        const player = preview.current;
-        if (!player) return;
-        if (isPreviewing) {
-            void player.play().catch(() => undefined);
-            return;
-        }
-        player.pause();
-        player.currentTime = 0;
-    }, [isPreviewing]);
-
     return (
-        <Card.Root
-            className="group overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
-            onMouseEnter={() => setIsPreviewing(true)}
-            onMouseLeave={() => setIsPreviewing(false)}
-        >
-            <div className="relative aspect-video overflow-hidden bg-black">
-                <video ref={preview} src={video.stream_src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
-                {video.poster_src && !isPreviewing ? (
+        <div className="group overflow-hidden transition-transform duration-200 hover:-translate-y-0.5">
+            <Card className="relative aspect-video overflow-hidden bg-black">
+                {video.poster_src ? (
                     <Image fill unoptimized alt={`${video.title} 封面`} src={video.poster_src} sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover" />
                 ) : null}
-                {!video.poster_src && !isPreviewing ? (
+                {!video.poster_src ? (
                     <div className="absolute inset-0 grid place-items-center bg-surface-secondary text-muted"><Video className="h-8 w-8" /></div>
                 ) : null}
                 <div className="absolute bottom-2 right-2">
@@ -59,18 +40,18 @@ export default function VideoCard({ video, onOpen }: { video: VideoAssetResponse
                 {progress > 0 && !video.playback_completed ? (
                     <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25"><div className="h-full bg-accent" style={{ width: `${progress}%` }} /></div>
                 ) : null}
-            </div>
+            </Card>
 
-            <Card.Content className="min-w-0 space-y-2 p-3 pb-2">
-                <Card.Title className="line-clamp-2 min-h-10 text-sm leading-5">{video.title}</Card.Title>
-                <Card.Description className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 space-y-2 py-3">
+                <h3 className="line-clamp-2 min-h-10 text-sm leading-5">{video.title}</h3>
+                <p className="flex min-w-0 items-center gap-2">
                     <Chip size="sm" variant="soft">{video.container?.toUpperCase() ?? "VIDEO"}</Chip>
                     <span className="truncate text-xs text-muted">{video.video_codec ?? (video.analysis_status === "ready" ? "未知编码" : "等待分析")}</span>
                     {video.width && video.height ? <span className="ml-auto shrink-0 text-xs text-muted">{video.width}×{video.height}</span> : null}
-                </Card.Description>
-            </Card.Content>
+                </p>
+            </div>
 
-            <Card.Footer className="flex items-center justify-between gap-3 px-3 pb-3 pt-0">
+            <div className="flex items-center justify-between gap-3">
                 <span className="truncate text-xs text-muted">
                     {progress > 0 && !video.playback_completed ? `已观看 ${Math.round(progress)}%` : video.playback_completed ? "播放完成" : "尚未观看"}
                 </span>
@@ -82,7 +63,7 @@ export default function VideoCard({ video, onOpen }: { video: VideoAssetResponse
                     </Tooltip.Trigger>
                     <Tooltip.Content>{progress > 0 ? "继续播放" : "播放视频"}</Tooltip.Content>
                 </Tooltip>
-            </Card.Footer>
-        </Card.Root>
+            </div>
+        </div>
     );
 }

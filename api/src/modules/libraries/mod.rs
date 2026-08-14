@@ -2,6 +2,7 @@ use axum::{Router, routing::get};
 
 use crate::core::app::AppState;
 
+pub mod cache;
 pub mod dto;
 pub mod handlers;
 
@@ -11,6 +12,7 @@ pub fn routes() -> Router<AppState> {
             "/api/libraries",
             get(handlers::list_libraries).post(handlers::create_library),
         )
+        .route("/api/libraries/covers", get(handlers::list_library_covers))
         .route(
             "/api/libraries/{id}",
             get(handlers::get_library)

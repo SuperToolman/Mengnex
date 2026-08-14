@@ -1,8 +1,6 @@
-﻿@import "tailwindcss";
-
+@import "tailwindcss";
 @import "@heroui/react/styles";
 
-/* 同时支持 html.dark 和 html[data-theme="dark"] 两种切换方式 */
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
@@ -10,82 +8,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ── 主题色 ─────────────────────────────────────────── */
-
-:root {
-  /* HeroUI semantic theme tokens. Components use these instead of app-specific overlays. */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --surface: #ffffff;
-  --surface-foreground: #0f172a;
-  --surface-secondary: #f1f5f9;
-  --surface-secondary-foreground: #0f172a;
-  --surface-tertiary: #e2e8f0;
-  --surface-tertiary-foreground: #0f172a;
-  --overlay: #ffffff;
-  --overlay-foreground: #0f172a;
-  --muted: #64748b;
-  --backdrop: rgba(15, 23, 42, 0.48);
-  --separator: rgba(203, 213, 225, 0.72);
-  --border: rgba(203, 213, 225, 0.72);
-  --focus: #0284c7;
-
-  --theme-app-background: linear-gradient(
-    to bottom right,
-    #eef3d5 0%,
-    #e3efc9 24%,
-    #f3d8df 62%,
-    #ecc8d6 100%
-  );
-  --theme-sidebar-blob-base: linear-gradient(140deg, rgba(244, 225, 255, 0.92), rgba(226, 233, 255, 0.88) 58%, rgba(214, 247, 229, 0.84));
-  --theme-sidebar-blob-lead: linear-gradient(135deg, rgba(255, 242, 247, 0.98), rgba(228, 241, 255, 0.92) 54%, rgba(215, 244, 228, 0.88));
-  --theme-sidebar-blob-source: linear-gradient(180deg, rgba(246, 236, 255, 0.84), rgba(224, 235, 255, 0.76));
-  --theme-sidebar-blob-bridge: linear-gradient(90deg, rgba(237, 228, 255, 0.82), rgba(226, 240, 255, 0.78), rgba(225, 244, 234, 0.8));
-  --theme-sidebar-blob-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -10px 18px rgba(182, 166, 255, 0.10);
-  --theme-sidebar-glow: radial-gradient(circle at 50% 50%, rgba(203, 162, 255, 0.18), rgba(203, 162, 255, 0));
-}
-
-:root.dark,
-:root[data-theme="dark"] {
-  /* Keep HeroUI overlays opaque while preserving the app's dark palette. */
-  --background: #0f172a;
-  --foreground: #f1f5f9;
-  --surface: #1e293b;
-  --surface-foreground: #f1f5f9;
-  --surface-secondary: #263449;
-  --surface-secondary-foreground: #f1f5f9;
-  --surface-tertiary: #334155;
-  --surface-tertiary-foreground: #f1f5f9;
-  --overlay: #1e293b;
-  --overlay-foreground: #f1f5f9;
-  --muted: #94a3b8;
-  --backdrop: rgba(2, 6, 23, 0.68);
-  --separator: rgba(71, 85, 105, 0.72);
-  --border: rgba(71, 85, 105, 0.72);
-  --focus: #38bdf8;
-
-  --theme-app-background: linear-gradient(
-    to bottom right,
-    #0b0816 0%,
-    #18102c 30%,
-    #261646 68%,
-    #341b5a 100%
-  );
-  --theme-sidebar-blob-base: linear-gradient(140deg, rgba(86, 52, 150, 0.72), rgba(63, 43, 120, 0.76) 56%, rgba(40, 31, 86, 0.80));
-  --theme-sidebar-blob-lead: linear-gradient(135deg, rgba(118, 71, 194, 0.76), rgba(83, 55, 156, 0.78) 56%, rgba(56, 40, 114, 0.82));
-  --theme-sidebar-blob-source: linear-gradient(180deg, rgba(92, 58, 164, 0.70), rgba(60, 44, 118, 0.76));
-  --theme-sidebar-blob-bridge: linear-gradient(90deg, rgba(98, 63, 172, 0.72), rgba(76, 50, 142, 0.76), rgba(56, 40, 114, 0.80));
-  --theme-sidebar-blob-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -10px 18px rgba(5, 2, 20, 0.26);
-  --theme-sidebar-glow: radial-gradient(circle at 50% 50%, rgba(168, 103, 255, 0.24), rgba(168, 103, 255, 0));
-  color-scheme: dark;
-}
-
 html,
 body {
   min-height: 100%;
 }
 
-/* 隐藏全局滚动条，但保留滚动能力。 */
 * {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -97,20 +24,13 @@ body {
 
 body {
   font-family: var(--font-sans);
-  background-color: #0b1120;
-  background-image: var(--theme-app-background);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-attachment: fixed;
-  background-position: center;
-  color: var(--foreground);
+  background: var(--app-canvas, #f8fafc);
+  color: var(--foreground, #0f172a);
 }
 
-/* ── 侧边栏选中态 ─────────────────────────────────── */
-
 .sidebar-active-focus {
-  background: var(--theme-sidebar-blob-lead);
-  box-shadow: var(--theme-sidebar-blob-shadow);
+  background: var(--accent, #0ea5e9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), height 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 160ms ease;
   will-change: transform, width, height;
 }
@@ -121,21 +41,7 @@ body {
 }
 
 @keyframes page-enter {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0) scale(0.985);
-    filter: blur(10px);
-  }
-
-  65% {
-    opacity: 1;
-    transform: translate3d(0, -3px, 0) scale(1.008);
-    filter: blur(0);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
-  }
+  0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.985); filter: blur(10px); }
+  65% { opacity: 1; transform: translate3d(0, -3px, 0) scale(1.008); filter: blur(0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }

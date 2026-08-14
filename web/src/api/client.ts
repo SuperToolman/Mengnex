@@ -42,13 +42,14 @@ import {
     purgeItem,
     restoreItem,
     resumeTask as resumeTaskSdk,
+    setup as setupSdk,
     replaceResourceTags,
     startScan,
     status,
+    taskSummary as taskSummarySdk,
     updateLibrary as updateLibrarySdk,
     updateLibraryPreviewConfig as updateLibraryPreviewConfigSdk,
     updatePreferences as updatePreferencesSdk,
-    updateRolePermissions as updateRolePermissionsSdk,
     updateTag as updateTagSdk,
     updatePlayback as updateVideoPlaybackSdk,
 } from "./generated/sdk.gen";
@@ -77,7 +78,9 @@ import type {
     RecycleBinItemResponse,
     RolePermissionsResponse,
     ScanTaskResponse,
+    SetupRequest,
     TaskResponse,
+    TaskSummaryResponse,
     TagResponse,
     TagResourceResponse,
     PreviewGenerationTaskResponse,
@@ -120,6 +123,7 @@ export type {
     RecycleBinItemResponse,
     ScanTaskResponse,
     TaskResponse,
+    TaskSummaryResponse,
     TagResponse,
     TagResourceResponse,
     PreviewGenerationTaskResponse,
@@ -137,7 +141,7 @@ export type {
 export type AuthUser = UserResponse;
 export type RolePermissions = RolePermissionsResponse;
 export type { WebdavConnectionResponse, CreateWebdavConnectionRequest };
-export type ListPhotosParams = { limit?: number; offset?: number; libraryId?: string };
+export type ListPhotosParams = { limit?: number; offset?: number; beforeId?: string; libraryId?: string };
 export type ListPhotoFolderContentsParams = { path?: string; limit?: number; offset?: number };
 export type ListVideosParams = { libraryId?: string; limit?: number; offset?: number };
 export type VideoCatalogParams = ListVideosParams & {
@@ -145,6 +149,10 @@ export type VideoCatalogParams = ListVideosParams & {
     sort?: "created" | "title" | "duration" | "updated";
     order?: "asc" | "desc";
     watched?: "all" | "unwatched" | "in_progress" | "completed";
+};
+export type LibraryCoversResponse = {
+    photos: PhotoAssetResponse[];
+    videos: VideoAssetResponse[];
 };
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -291,8 +299,26 @@ export async function getScanTasks() {
     return execute(listScanTasks(sdkOptions));
 }
 
-export async function getTasks() {
-    return execute(listTasks(sdkOptions));
+export async function getTasks(active?: boolean) {
+    return execute(listTasks({ ...sdkOptions, query: active === undefined ? undefined : { active } }));
+}
+
+export async function getTaskSummary() {
+    return execute(taskSummarySdk(sdkOptions));
+}
+
+export async function getLibraryCovers() {
+    const response = await fetch(`${API_BASE_URL}/api/libraries/covers`, {
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error((await response.json().catch(() => null))?.message ?? "无法加载媒体库封面");
+    }
+    const covers = await response.json() as LibraryCoversResponse;
+    return {
+        photos: covers.photos.map(normalizePhoto),
+        videos: covers.videos.map(normalizeVideo),
+    };
 }
 
 export async function pauseTask(taskId: string) {
@@ -321,6 +347,7 @@ export async function getPhotos(params?: ListPhotosParams) {
         query: {
             limit: params?.limit,
             offset: params?.offset,
+            before_id: params?.beforeId,
             library_id: params?.libraryId,
         },
     }));
@@ -470,6 +497,10 @@ export async function login(payload: CredentialsRequest) {
     return result;
 }
 
+export async function setupApplication(payload: SetupRequest) {
+    return execute(setupSdk({ ...sdkOptions, body: payload }));
+}
+
 export async function logout() {
     return execute(logoutSdk(sdkOptions));
 }
@@ -488,10 +519,6 @@ export async function createUser(payload: CreateUserRequest) {
 
 export async function getRolePermissions() {
     return execute(listRolePermissions(sdkOptions));
-}
-
-export async function updateRolePermissions(role: AuthRole, permissions: string[]) {
-    return execute(updateRolePermissionsSdk({ ...sdkOptions, path: { role }, body: { permissions } }));
 }
 
 export async function getPreferences() {

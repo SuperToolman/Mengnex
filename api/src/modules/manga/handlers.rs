@@ -4,6 +4,7 @@ use crate::{
         author, author_resource, manga_chapter, manga_page, manga_series, media_file, tag,
         tag_resource,
     },
+    modules::auth::service::CurrentUser,
     modules::manga::dto::{
         MangaChapterResponse, MangaDetailResponse, MangaPageResponse, MangaReaderResponse,
         MangaSeriesResponse,
@@ -11,7 +12,7 @@ use crate::{
 };
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
 };
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
 
@@ -69,10 +70,15 @@ async fn series_response(
 }
 #[utoipa::path(get,path="/api/manga",responses((status=200,body=[MangaSeriesResponse])),tag="manga")]
 pub async fn list_series(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<MangaSeriesResponse>>, ApiError> {
     Ok(Json({
-        let series = manga_series::Entity::find()
+        let mut select = manga_series::Entity::find();
+        if let Some(library_ids) = current.library_ids {
+            select = select.filter(manga_series::Column::LibraryId.is_in(library_ids));
+        }
+        let series = select
             .order_by_desc(manga_series::Column::CreatedAt)
             .all(&state.db)
             .await?;
@@ -85,6 +91,7 @@ pub async fn list_series(
 }
 #[utoipa::path(get,path="/api/manga/{id}",responses((status=200,body=MangaDetailResponse)),tag="manga")]
 pub async fn get_series(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<MangaDetailResponse>, ApiError> {
@@ -92,6 +99,9 @@ pub async fn get_series(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("manga"))?;
+    if !current.can_access_library(&series.library_id) {
+        return Err(ApiError::NotFound("manga"));
+    }
     let chapters = manga_chapter::Entity::find()
         .filter(manga_chapter::Column::SeriesId.eq(series.id.clone()))
         .order_by_asc(manga_chapter::Column::SortOrder)
@@ -118,6 +128,7 @@ pub async fn get_series(
 }
 #[utoipa::path(get,path="/api/manga/chapters/{id}/reader",responses((status=200,body=MangaReaderResponse)),tag="manga")]
 pub async fn get_reader(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<MangaReaderResponse>, ApiError> {
@@ -125,6 +136,13 @@ pub async fn get_reader(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("manga chapter"))?;
+    let series = manga_series::Entity::find_by_id(&chapter.series_id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("manga chapter"))?;
+    if !current.can_access_library(&series.library_id) {
+        return Err(ApiError::NotFound("manga chapter"));
+    }
     let pages = manga_page::Entity::find()
         .filter(manga_page::Column::ChapterId.eq(chapter.id.clone()))
         .order_by_asc(manga_page::Column::SortOrder)

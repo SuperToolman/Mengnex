@@ -9,8 +9,8 @@ use axum::{
 };
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
-    Set, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, DbBackend, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Set, Statement, Value, sea_query::Expr,
 };
 use serde::Deserialize;
 
@@ -22,11 +22,13 @@ use crate::{
     },
     modules::{
         auth::service::CurrentUser,
+        libraries::cache::start_cache_generation,
         tasks::{
             dto::{TaskKind, TaskResponse, TaskStatus},
             service::{
                 CreateAppTaskParams, UpdateAppTaskParams, create_app_task,
-                find_running_library_task, task_response_from_model, update_app_task,
+                find_running_library_background_task, find_running_library_task,
+                task_response_from_model, update_app_task,
             },
         },
         videos::{
@@ -64,6 +66,11 @@ pub struct GenerateCoversQuery {
     pub force: Option<bool>,
 }
 
+#[derive(Debug, FromQueryResult)]
+struct CatalogCount {
+    total: i64,
+}
+
 #[utoipa::path(post, path = "/api/videos/covers/{library_id}", params(("library_id" = String, Path), ("force" = Option<bool>, Query)), responses((status = 200, body = TaskResponse)), tag = "videos")]
 pub async fn start_cover_generation(
     State(state): State<AppState>,
@@ -79,72 +86,9 @@ pub async fn start_cover_generation(
             "media library does not support video covers".to_owned(),
         ));
     }
-    if find_running_library_task(&state.db, &library.id, TaskKind::VideoCoverGenerate)
-        .await?
-        .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::ScanLibrary)
-            .await?
-            .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::GenerateCache)
-            .await?
-            .is_some()
-    {
-        return Err(ApiError::BadRequest(
-            "library already has a running background task".to_owned(),
-        ));
-    }
-    let task_id = uuid::Uuid::new_v4().to_string();
-    let task = create_app_task(
-        &state.db,
-        CreateAppTaskParams {
-            id: task_id.clone(),
-            kind: TaskKind::VideoCoverGenerate.to_string(),
-            title: "Generate video covers".to_owned(),
-            library_id: Some(library.id.clone()),
-            status: TaskStatus::Queued.to_string(),
-            progress_percent: 0,
-            processed_items: 0,
-            total_items: 0,
-            detail: None,
-            error_message: None,
-            metadata_json: None,
-            created_at: Utc::now(),
-            finished_at: None,
-        },
-    )
-    .await?;
-    let response = task_response_from_model(task, Some(library.name.clone()), None);
-    let db = state.db.clone();
-    let force = query.force.unwrap_or(false);
-    tokio::spawn(async move {
-        let _ = update_app_task(
-            &db,
-            &task_id,
-            UpdateAppTaskParams {
-                status: Some(TaskStatus::Running.to_string()),
-                ..Default::default()
-            },
-        )
-        .await;
-        let result = service::generate_library_covers(&db, &library, &task_id, force, None).await;
-        let (status, error) = match result {
-            Ok(_) => (TaskStatus::Completed.to_string(), None),
-            Err(ApiError::TaskCanceled) => (TaskStatus::Canceled.to_string(), None),
-            Err(error) => (TaskStatus::Failed.to_string(), Some(format!("{error:?}"))),
-        };
-        let _ = update_app_task(
-            &db,
-            &task_id,
-            UpdateAppTaskParams {
-                status: Some(status),
-                progress_percent: Some(100),
-                error_message: Some(error),
-                finished_at: Some(Some(Utc::now())),
-                ..Default::default()
-            },
-        )
-        .await;
-    });
+    let library_name = library.name.clone();
+    let task = start_cache_generation(&state.db, library, query.force.unwrap_or(false)).await?;
+    let response = task_response_from_model(task, Some(library_name), None);
     Ok(Json(response))
 }
 
@@ -175,6 +119,7 @@ pub async fn delete_covers(
 
 #[utoipa::path(get, path = "/api/videos/{id}/poster", params(("id" = String, Path)), responses((status = 200, description = "Generated video poster"), (status = 404)), tag = "videos")]
 pub async fn get_poster(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
@@ -182,6 +127,9 @@ pub async fn get_poster(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("video asset"))?;
+    if !current.can_access_library(&asset.library_id) {
+        return Err(ApiError::NotFound("video asset"));
+    }
     let path = service::resolve_cover_path(&asset).ok_or(ApiError::NotFound("video poster"))?;
     let file = tokio::fs::File::open(path).await.map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -201,6 +149,7 @@ pub async fn get_poster(
         .into_response())
 }
 
+#[utoipa::path(post, path = "/api/videos/analyze/{library_id}", params(("library_id" = String, Path)), responses((status = 200, body = TaskResponse)), tag = "videos")]
 pub async fn start_analysis(
     State(state): State<AppState>,
     Path(library_id): Path<String>,
@@ -214,19 +163,27 @@ pub async fn start_analysis(
             "media library does not support video analysis".to_owned(),
         ));
     }
+    if find_running_library_background_task(&state.db, &library.id)
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::BadRequest(
+            "library already has a running background task".to_owned(),
+        ));
+    }
     let task_id = uuid::Uuid::new_v4().to_string();
     let task = create_app_task(
         &state.db,
         CreateAppTaskParams {
             id: task_id.clone(),
             kind: TaskKind::VideoAnalyze.to_string(),
-            title: "Analyze videos".to_owned(),
+            title: "分析视频技术信息".to_owned(),
             library_id: Some(library.id.clone()),
             status: TaskStatus::Queued.to_string(),
             progress_percent: 0,
             processed_items: 0,
             total_items: 0,
-            detail: None,
+            detail: Some("等待读取视频时长、分辨率与编码信息".to_owned()),
             error_message: None,
             metadata_json: None,
             created_at: Utc::now(),
@@ -245,13 +202,50 @@ pub async fn start_analysis(
             },
         )
         .await;
-        let result = service::analyze_pending_assets(&task_db, &library.id).await;
-        let (status, done, total, error) = match result {
-            Ok((done, total)) => (TaskStatus::Completed.to_string(), done, total, None),
+        let result =
+            service::analyze_pending_assets(&task_db, &task_id, &library.id, &library.source_type)
+                .await;
+        let (status, progress, done, total, detail, error) = match result {
+            Ok(summary) if summary.failed_assets > 0 => (
+                TaskStatus::Failed.to_string(),
+                Some(100),
+                Some(summary.processed_assets),
+                Some(summary.total_assets),
+                Some(Some(format!(
+                    "已分析 {}，已跳过 {}，失败 {}",
+                    summary.analyzed_assets, summary.skipped_assets, summary.failed_assets
+                ))),
+                Some(
+                    summary
+                        .last_error
+                        .unwrap_or_else(|| format!("{} 个视频分析失败", summary.failed_assets)),
+                ),
+            ),
+            Ok(summary) => (
+                TaskStatus::Completed.to_string(),
+                Some(100),
+                Some(summary.processed_assets),
+                Some(summary.total_assets),
+                Some(Some(format!(
+                    "已分析 {}，已跳过 {}，失败 0",
+                    summary.analyzed_assets, summary.skipped_assets
+                ))),
+                None,
+            ),
+            Err(ApiError::TaskCanceled) => (
+                TaskStatus::Canceled.to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
             Err(error) => (
                 TaskStatus::Failed.to_string(),
-                0,
-                0,
+                None,
+                None,
+                None,
+                None,
                 Some(format!("{error:?}")),
             ),
         };
@@ -260,9 +254,10 @@ pub async fn start_analysis(
             &task_id,
             UpdateAppTaskParams {
                 status: Some(status),
-                progress_percent: Some(100),
-                processed_items: Some(done),
-                total_items: Some(total),
+                progress_percent: progress,
+                processed_items: done,
+                total_items: total,
+                detail,
                 error_message: Some(error),
                 finished_at: Some(Some(Utc::now())),
                 ..Default::default()
@@ -305,52 +300,126 @@ pub async fn list_video_catalog(
     Query(query): Query<VideoCatalogQuery>,
 ) -> Result<Json<VideoCatalogResponse>, ApiError> {
     let video_library_ids = media_library::Entity::find()
-        .filter(media_library::Column::MediaType.eq("video"))
+        .filter(media_library::Column::MediaType.is_in(["video", "mixed_video"]))
         .all(&state.db)
         .await?
         .into_iter()
         .map(|library| library.id)
+        .filter(|library_id| current.can_access_library(library_id))
         .collect::<Vec<_>>();
-    let active_items = media_item::Entity::find()
-        .select_only()
-        .column(media_item::Column::Id)
-        .filter(media_item::Column::DeletedAt.is_null())
-        .filter(media_item::Column::SourceMissingAt.is_null())
-        .into_query();
-    let mut select = video_asset::Entity::find()
-        .filter(video_asset::Column::LibraryId.is_in(video_library_ids))
-        .filter(Expr::col(video_asset::Column::ItemId).in_subquery(active_items));
-    if let Some(library_id) = query.library_id.filter(|value| !value.is_empty()) {
-        select = select.filter(video_asset::Column::LibraryId.eq(library_id));
+    if video_library_ids.is_empty() {
+        return Ok(Json(VideoCatalogResponse {
+            items: Vec::new(),
+            total: 0,
+            limit: query.limit.unwrap_or(48).clamp(1, 100),
+            offset: query.offset.unwrap_or(0),
+        }));
     }
+
     let search = query
         .search
-        .map(|value| value.trim().to_ascii_lowercase())
+        .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty());
     let descending = query.order.as_deref() != Some("asc");
-    select = match query.sort.as_deref() {
-        Some("title") if descending => select.order_by_desc(video_asset::Column::Title),
-        Some("title") => select.order_by_asc(video_asset::Column::Title),
-        Some("duration") if descending => {
-            select.order_by_desc(video_asset::Column::DurationSeconds)
-        }
-        Some("duration") => select.order_by_asc(video_asset::Column::DurationSeconds),
-        Some("updated") if descending => select.order_by_desc(video_asset::Column::UpdatedAt),
-        Some("updated") => select.order_by_asc(video_asset::Column::UpdatedAt),
-        _ if descending => select.order_by_desc(video_asset::Column::CreatedAt),
-        _ => select.order_by_asc(video_asset::Column::CreatedAt),
+    let sort_column = match query.sort.as_deref() {
+        Some("title") => "va.title",
+        Some("duration") => "va.duration_seconds",
+        Some("updated") => "va.updated_at",
+        _ => "va.created_at",
     };
+    let sort_order = if descending { "DESC" } else { "ASC" };
+    let limit = query.limit.unwrap_or(48).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0);
 
-    let states = video_playback_state::Entity::find()
-        .filter(video_playback_state::Column::UserId.eq(&current.id))
+    let mut conditions = vec![
+        "mi.deleted_at IS NULL".to_owned(),
+        "mi.source_missing_at IS NULL".to_owned(),
+        "(vcm.video_asset_id IS NULL OR vc.default_video_asset_id = va.id)".to_owned(),
+        format!(
+            "va.library_id IN ({})",
+            vec!["?"; video_library_ids.len()].join(", ")
+        ),
+    ];
+    let mut values = vec![Value::from(current.id.clone())];
+    values.extend(video_library_ids.into_iter().map(Value::from));
+    if let Some(library_id) = query.library_id.filter(|value| !value.is_empty()) {
+        conditions.push("va.library_id = ?".to_owned());
+        values.push(Value::from(library_id));
+    }
+    if let Some(search) = search {
+        conditions
+            .push("(LOWER(va.title) LIKE LOWER(?) OR LOWER(vc.title) LIKE LOWER(?))".to_owned());
+        let pattern = format!("%{search}%");
+        values.push(Value::from(pattern.clone()));
+        values.push(Value::from(pattern));
+    }
+    match query.watched.as_deref() {
+        Some("completed") => conditions.push("COALESCE(vps.completed, 0) = 1".to_owned()),
+        Some("in_progress") => conditions.push(
+            "COALESCE(vps.completed, 0) = 0 AND COALESCE(vps.position_seconds, 0) > 0".to_owned(),
+        ),
+        Some("unwatched") => conditions.push(
+            "COALESCE(vps.completed, 0) = 0 AND COALESCE(vps.position_seconds, 0) <= 0".to_owned(),
+        ),
+        _ => {}
+    }
+    let from_sql = format!(
+        " FROM video_assets va
+          JOIN media_items mi ON mi.id = va.item_id
+          LEFT JOIN video_collection_members vcm ON vcm.video_asset_id = va.id
+          LEFT JOIN video_collections vc ON vc.id = vcm.collection_id
+          LEFT JOIN video_playback_states vps ON vps.video_asset_id = va.id AND vps.user_id = ?
+          WHERE {}",
+        conditions.join(" AND ")
+    );
+    let total = CatalogCount::find_by_statement(Statement::from_sql_and_values(
+        DbBackend::Sqlite,
+        format!("SELECT COUNT(*) AS total{from_sql}"),
+        values.clone(),
+    ))
+    .one(&state.db)
+    .await?
+    .map_or(0, |row| row.total.max(0) as u64);
+
+    let mut page_values = values;
+    page_values.push(Value::from(limit as i64));
+    page_values.push(Value::from(offset as i64));
+    let assets = video_asset::Entity::find()
+        .from_raw_sql(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            format!(
+                "SELECT va.*{from_sql} ORDER BY {sort_column} {sort_order}, va.id {sort_order} LIMIT ? OFFSET ?"
+            ),
+            page_values,
+        ))
         .all(&state.db)
-        .await?
-        .into_iter()
-        .map(|state| (state.video_asset_id.clone(), state))
-        .collect::<HashMap<_, _>>();
-    let mut assets = select.all(&state.db).await?;
-    let collections = video_collection::Entity::find().all(&state.db).await?;
+        .await?;
+    let asset_ids = assets
+        .iter()
+        .map(|asset| asset.id.clone())
+        .collect::<Vec<_>>();
+    let states = if asset_ids.is_empty() {
+        HashMap::new()
+    } else {
+        video_playback_state::Entity::find()
+            .filter(video_playback_state::Column::UserId.eq(&current.id))
+            .filter(video_playback_state::Column::VideoAssetId.is_in(asset_ids.clone()))
+            .all(&state.db)
+            .await?
+            .into_iter()
+            .map(|state| (state.video_asset_id.clone(), state))
+            .collect::<HashMap<_, _>>()
+    };
     let collection_members = video_collection_member::Entity::find()
+        .filter(video_collection_member::Column::VideoAssetId.is_in(asset_ids))
+        .all(&state.db)
+        .await?;
+    let collection_ids = collection_members
+        .iter()
+        .map(|member| member.collection_id.clone())
+        .collect::<Vec<_>>();
+    let collections = video_collection::Entity::find()
+        .filter(video_collection::Column::Id.is_in(collection_ids.clone()))
         .all(&state.db)
         .await?;
     let collection_by_id = collections
@@ -365,42 +434,18 @@ pub async fn list_video_catalog(
                 .map(|collection| (member.video_asset_id.clone(), *collection))
         })
         .collect::<HashMap<_, _>>();
-    let member_counts = collection_members
+    let count_members = video_collection_member::Entity::find()
+        .filter(video_collection_member::Column::CollectionId.is_in(collection_ids))
+        .all(&state.db)
+        .await?;
+    let member_counts = count_members
         .iter()
         .fold(HashMap::new(), |mut counts, member| {
             *counts.entry(member.collection_id.clone()).or_insert(0_u64) += 1;
             counts
         });
-    assets.retain(|asset| {
-        member_collection
-            .get(&asset.id)
-            .is_none_or(|collection| collection.default_video_asset_id == asset.id)
-    });
-    if let Some(search) = search.as_deref() {
-        assets.retain(|asset| {
-            asset.title.to_ascii_lowercase().contains(search)
-                || member_collection.get(&asset.id).is_some_and(|collection| {
-                    collection.title.to_ascii_lowercase().contains(search)
-                })
-        });
-    }
-    assets.retain(|asset| match query.watched.as_deref() {
-        Some("completed") => states.get(&asset.id).is_some_and(|state| state.completed),
-        Some("in_progress") => states
-            .get(&asset.id)
-            .is_some_and(|state| !state.completed && state.position_seconds > 0.0),
-        Some("unwatched") => states
-            .get(&asset.id)
-            .is_none_or(|state| state.position_seconds <= 0.0 && !state.completed),
-        _ => true,
-    });
-    let total = assets.len() as u64;
-    let limit = query.limit.unwrap_or(48).clamp(1, 100);
-    let offset = query.offset.unwrap_or(0);
     let items = assets
         .into_iter()
-        .skip(offset as usize)
-        .take(limit as usize)
         .map(|asset| {
             let state = states.get(&asset.id);
             let collection = member_collection.get(&asset.id);
@@ -434,6 +479,9 @@ pub async fn get_video(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("video asset"))?;
+    if !current.can_access_library(&asset.library_id) {
+        return Err(ApiError::NotFound("video asset"));
+    }
     let library = media_library::Entity::find_by_id(&asset.library_id)
         .one(&state.db)
         .await?
@@ -598,10 +646,13 @@ pub async fn update_playback(
             "invalid playback position or duration".to_owned(),
         ));
     }
-    video_asset::Entity::find_by_id(&id)
+    let asset = video_asset::Entity::find_by_id(&id)
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("video asset"))?;
+    if !current.can_access_library(&asset.library_id) {
+        return Err(ApiError::NotFound("video asset"));
+    }
     let now = Utc::now();
     let position = payload
         .duration_seconds
@@ -661,6 +712,7 @@ pub async fn update_playback(
     tag = "videos"
 )]
 pub async fn list_videos(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Query(query): Query<ListVideosQuery>,
 ) -> Result<Json<Vec<VideoAssetResponse>>, ApiError> {
@@ -671,6 +723,7 @@ pub async fn list_videos(
         .await?
         .into_iter()
         .map(|library| library.id)
+        .filter(|library_id| current.can_access_library(library_id))
         .collect::<Vec<_>>();
     select = select.filter(video_asset::Column::LibraryId.is_in(video_library_ids));
     if let Some(library_id) = query.library_id {

@@ -65,6 +65,7 @@ export type CreateTagRequest = {
 export type CreateUserRequest = {
     avatar_url?: string | null;
     display_name: string;
+    library_ids?: Array<string>;
     password: string;
     role: AuthRole;
     username: string;
@@ -99,6 +100,11 @@ export type DeleteTasksResponse = {
 
 export type HealthResponse = {
     status: string;
+};
+
+export type LibraryCoversResponse = {
+    photos: Array<PhotoAssetResponse>;
+    videos: Array<VideoAssetResponse>;
 };
 
 export type LibraryPreviewJobResponse = {
@@ -275,8 +281,6 @@ export type PreviewGenerationTaskResponse = {
     updated_at: string;
 };
 
-export type PreviewGenerationTaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
-
 export type PurgeRecycleBinItemResponse = {
     id: string;
 };
@@ -322,6 +326,12 @@ export type ScanTaskResponse = {
 
 export type ScanTaskStatus = 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
 
+export type SetupRequest = {
+    display_name: string;
+    password: string;
+    username: string;
+};
+
 export type TagResourceResponse = {
     id: string;
     image_src?: string | null;
@@ -361,6 +371,13 @@ export type TaskResponse = {
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
 
+export type TaskSummaryResponse = {
+    active: number;
+    failed: number;
+    history: number;
+    total: number;
+};
+
 export type UpdateLibraryPreviewConfigRequest = {
     previews_enabled: boolean;
 };
@@ -389,10 +406,6 @@ export type UpdatePreferencesRequest = {
     video_probe_timeout_seconds?: number | null;
 };
 
-export type UpdateRolePermissionsRequest = {
-    permissions: Array<string>;
-};
-
 export type UpdateTagRequest = {
     avatar_url?: string | null;
     background_url?: string | null;
@@ -410,6 +423,7 @@ export type UserResponse = {
     created_at: string;
     display_name: string;
     id: string;
+    library_ids: Array<string>;
     role: AuthRole;
     username: string;
 };
@@ -547,20 +561,18 @@ export type ListRolePermissionsResponses = {
 
 export type ListRolePermissionsResponse = ListRolePermissionsResponses[keyof ListRolePermissionsResponses];
 
-export type UpdateRolePermissionsData = {
-    body: UpdateRolePermissionsRequest;
-    path: {
-        role: string;
-    };
+export type SetupData = {
+    body: SetupRequest;
+    path?: never;
     query?: never;
-    url: '/api/auth/roles/{role}/permissions';
+    url: '/api/auth/setup';
 };
 
-export type UpdateRolePermissionsResponses = {
-    200: RolePermissionsResponse;
+export type SetupResponses = {
+    200: AuthenticatedUserResponse;
 };
 
-export type UpdateRolePermissionsResponse = UpdateRolePermissionsResponses[keyof UpdateRolePermissionsResponses];
+export type SetupResponse = SetupResponses[keyof SetupResponses];
 
 export type StatusData = {
     body?: never;
@@ -660,6 +672,19 @@ export type CreateLibraryResponses = {
 };
 
 export type CreateLibraryResponse = CreateLibraryResponses[keyof CreateLibraryResponses];
+
+export type ListLibraryCoversData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/libraries/covers';
+};
+
+export type ListLibraryCoversResponses = {
+    200: LibraryCoversResponse;
+};
+
+export type ListLibraryCoversResponse = ListLibraryCoversResponses[keyof ListLibraryCoversResponses];
 
 export type DeleteLibraryData = {
     body?: never;
@@ -992,6 +1017,10 @@ export type ListPhotosData = {
          * Number of photos to skip
          */
         offset?: number;
+        /**
+         * Return photos after this cursor id
+         */
+        before_id?: string;
         /**
          * Limit results to one media library
          */
@@ -1327,7 +1356,12 @@ export type ListTagResourcesResponse = ListTagResourcesResponses[keyof ListTagRe
 export type ListTasksData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Only return queued, running, and paused tasks
+         */
+        active?: boolean;
+    };
     url: '/api/tasks';
 };
 
@@ -1355,6 +1389,22 @@ export type ClearCompletedTasksResponses = {
 };
 
 export type ClearCompletedTasksResponse = ClearCompletedTasksResponses[keyof ClearCompletedTasksResponses];
+
+export type TaskSummaryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tasks/summary';
+};
+
+export type TaskSummaryResponses = {
+    /**
+     * Application task counts
+     */
+    200: TaskSummaryResponse;
+};
+
+export type TaskSummaryResponse2 = TaskSummaryResponses[keyof TaskSummaryResponses];
 
 export type DeleteTaskData = {
     body?: never;
@@ -1489,6 +1539,21 @@ export type ListVideosResponses = {
 };
 
 export type ListVideosResponse = ListVideosResponses[keyof ListVideosResponses];
+
+export type StartAnalysisData = {
+    body?: never;
+    path: {
+        library_id: string;
+    };
+    query?: never;
+    url: '/api/videos/analyze/{library_id}';
+};
+
+export type StartAnalysisResponses = {
+    200: TaskResponse;
+};
+
+export type StartAnalysisResponse = StartAnalysisResponses[keyof StartAnalysisResponses];
 
 export type ListVideoCatalogData = {
     body?: never;

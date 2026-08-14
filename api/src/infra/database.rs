@@ -1,9 +1,9 @@
-use std::{collections::HashSet, env, fs, path::PathBuf};
+use std::{collections::HashSet, env, fs, path::PathBuf, time::Duration};
 
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, DbErr,
-    EntityTrait, PaginatorTrait, QueryFilter, Schema, Set, Statement,
+    ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseConnection,
+    DbBackend, DbErr, EntityTrait, PaginatorTrait, QueryFilter, Schema, Set, Statement,
+    sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous},
 };
 
 use crate::infra::entities::{
@@ -19,15 +19,50 @@ pub async fn connect() -> Result<DatabaseConnection, DbErr> {
         Ok(value) => value,
         Err(_) => default_database_url()?,
     };
-    let db = Database::connect(database_url).await?;
+    let database_url = configure_sqlite_url(database_url);
+    let options = database_connect_options(database_url);
+    let db = Database::connect(options).await?;
 
-    configure_sqlite(&db).await?;
     reset_legacy_schema_if_needed(&db).await?;
     create_tables(&db).await?;
+    normalize_legacy_app_tasks(&db).await?;
     ensure_avatar_directories()?;
     backfill_app_tasks(&db).await?;
 
     Ok(db)
+}
+
+fn database_connect_options(database_url: String) -> ConnectOptions {
+    let mut options = ConnectOptions::new(database_url);
+    options
+        .max_connections(12)
+        .min_connections(1)
+        .connect_timeout(Duration::from_secs(10))
+        .acquire_timeout(Duration::from_secs(10))
+        .idle_timeout(Duration::from_secs(300))
+        .sqlx_logging(false)
+        .map_sqlx_sqlite_opts(|options| {
+            options
+                .journal_mode(SqliteJournalMode::Wal)
+                .synchronous(SqliteSynchronous::Normal)
+                .busy_timeout(Duration::from_secs(5))
+                .foreign_keys(true)
+        });
+
+    options
+}
+
+fn configure_sqlite_url(mut database_url: String) -> String {
+    if !database_url.starts_with("sqlite:") {
+        return database_url;
+    }
+
+    if !database_url.contains("mode=") {
+        database_url.push(if database_url.contains('?') { '&' } else { '?' });
+        database_url.push_str("mode=rwc");
+    }
+
+    database_url
 }
 
 fn default_database_url() -> Result<String, DbErr> {
@@ -71,7 +106,6 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     backfill_author_avatar_history(db).await?;
     create_indexes(db).await?;
     ensure_default_app_settings(db).await?;
-    ensure_initial_super_admin(db).await?;
     ensure_default_role_permissions(db).await?;
 
     Ok(())
@@ -246,8 +280,8 @@ async fn ensure_default_app_settings(db: &DatabaseConnection) -> Result<(), DbEr
     let now = chrono::Utc::now();
     app_setting::ActiveModel {
         id: Set("global".to_owned()),
-        preview_max_dimension: Set(960),
-        preview_quality: Set(55),
+        preview_max_dimension: Set(640),
+        preview_quality: Set(45),
         media_cache_max_bytes: Set(20 * 1024 * 1024 * 1024),
         media_cache_directory: Set(None),
         video_probe_enabled: Set(true),
@@ -264,44 +298,13 @@ async fn ensure_default_app_settings(db: &DatabaseConnection) -> Result<(), DbEr
     Ok(())
 }
 
-async fn ensure_initial_super_admin(db: &DatabaseConnection) -> Result<(), DbErr> {
-    if app_user::Entity::find().count(db).await? > 0 {
-        return Ok(());
-    }
-
-    let salt = SaltString::encode_b64(uuid::Uuid::new_v4().as_bytes())
-        .map_err(|err| DbErr::Custom(err.to_string()))?;
-    let password_hash = Argon2::default()
-        .hash_password(b"Mengnex@2026", &salt)
-        .map_err(|err| DbErr::Custom(err.to_string()))?
-        .to_string();
-    let now = chrono::Utc::now();
-    app_user::ActiveModel {
-        id: Set(uuid::Uuid::new_v4().to_string()),
-        username: Set("superadmin".to_owned()),
-        display_name: Set(Some("Super Administrator".to_owned())),
-        avatar_url: Set(None),
-        password_hash: Set(password_hash),
-        role: Set("owner".to_owned()),
-        created_at: Set(now),
-        updated_at: Set(now),
-    }
-    .insert(db)
-    .await?;
-
-    Ok(())
-}
-
 async fn ensure_default_role_permissions(db: &DatabaseConnection) -> Result<(), DbErr> {
     if role_permission::Entity::find().count(db).await? > 0 {
         return Ok(());
     }
 
     let defaults: [(&str, &[&str]); 4] = [
-        (
-            "owner",
-            &["media.read", "media.write", "system.manage", "role.manage"],
-        ),
+        ("owner", &["media.read", "media.write", "system.manage"]),
         ("admin", &["media.read", "media.write", "system.manage"]),
         ("editor", &["media.read", "media.write"]),
         ("viewer", &["media.read"]),
@@ -329,6 +332,7 @@ async fn create_indexes(db: &DatabaseConnection) -> Result<(), DbErr> {
         "CREATE INDEX IF NOT EXISTS idx_scan_tasks_updated_at ON scan_tasks(updated_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_library_id ON app_tasks(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_kind_status ON app_tasks(kind, status)",
+        "CREATE INDEX IF NOT EXISTS idx_app_tasks_status ON app_tasks(status)",
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_updated_at ON app_tasks(updated_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_media_files_library_id ON media_files(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_media_files_full_path ON media_files(full_path)",
@@ -336,10 +340,12 @@ async fn create_indexes(db: &DatabaseConnection) -> Result<(), DbErr> {
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_video_assets_file_id ON video_assets(file_id)",
         "CREATE INDEX IF NOT EXISTS idx_video_assets_library_id ON video_assets(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_video_assets_library_created_at ON video_assets(library_id, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_video_assets_library_updated_at ON video_assets(library_id, updated_at DESC)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_video_collections_library_path ON video_collections(library_id, source_path)",
         "CREATE INDEX IF NOT EXISTS idx_video_collection_members_collection ON video_collection_members(collection_id, sort_order)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_video_collection_members_asset ON video_collection_members(video_asset_id)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_video_playback_user_asset ON video_playback_states(user_id, video_asset_id)",
+        "CREATE INDEX IF NOT EXISTS idx_video_playback_user_completed ON video_playback_states(user_id, completed, position_seconds)",
         "CREATE INDEX IF NOT EXISTS idx_video_playback_user_recent ON video_playback_states(user_id, last_played_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_photo_assets_library_id ON photo_assets(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_photo_assets_library_batch_time ON photo_assets(library_id, batch_time DESC)",
@@ -480,23 +486,6 @@ async fn add_column_if_missing(
     Ok(())
 }
 
-async fn configure_sqlite(db: &DatabaseConnection) -> Result<(), DbErr> {
-    for statement in [
-        "PRAGMA journal_mode = WAL",
-        "PRAGMA synchronous = NORMAL",
-        "PRAGMA busy_timeout = 5000",
-        "PRAGMA foreign_keys = ON",
-    ] {
-        db.execute(Statement::from_string(
-            DbBackend::Sqlite,
-            statement.to_owned(),
-        ))
-        .await?;
-    }
-
-    Ok(())
-}
-
 async fn backfill_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr> {
     let existing_task_ids = app_task::Entity::find()
         .all(db)
@@ -543,4 +532,106 @@ async fn backfill_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr> {
     }
 
     Ok(())
+}
+
+async fn normalize_legacy_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr> {
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET kind = 'generate_cache', title = '生成浏览缓存' WHERE kind = 'video_cover_generate'"
+            .to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET status = 'failed', error_message = COALESCE(error_message, detail) WHERE status = 'completed' AND ((detail LIKE '%失败 %' AND detail NOT LIKE '%失败 0%') OR (detail LIKE '%failed %' AND detail NOT LIKE '%failed 0%'))"
+            .to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET error_message = '浏览缓存生成失败：' || (SELECT poster_error FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL ORDER BY updated_at DESC LIMIT 1) WHERE kind IN ('generate_cache', 'scan_library') AND status = 'failed' AND (error_message IS NULL OR error_message = detail OR error_message LIKE 'generated %') AND EXISTS (SELECT 1 FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL)"
+            .to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET title = '分析视频技术信息' WHERE kind = 'video_analyze'".to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET status = 'failed', error_message = '视频技术信息读取失败，请重新执行任务查看具体原因' WHERE kind = 'video_analyze' AND status = 'completed' AND EXISTS (SELECT 1 FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND video_assets.analysis_status = 'failed')"
+            .to_owned(),
+    ))
+    .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::sqlx;
+    use uuid::Uuid;
+
+    #[test]
+    fn sqlite_url_only_adds_supported_mode_parameter() {
+        assert_eq!(
+            configure_sqlite_url("sqlite://data/app.db".to_owned()),
+            "sqlite://data/app.db?mode=rwc"
+        );
+        assert_eq!(
+            configure_sqlite_url("sqlite://data/app.db?cache=shared".to_owned()),
+            "sqlite://data/app.db?cache=shared&mode=rwc"
+        );
+        assert_eq!(
+            configure_sqlite_url("postgres://localhost/app".to_owned()),
+            "postgres://localhost/app"
+        );
+    }
+
+    #[tokio::test]
+    async fn every_sqlite_pool_connection_has_required_pragmas() {
+        let database_path = env::temp_dir().join(format!("mengnex-{}.db", Uuid::new_v4()));
+        let database_url = format!(
+            "sqlite://{}?mode=rwc",
+            database_path.to_string_lossy().replace('\\', "/")
+        );
+        let db = Database::connect(database_connect_options(database_url))
+            .await
+            .expect("connect to temporary SQLite database");
+        let pool = db.get_sqlite_connection_pool();
+        let mut connections = Vec::new();
+
+        for _ in 0..4 {
+            connections.push(pool.acquire().await.expect("acquire pooled connection"));
+        }
+
+        for connection in &mut connections {
+            let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+                .fetch_one(&mut **connection)
+                .await
+                .expect("read foreign_keys");
+            let busy_timeout: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
+                .fetch_one(&mut **connection)
+                .await
+                .expect("read busy_timeout");
+            let synchronous: i64 = sqlx::query_scalar("PRAGMA synchronous")
+                .fetch_one(&mut **connection)
+                .await
+                .expect("read synchronous");
+            let journal_mode: String = sqlx::query_scalar("PRAGMA journal_mode")
+                .fetch_one(&mut **connection)
+                .await
+                .expect("read journal_mode");
+
+            assert_eq!(foreign_keys, 1);
+            assert_eq!(busy_timeout, 5_000);
+            assert_eq!(synchronous, 1);
+            assert_eq!(journal_mode, "wal");
+        }
+
+        drop(connections);
+        db.close().await.expect("close temporary SQLite database");
+        fs::remove_file(&database_path).expect("remove temporary SQLite database");
+    }
 }

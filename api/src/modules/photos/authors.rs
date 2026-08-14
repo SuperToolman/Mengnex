@@ -6,6 +6,7 @@ use crate::{
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 use std::{fs::File, io::BufReader, path::Path};
 
+#[expect(dead_code, reason = "reserved for explicit EXIF metadata rebuild jobs")]
 pub async fn rebuild_photo_author_links_for_files(
     db: &DatabaseConnection,
     library: &media_library::Model,

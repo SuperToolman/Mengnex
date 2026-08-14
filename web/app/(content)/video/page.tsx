@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronDown, Video } from "@gravity-ui/icons";
-import { Alert, Card, ListBox, Pagination, SearchField, Select, Skeleton } from "@heroui/react";
+import { ChevronDown } from "@gravity-ui/icons";
+import { Alert, ListBox, Pagination, SearchField, Select, Skeleton } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import MediaLibraryLayout, { MediaLibraryEmptyState } from "@/app/components/MediaLibraryLayout";
+import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import { getMediaLibraries, getVideoCatalog, type LibraryResponse, type VideoAssetResponse } from "@/src/api/client";
 import VideoCard from "./components/VideoCard";
 
@@ -41,7 +41,7 @@ function FilterSelect<T extends string>({
     className: string;
 }) {
     return (
-        <Select.Root selectedKey={value} onSelectionChange={(key) => key && onChange(String(key) as T)}>
+        <Select.Root aria-label={label} selectedKey={value} onSelectionChange={(key) => key && onChange(String(key) as T)}>
             <Select.Trigger aria-label={label} className={`h-9 ${className}`}>
                 <Select.Value className="truncate" />
                 <Select.Indicator><ChevronDown className="h-4 w-4" /></Select.Indicator>
@@ -59,13 +59,13 @@ function VideoGridSkeleton() {
     return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {Array.from({ length: 10 }).map((_, index) => (
-                <Card.Root key={index} className="overflow-hidden">
+                <div key={index} className="overflow-hidden border border-border">
                     <Skeleton className="aspect-video w-full rounded-none" />
-                    <Card.Content className="space-y-3 p-3">
+                    <div className="space-y-3 p-3">
                         <Skeleton className="h-4 w-4/5" />
                         <Skeleton className="h-3 w-2/5" />
-                    </Card.Content>
-                </Card.Root>
+                    </div>
+                </div>
             ))}
         </div>
     );
@@ -145,7 +145,7 @@ export default function VideoPage() {
     );
 
     return (
-        <MediaLibraryLayout title="视频" description={`${total} 个视频`} header={controls}>
+        <ContentPageLayout title="视频" description={`${total} 个视频`} header={controls}>
             {error ? (
                 <Alert status="danger">
                     <Alert.Indicator />
@@ -157,15 +157,14 @@ export default function VideoPage() {
             ) : null}
             {!error && isLoading ? <VideoGridSkeleton /> : null}
             {!error && !isLoading && total === 0 ? (
-                <MediaLibraryEmptyState message={debouncedQuery || watched !== "all" ? "没有匹配的视频。" : "创建视频媒体库并扫描后，视频会显示在这里。"} />
+                <ContentPageEmptyState message={debouncedQuery || watched !== "all" ? "没有匹配的视频。" : "创建视频媒体库并扫描后，视频会显示在这里。"} />
             ) : null}
             {!error && !isLoading && videos.length > 0 ? (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {videos.map((video) => <VideoCard key={video.id} video={video} onOpen={() => router.push(`/video/${video.id}`)} />)}
                     </div>
-                    <Card.Root variant="secondary" className="mx-auto w-fit">
-                        <Card.Content className="p-2">
+                    <div className="mx-auto w-fit bg-surface-secondary p-2">
                             <Pagination size="sm">
                                 <Pagination.Summary>第 {page + 1} / {pageCount} 页</Pagination.Summary>
                                 <Pagination.Content>
@@ -178,10 +177,9 @@ export default function VideoPage() {
                                     </Pagination.Item>
                                 </Pagination.Content>
                             </Pagination>
-                        </Card.Content>
-                    </Card.Root>
+                    </div>
                 </div>
             ) : null}
-        </MediaLibraryLayout>
+        </ContentPageLayout>
     );
 }

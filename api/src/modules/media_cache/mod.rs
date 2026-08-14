@@ -7,7 +7,6 @@ use std::{
 use chrono::{DateTime, Utc};
 
 use sea_orm::{DatabaseConnection, EntityTrait};
-
 use crate::{
     core::error::ApiError,
     infra::entities::{app_setting, media_file},
@@ -86,7 +85,6 @@ impl MediaCache {
             .parent()
             .ok_or_else(|| ApiError::BadRequest("invalid media cache path".to_owned()))?;
         tokio::fs::create_dir_all(parent).await?;
-
         let temporary = self.marker_path(&path, "part");
         tokio::fs::write(&temporary, bytes).await?;
         if tokio::fs::try_exists(&path).await? {
@@ -229,6 +227,7 @@ mod tests {
             mime_type: None,
             file_size: 0,
             modified_at: None,
+            etag: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

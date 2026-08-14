@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Card } from "@heroui/react";
+import ContentPageLayout from "@/app/components/ContentPageLayout";
 
 type SettingSection = {
     label: string;
@@ -10,6 +12,7 @@ type SettingSection = {
         href: string;
         label: string;
         description: string;
+        activePaths?: string[];
     }>;
 };
 
@@ -24,29 +27,19 @@ const settingSections: SettingSection[] = [
                 description: "管理媒体库与扫描入口",
             },
             {
-                href: "/settings/libraries/scan-settings",
-                label: "扫描设置",
-                description: "预览图缓存与视频分析参数",
-            },
-            {
                 href: "/settings/libraries/metadata",
-                label: "元数据管理",
-                description: "媒体识别与元数据维护",
+                label: "资源管理",
+                description: "元数据、作者与标签词库",
+                activePaths: [
+                    "/settings/libraries/metadata",
+                    "/settings/libraries/authors",
+                    "/settings/libraries/tags",
+                ],
             },
             {
                 href: "/settings/libraries/remote-sources",
                 label: "远程数据源",
                 description: "管理 WebDAV 等远程媒体连接",
-            },
-            {
-                href: "/settings/libraries/authors",
-                label: "作者库",
-                description: "查看扫描识别出的媒体作者",
-            },
-            {
-                href: "/settings/libraries/tags",
-                label: "标签库",
-                description: "管理所有媒体类型共用的标签",
             },
         ],
     },
@@ -87,54 +80,50 @@ export default function SettingsLayout({
     const pathname = usePathname();
 
     return (
-        <div className="flex h-full min-h-0 gap-4">
-            <aside className="w-72 shrink-0 overflow-auto rounded-3xl bg-surface p-3 shadow-surface">
-                <div className="px-3 py-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">
-                        设置
-                    </p>
-                    <h1 className="mt-1 text-xl font-semibold text-foreground">
-                        设置
-                    </h1>
-                </div>
-                <div className="mt-4 space-y-4">
+        <ContentPageLayout title="设置" description="管理媒体库、界面偏好和访问安全。">
+            <div className="flex h-full min-h-0 gap-4">
+                <aside className="w-55 overflow-y-auto space-y-4">
                     {settingSections.map((section) => (
-                        <section key={section.label} className="rounded-3xl bg-white/6 px-3 py-3">
-                            <div className="px-2">
-                                <h2 className="text-sm font-semibold text-foreground">
-                                    {section.label}
-                                </h2>
-                                <p className="mt-1 text-xs leading-5 text-muted">
-                                    {section.description}
-                                </p>
-                            </div>
-                            <nav className="mt-3 flex flex-col gap-1.5">
-                                {section.items.map((item) => {
-                                    const active = pathname === item.href;
+                        <Card.Root key={section.label}>
+                            <Card.Content>
+                                <section>
+                                    <div className="px-2">
+                                        <h2 className="text-sm font-semibold text-foreground">
+                                            {section.label}
+                                        </h2>
+                                        <p className="mt-1 text-xs leading-5 text-muted">
+                                            {section.description}
+                                        </p>
+                                    </div>
+                                    <nav className="mt-3 flex flex-col gap-1.5">
+                                        {section.items.map((item) => {
+                                            const active = (item.activePaths ?? [item.href]).includes(pathname);
 
-                                    return (
-                                        <Link
-                                            key={item.href}
-                                            href={item.href}
-                                            className={`rounded-2xl px-3 py-3 text-left transition ${active ? "bg-accent-soft" : "hover:bg-default"}`}
-                                        >
-                                            <span className={`block text-sm font-medium ${active ? "text-accent-soft-foreground" : "text-foreground"}`}>
-                                                {item.label}
-                                            </span>
-                                            <span className="mt-1 block text-xs text-muted">
-                                                {item.description}
-                                            </span>
-                                        </Link>
-                                    );
-                                })}
-                            </nav>
-                        </section>
+                                            return (
+                                                <Link
+                                                    key={item.href}
+                                                    href={item.href}
+                                                    className={`rounded-2xl px-2 py-2 text-left transition ${active ? "bg-accent-soft" : "hover:bg-default"}`}
+                                                >
+                                                    <span className={`block text-sm font-medium ${active ? "text-accent-soft-foreground" : "text-foreground"}`}>
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="mt-1 block text-xs text-muted">
+                                                        {item.description}
+                                                    </span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </nav>
+                                </section>
+                            </Card.Content>
+                        </Card.Root>
                     ))}
-                </div>
-            </aside>
-            <section className="min-w-0 flex-1 overflow-auto rounded-3xl bg-surface p-6 shadow-surface">
-                {children}
-            </section>
-        </div>
+                </aside>
+                <section className="min-w-0 flex-1 overflow-auto rounded-3xl bg-surface p-6 shadow-surface">
+                    {children}
+                </section>
+            </div>
+        </ContentPageLayout>
     );
 }

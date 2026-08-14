@@ -20,12 +20,9 @@ use crate::{
     modules::{
         manga::service::rebuild_image_manga_index,
         media_types::processor_for,
-        photos::{
-            folders::{folder_path_for_source, refresh_photo_folder_index},
-            service::{PreviewGenerationProgress, generate_library_previews_with_progress},
-        },
-        tasks::service::{UpdateAppTaskParams, update_app_task, wait_for_task_permit},
-        videos::service::{generate_library_covers, resolve_cover_path, upsert_video_asset},
+        photos::folders::{folder_path_for_source, refresh_photo_folder_index},
+        tasks::service::wait_for_task_permit,
+        videos::service::{resolve_cover_path, upsert_video_asset},
     },
 };
 
@@ -36,12 +33,6 @@ pub struct ScanSummary {
     pub inserted_items: i64,
     pub updated_files: i64,
     pub removed_files: i64,
-    pub preview_file_ids: Vec<String>,
-    pub preview_total: i64,
-    pub preview_processed: i64,
-    pub preview_failed: i64,
-    pub previews_generated: i64,
-    pub has_preview_phase: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -51,7 +42,6 @@ pub struct ScanProgress {
     pub inserted_items: i64,
     pub updated_files: i64,
     pub removed_files: i64,
-    pub has_preview_phase: bool,
 }
 
 impl From<&ScanSummary> for ScanProgress {
@@ -62,7 +52,6 @@ impl From<&ScanSummary> for ScanProgress {
             inserted_items: value.inserted_items,
             updated_files: value.updated_files,
             removed_files: value.removed_files,
-            has_preview_phase: value.has_preview_phase,
         }
     }
 }
@@ -84,17 +73,17 @@ where
         .list_entries()?
         .into_iter()
         .filter(|entry| {
-            if library.media_type == "video" {
-                if let Some(configured) = library.scan_extensions.as_deref() {
-                    let extension = entry
-                        .file_name
-                        .rsplit_once('.')
-                        .map(|(_, extension)| extension.to_ascii_lowercase());
-                    if extension.as_ref().is_none_or(|extension| {
-                        !configured.split(',').any(|allowed| allowed == extension)
-                    }) {
-                        return false;
-                    }
+            if library.media_type == "video"
+                && let Some(configured) = library.scan_extensions.as_deref()
+            {
+                let extension = entry
+                    .file_name
+                    .rsplit_once('.')
+                    .map(|(_, extension)| extension.to_ascii_lowercase());
+                if extension.as_ref().is_none_or(|extension| {
+                    !configured.split(',').any(|allowed| allowed == extension)
+                }) {
+                    return false;
                 }
             }
             processor_for(&library.media_type).is_none_or(|processor| {
@@ -105,12 +94,8 @@ where
             })
         })
         .collect::<Vec<_>>();
-    let has_preview_phase = processor_for(&library.media_type)
-        .is_some_and(|processor| processor.creates_derived_assets())
-        && library.previews_enabled;
     let mut summary = ScanSummary {
         discovered_files: files.len() as i64,
-        has_preview_phase,
         ..ScanSummary::default()
     };
     let existing_items = media_item::Entity::find()
@@ -190,13 +175,6 @@ where
                 && existing_file.file_size == entry.file_size
                 && existing_file.modified_at == entry.modified_at;
             let etag_is_current = existing_file.etag == entry.etag;
-            let content_changed = match (&existing_file.etag, &entry.etag) {
-                (Some(existing_etag), Some(entry_etag)) => existing_etag != entry_etag,
-                _ => {
-                    existing_file.file_size != entry.file_size
-                        || existing_file.modified_at != entry.modified_at
-                }
-            };
             let restore_missing_item = item.source_missing_at.is_some();
 
             if !restore_missing_item && metadata_unchanged && etag_is_current {
@@ -260,10 +238,6 @@ where
                     .is_some_and(|processor| processor.media_type() == "video")
                 {
                     upsert_video_asset(&txn, &file, &item_title).await?;
-                }
-
-                if content_changed || restore_missing_item {
-                    summary.preview_file_ids.push(file.id.clone());
                 }
 
                 txn.commit().await?;
@@ -345,8 +319,6 @@ where
                 upsert_video_asset(&txn, &file, &title).await?;
             }
 
-            summary.preview_file_ids.push(file.id.clone());
-
             txn.commit().await?;
         }
 
@@ -367,60 +339,6 @@ where
         rebuild_difference_video_collections(db, library).await?;
     }
     on_progress(&ScanProgress::from(&summary)).await?;
-
-    if processor_for(&library.media_type)
-        .is_some_and(|processor| processor.creates_derived_assets())
-        && library.previews_enabled
-    {
-        wait_for_task_permit(db, &scan_task_id).await?;
-        if library.media_type == "photo" {
-            let progress_db = db.clone();
-            let progress_task_id = scan_task_id.clone();
-            let scan_processed = summary.processed_files;
-            let scan_total = summary.discovered_files;
-            let preview_summary = generate_library_previews_with_progress(
-                db,
-                library,
-                false,
-                Some(&scan_task_id),
-                move |progress| {
-                    let progress_db = progress_db.clone();
-                    let progress_task_id = progress_task_id.clone();
-                    let progress = progress.clone();
-                    Box::pin(async move {
-                        update_preview_task_progress(
-                            &progress_db,
-                            &progress_task_id,
-                            scan_processed,
-                            scan_total,
-                            &progress,
-                        )
-                        .await
-                    })
-                },
-            )
-            .await?;
-            summary.preview_total = preview_summary.processed_assets;
-            summary.preview_processed = preview_summary.processed_assets;
-            summary.preview_failed = preview_summary.failed_assets;
-            summary.previews_generated = preview_summary.generated_previews;
-        } else if processor_for(&library.media_type)
-            .is_some_and(|processor| processor.media_type() == "video")
-        {
-            let cover_summary = generate_library_covers(
-                db,
-                library,
-                &scan_task_id,
-                false,
-                Some((summary.processed_files, summary.discovered_files)),
-            )
-            .await?;
-            summary.preview_total = cover_summary.processed_assets;
-            summary.preview_processed = cover_summary.processed_assets;
-            summary.preview_failed = cover_summary.failed_assets;
-            summary.previews_generated = cover_summary.generated_covers;
-        }
-    }
 
     Ok(summary)
 }
@@ -561,46 +479,6 @@ async fn rebuild_difference_video_collections(
     Ok(())
 }
 
-async fn update_preview_task_progress(
-    db: &DatabaseConnection,
-    task_id: &str,
-    scan_processed: i64,
-    scan_total: i64,
-    progress: &PreviewGenerationProgress,
-) -> Result<(), ApiError> {
-    let overall_processed = scan_processed.saturating_add(progress.processed_assets);
-    let overall_total = scan_total.saturating_add(progress.total_assets);
-    let overall_percent = if overall_total <= 0 {
-        99
-    } else {
-        ((overall_processed as f64 / overall_total as f64) * 100.0)
-            .round()
-            .clamp(0.0, 99.0) as i32
-    };
-    let mut detail = format!(
-        "正在生成预览图：已生成 {}，已跳过 {}，失败 {}",
-        progress.generated_previews, progress.skipped_assets, progress.failed_assets
-    );
-    if let Some(error) = progress.last_error.as_deref() {
-        let abbreviated = error.chars().take(300).collect::<String>();
-        detail.push_str(&format!("; last failure: {abbreviated}"));
-    }
-    update_app_task(
-        db,
-        task_id,
-        UpdateAppTaskParams {
-            progress_percent: Some(overall_percent),
-            processed_items: Some(overall_processed),
-            total_items: Some(overall_total),
-            detail: Some(Some(detail)),
-            error_message: Some(None),
-            ..UpdateAppTaskParams::default()
-        },
-    )
-    .await?;
-    Ok(())
-}
-
 async fn purge_invalid_video_index(
     db: &DatabaseConnection,
     file: &media_file::Model,
@@ -609,10 +487,10 @@ async fn purge_invalid_video_index(
         .filter(video_asset::Column::FileId.eq(&file.id))
         .one(db)
         .await?;
-    if let Some(asset) = &asset {
-        if let Some(path) = resolve_cover_path(asset) {
-            let _ = tokio::fs::remove_file(path).await;
-        }
+    if let Some(asset) = &asset
+        && let Some(path) = resolve_cover_path(asset)
+    {
+        let _ = tokio::fs::remove_file(path).await;
     }
     let txn = db.begin().await?;
     if let Some(asset) = asset {

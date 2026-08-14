@@ -22,7 +22,7 @@ pub async fn get_preferences(
     let settings = app_setting::Entity::find_by_id(SETTINGS_ID)
         .one(&state.db)
         .await?
-        .ok_or_else(|| ApiError::NotFound("Preferences not found".into()))?;
+        .ok_or_else(|| ApiError::NotFound("Preferences not found"))?;
 
     Ok(Json(PreferencesResponse::from(settings)))
 }
@@ -41,7 +41,7 @@ pub async fn update_preferences(
     let settings = app_setting::Entity::find_by_id(SETTINGS_ID)
         .one(&state.db)
         .await?
-        .ok_or_else(|| ApiError::NotFound("Preferences not found".into()))?;
+        .ok_or_else(|| ApiError::NotFound("Preferences not found"))?;
 
     let mut active_settings: app_setting::ActiveModel = settings.into();
 

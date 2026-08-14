@@ -1,5 +1,5 @@
-import MediaLibraryLayout, { MediaLibraryEmptyState } from "@/app/components/MediaLibraryLayout";
+import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 
 export default function AnimePage() {
-    return <MediaLibraryLayout title="动画" description="管理和浏览动画媒体库。"><MediaLibraryEmptyState message="暂时没有可显示的动画。" /></MediaLibraryLayout>;
+    return <ContentPageLayout title="动画" description="管理和浏览动画媒体库。"><ContentPageEmptyState message="暂时没有可显示的动画。" /></ContentPageLayout>;
 }

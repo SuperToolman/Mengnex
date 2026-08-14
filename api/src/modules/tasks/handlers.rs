@@ -1,18 +1,20 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, Query, State},
 };
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+};
 
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{app_task, media_library, scan_task},
     modules::{
-        libraries::dto::PreviewGenerationTaskStatus,
+        auth::service::CurrentUser,
         scanner::dto::ScanTaskStatus,
         tasks::{
-            dto::{DeleteTasksResponse, TaskKind, TaskResponse, TaskStatus},
+            dto::{DeleteTasksResponse, TaskKind, TaskResponse, TaskStatus, TaskSummaryResponse},
             service::{
                 UpdateAppTaskParams, can_cancel_status, can_pause_status, can_resume_status,
                 get_app_task, is_terminal_status, task_response_from_model, update_app_task,
@@ -21,22 +23,50 @@ use crate::{
     },
 };
 
+#[derive(Debug, serde::Deserialize)]
+pub struct TaskListQuery {
+    pub active: Option<bool>,
+}
+
 #[utoipa::path(
     get,
     path = "/api/tasks",
+    params(("active" = Option<bool>, Query, description = "Only return queued, running, and paused tasks")),
     responses((status = 200, description = "List application tasks", body = [TaskResponse])),
     tag = "tasks"
 )]
 pub async fn list_tasks(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
+    Query(query): Query<TaskListQuery>,
 ) -> Result<Json<Vec<TaskResponse>>, ApiError> {
-    let libraries = media_library::Entity::find().all(&state.db).await?;
+    let mut library_select = media_library::Entity::find();
+    let mut task_select = app_task::Entity::find();
+    if let Some(library_ids) = current.library_ids {
+        library_select =
+            library_select.filter(media_library::Column::Id.is_in(library_ids.clone()));
+        task_select = task_select.filter(app_task::Column::LibraryId.is_in(library_ids));
+    }
+    if query.active == Some(true) {
+        task_select = task_select.filter(app_task::Column::Status.is_in([
+            TaskStatus::Queued.to_string(),
+            TaskStatus::Running.to_string(),
+            TaskStatus::Paused.to_string(),
+        ]));
+    } else if query.active == Some(false) {
+        task_select = task_select.filter(app_task::Column::Status.is_in([
+            TaskStatus::Completed.to_string(),
+            TaskStatus::Canceled.to_string(),
+            TaskStatus::Failed.to_string(),
+        ]));
+    }
+    let libraries = library_select.all(&state.db).await?;
     let library_name_map = libraries
         .into_iter()
         .map(|library| (library.id, library.name))
         .collect::<std::collections::HashMap<_, _>>();
 
-    let tasks = app_task::Entity::find()
+    let tasks = task_select
         .order_by_desc(app_task::Column::UpdatedAt)
         .all(&state.db)
         .await?;
@@ -58,6 +88,55 @@ pub async fn list_tasks(
     }
 
     Ok(Json(responses))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/tasks/summary",
+    responses((status = 200, description = "Application task counts", body = TaskSummaryResponse)),
+    tag = "tasks"
+)]
+pub async fn task_summary(
+    Extension(current): Extension<CurrentUser>,
+    State(state): State<AppState>,
+) -> Result<Json<TaskSummaryResponse>, ApiError> {
+    let library_ids = current.library_ids.as_deref();
+    let total = task_query(library_ids).count(&state.db).await?;
+    let active = task_query(library_ids)
+        .filter(app_task::Column::Status.is_in([
+            TaskStatus::Queued.to_string(),
+            TaskStatus::Running.to_string(),
+            TaskStatus::Paused.to_string(),
+        ]))
+        .count(&state.db)
+        .await?;
+    let history = task_query(library_ids)
+        .filter(app_task::Column::Status.is_in([
+            TaskStatus::Completed.to_string(),
+            TaskStatus::Canceled.to_string(),
+            TaskStatus::Failed.to_string(),
+        ]))
+        .count(&state.db)
+        .await?;
+    let failed = task_query(library_ids)
+        .filter(app_task::Column::Status.eq(TaskStatus::Failed.to_string()))
+        .count(&state.db)
+        .await?;
+
+    Ok(Json(TaskSummaryResponse {
+        total,
+        active,
+        history,
+        failed,
+    }))
+}
+
+fn task_query(library_ids: Option<&[String]>) -> sea_orm::Select<app_task::Entity> {
+    let mut query = app_task::Entity::find();
+    if let Some(library_ids) = library_ids {
+        query = query.filter(app_task::Column::LibraryId.is_in(library_ids.iter().cloned()));
+    }
+    query
 }
 
 #[utoipa::path(
@@ -255,21 +334,21 @@ pub async fn cancel_task(
 
 fn status_for_pause(task: &app_task::Model) -> String {
     match task.kind.as_str() {
-        "generate_cache" => PreviewGenerationTaskStatus::Paused.to_string(),
+        "generate_cache" => TaskStatus::Paused.to_string(),
         _ => TaskStatus::Paused.to_string(),
     }
 }
 
 fn status_for_resume(task: &app_task::Model) -> String {
     match task.kind.as_str() {
-        "generate_cache" => PreviewGenerationTaskStatus::Running.to_string(),
+        "generate_cache" => TaskStatus::Running.to_string(),
         _ => TaskStatus::Running.to_string(),
     }
 }
 
 fn status_for_cancel(task: &app_task::Model) -> String {
     match task.kind.as_str() {
-        "generate_cache" => PreviewGenerationTaskStatus::Canceled.to_string(),
+        "generate_cache" => TaskStatus::Canceled.to_string(),
         _ => TaskStatus::Canceled.to_string(),
     }
 }

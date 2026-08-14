@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, Card, Chip } from "@heroui/react";
+import { Avatar, Button, Card, Chip } from "@heroui/react";
 import type { TagResponse } from "@/src/api/client";
 
 type TagCardProps = {
@@ -33,14 +33,14 @@ export default function TagCard({
         : { backgroundColor: backgroundColor(tag.name) };
 
     return (
-        <button type="button" className="w-full min-w-0 text-left" onClick={onPress}>
-        <Card.Root className="relative aspect-[2] w-full overflow-hidden transition-transform hover:-translate-y-0.5">
+        <Button variant="ghost" className="group h-auto w-full min-w-0 p-0 text-left" onPress={onPress}>
+        <Card.Root className="relative aspect-[2] w-full overflow-hidden transition-transform group-hover:-translate-y-0.5">
             <div className="absolute inset-0 bg-cover bg-center" style={backgroundStyle} />
             {avatarSrc ? <div className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${avatarSrc})` }} /> : null}
-            <Card.Content className="absolute inset-x-0 bottom-0 z-10 !flex !flex-row !items-end !justify-start !gap-3 !p-3">
-                <Avatar size="sm" className="!h-11 !w-11 !rounded-lg shrink-0 overflow-hidden [&_img]:!rounded-lg">
-                    {avatarSrc ? <Avatar.Image src={avatarSrc} alt={tag.name} className="!h-full !w-full object-cover" /> : null}
-                    <Avatar.Fallback className="!rounded-lg text-sm font-semibold">{fallbackAvatarName(tag.name)}</Avatar.Fallback>
+            <Card.Content className="absolute inset-x-0 bottom-0 z-10 flex flex-row items-end justify-start gap-3 p-3">
+                <Avatar aria-label={tag.name} size="sm" className="h-11 w-11 shrink-0 overflow-hidden rounded-lg [&_img]:rounded-lg">
+                    {avatarSrc ? <Avatar.Image src={avatarSrc} alt={tag.name} className="h-full w-full object-cover" /> : null}
+                    <Avatar.Fallback className="rounded-lg text-sm font-semibold">{fallbackAvatarName(tag.name)}</Avatar.Fallback>
                 </Avatar>
                 <div className="min-w-0 flex-1 text-left">
                     <Card.Title className="truncate text-sm text-white">{tag.name}</Card.Title>
@@ -48,6 +48,6 @@ export default function TagCard({
                 </div>
             </Card.Content>
         </Card.Root>
-        </button>
+        </Button>
     );
 }

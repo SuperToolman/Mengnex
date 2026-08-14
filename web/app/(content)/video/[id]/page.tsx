@@ -3,6 +3,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, CircleInfo } from "@gravity-ui/icons";
 import { Button, Card, Chip } from "@heroui/react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVideo, updateVideoPlayback, type VideoAssetResponse, type VideoDetailResponse } from "@/src/api/client";
@@ -135,7 +136,7 @@ export default function VideoPlayerPage() {
                                     onClick={() => !active && switchCollectionMember(member)}
                                 >
                                     <div className="relative aspect-video overflow-hidden bg-black">
-                                        {member.poster_src ? <img src={member.poster_src} alt={`${member.title} 封面`} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-xs text-white/35">暂无封面</div>}
+                                        {member.poster_src ? <Image src={member.poster_src} alt={`${member.title} 封面`} fill sizes="240px" unoptimized className="object-cover" /> : <div className="grid h-full place-items-center text-xs text-white/35">暂无封面</div>}
                                         {active ? <Chip size="sm" color="accent" className="absolute left-2 top-2">正在播放</Chip> : null}
                                     </div>
                                     <div className="p-2.5">

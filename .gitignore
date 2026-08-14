@@ -47,6 +47,10 @@ api/data/thumb/*
 !api/data/thumb/.gitkeep
 api/data/preview/*
 !api/data/preview/.gitkeep
+api/data/avatars/*
+!api/data/avatars/.gitkeep
+api/data/webdav-transient/*
+!api/data/webdav-transient/.gitkeep
 data/dev/*.db
 data/dev/*.db-shm
 data/dev/*.db-wal

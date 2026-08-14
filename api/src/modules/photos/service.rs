@@ -84,8 +84,7 @@ struct RenderedDerivatives {
 #[derive(Debug)]
 struct PreviewRenderCandidate {
     asset: photo_asset::Model,
-    source_path: String,
-    delete_source_after_render: bool,
+    source: sources::MaterializedMediaFile,
     settings: ScanRenderSettings,
 }
 
@@ -218,6 +217,7 @@ where
     generate_previews_with_progress(db, library, None, force, control_task_id, on_progress).await
 }
 
+#[expect(dead_code, reason = "reserved for targeted preview regeneration jobs")]
 pub async fn generate_file_previews_with_progress<F>(
     db: &DatabaseConnection,
     library: &media_library::Model,
@@ -339,12 +339,9 @@ where
                     continue;
                 }
             };
-        let source_path = materialized.path.to_string_lossy().into_owned();
-
         render_jobs.spawn(render_preview_candidate(PreviewRenderCandidate {
             asset,
-            source_path,
-            delete_source_after_render: materialized.temporary,
+            source: materialized,
             settings: settings.clone(),
         }));
 
@@ -370,9 +367,10 @@ where
 async fn render_preview_candidate(
     candidate: PreviewRenderCandidate,
 ) -> Result<PreviewRenderResult, ApiError> {
+    let source_path = candidate.source.path.to_string_lossy().into_owned();
     let source_label = candidate.asset.source_path.clone();
     let render_result = render_derivatives(
-        candidate.source_path.clone(),
+        source_path,
         candidate.asset.file_id.clone(),
         candidate.asset.library_id.clone(),
         candidate.settings,
@@ -383,10 +381,6 @@ async fn render_preview_candidate(
             "failed to generate derivatives for {source_label}: {error:?}"
         ))
     });
-
-    if candidate.delete_source_after_render {
-        let _ = tokio::fs::remove_file(candidate.source_path).await;
-    }
 
     let rendered = render_result?;
     Ok(PreviewRenderResult {

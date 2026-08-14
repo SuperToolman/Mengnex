@@ -125,13 +125,13 @@ function SidebarSection({
     const listRef = useRef<HTMLUListElement | null>(null);
     const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
     const [activeFrame, setActiveFrame] = useState<ActiveFrame | null>(null);
-    const [preview, setPreview] = useState<{ index: number; pathname: string } | null>(null);
 
-    const matchedIndex = items.findIndex(
-        (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-    );
+    const matchedIndex = items.findIndex((item) => {
+        const activePath = item.activePrefix ?? item.href;
+        return pathname === activePath || pathname.startsWith(`${activePath}/`);
+    });
     const routeIndex = pathname === "/" && items.length > 0 ? 0 : matchedIndex;
-    const focusIndex = preview?.pathname === pathname ? preview.index : routeIndex;
+    const focusIndex = routeIndex;
 
     const measureItem = (index: number | null) => {
         if (!listRef.current || index === null || index < 0) {
@@ -222,11 +222,6 @@ function SidebarSection({
                             expanded={expanded}
                             active={isActive}
                             title={item.label}
-                            onClick={() => {
-                                if (index !== routeIndex) {
-                                    setPreview({ index, pathname });
-                                }
-                            }}
                             itemRef={(node) => {
                                 itemRefs.current[index] = node;
                             }}
@@ -250,7 +245,6 @@ export default function SideBar() {
         const cachedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
 
         // Restore before paint so a saved collapsed state never flashes expanded.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setExpanded(cachedValue !== "0");
         setPreferenceLoaded(true);
     }, []);

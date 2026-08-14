@@ -137,6 +137,61 @@ pub async fn find_running_library_task(
         .await?)
 }
 
+pub async fn find_running_library_background_task(
+    db: &DatabaseConnection,
+    library_id: &str,
+) -> Result<Option<app_task::Model>, ApiError> {
+    Ok(app_task::Entity::find()
+        .filter(app_task::Column::LibraryId.eq(library_id.to_owned()))
+        .filter(app_task::Column::FinishedAt.is_null())
+        .filter(app_task::Column::Status.is_in(["queued", "running", "paused"]))
+        .one(db)
+        .await?)
+}
+
+pub async fn recover_interrupted_tasks(db: &DatabaseConnection) -> Result<u64, ApiError> {
+    let now = Utc::now();
+    let tasks = app_task::Entity::find()
+        .filter(app_task::Column::Status.is_in(["queued", "running", "paused"]))
+        .filter(app_task::Column::FinishedAt.is_null())
+        .all(db)
+        .await?;
+    let mut recovered = 0;
+    for task in tasks {
+        let task_id = task.id.clone();
+        update_app_task(
+            db,
+            &task_id,
+            UpdateAppTaskParams {
+                status: Some("failed".to_owned()),
+                error_message: Some(Some(
+                    "task was interrupted by an application restart; start it again".to_owned(),
+                )),
+                finished_at: Some(Some(now)),
+                ..Default::default()
+            },
+        )
+        .await?;
+        if task.kind == "scan_library"
+            && let Some(scan) = scan_task::Entity::find_by_id(task_id).one(db).await?
+        {
+            let mut active: scan_task::ActiveModel = scan.into();
+            active.status = Set("failed".to_owned());
+            active.error_message = Set(Some(
+                "task was interrupted by an application restart; start it again".to_owned(),
+            ));
+            active.finished_at = Set(Some(now));
+            active.updated_at = Set(now);
+            active.update(db).await?;
+        }
+        recovered += 1;
+    }
+    if recovered > 0 {
+        tracing::warn!(recovered, "marked interrupted background tasks as failed");
+    }
+    Ok(recovered)
+}
+
 pub async fn get_app_task(
     db: &DatabaseConnection,
     task_id: &str,
@@ -201,25 +256,18 @@ pub fn task_response_from_model(
                 .unwrap_or(0)
                 .max(0)
                 .min(scan_total);
-            let preview_total = value.total_items.saturating_sub(scan_total).max(0);
-            let preview_processed = value
-                .processed_items
-                .saturating_sub(scan_processed)
-                .max(0)
-                .min(preview_total);
-            (
-                Some(scan_processed),
-                Some(scan_total),
-                Some(preview_processed),
-                Some(preview_total),
-            )
-        } else {
+            (Some(scan_processed), Some(scan_total), None, None)
+        } else if value.kind == TaskKind::GenerateCache.to_string()
+            || value.kind == TaskKind::VideoCoverGenerate.to_string()
+        {
             (
                 None,
                 None,
                 Some(value.processed_items.max(0)),
                 Some(value.total_items.max(0)),
             )
+        } else {
+            (None, None, None, None)
         };
 
     TaskResponse {

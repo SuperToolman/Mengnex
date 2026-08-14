@@ -80,8 +80,19 @@ pub struct VideoCoverSummary {
     pub generated_covers: i64,
     pub skipped_assets: i64,
     pub failed_assets: i64,
+    pub last_error: Option<String>,
     pub deleted_covers: i64,
     pub reclaimed_bytes: i64,
+}
+
+#[derive(Debug, Default)]
+pub struct VideoAnalysisSummary {
+    pub total_assets: i64,
+    pub processed_assets: i64,
+    pub analyzed_assets: i64,
+    pub skipped_assets: i64,
+    pub failed_assets: i64,
+    pub last_error: Option<String>,
 }
 
 pub fn preview_root(library_id: &str) -> PathBuf {
@@ -142,11 +153,13 @@ pub async fn generate_library_covers(
             .one(db)
             .await?
         else {
+            let error = "未找到源媒体文件记录".to_owned();
             let mut active: video_asset::ActiveModel = asset.into();
-            active.poster_error = Set(Some("source media file record was not found".to_owned()));
+            active.poster_error = Set(Some(error.clone()));
             active.updated_at = Set(Utc::now());
             active.update(db).await?;
             summary.failed_assets += 1;
+            summary.last_error = Some(error);
             summary.processed_assets += 1;
             update_cover_progress(db, task_id, &summary, total, base_processed, base_total).await?;
             continue;
@@ -154,17 +167,13 @@ pub async fn generate_library_covers(
         let materialized = sources::materialize_media_file_for_derivative(db, library, &file).await;
         let result = match materialized {
             Ok(materialized) => {
-                let result = render_cover(
+                render_cover(
                     &settings,
                     &materialized.path,
                     &target,
                     asset.duration_seconds,
                 )
-                .await;
-                if materialized.temporary {
-                    let _ = tokio::fs::remove_file(&materialized.path).await;
-                }
-                result
+                .await
             }
             Err(error) => Err(format!("{error:?}")),
         };
@@ -181,8 +190,10 @@ pub async fn generate_library_covers(
             }
             Err(error) => {
                 let _ = tokio::fs::remove_file(&target).await;
-                active.poster_error = Set(Some(error.chars().take(500).collect()));
+                let error = error.chars().take(500).collect::<String>();
+                active.poster_error = Set(Some(error.clone()));
                 summary.failed_assets += 1;
+                summary.last_error = Some(error);
             }
         }
         active.updated_at = Set(Utc::now());
@@ -238,6 +249,12 @@ async fn render_cover(
         Ok(Ok(Ok(output))) => {
             return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
         }
+        Ok(Ok(Err(error))) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(format!(
+                "找不到 FFmpeg 可执行文件“{}”，请在扫描设置中配置正确路径",
+                settings.video_ffmpeg_command
+            ));
+        }
         Ok(Ok(Err(error))) => return Err(error.to_string()),
         Ok(Err(error)) => return Err(error.to_string()),
         Err(_) => return Err("ffmpeg cover generation timed out".to_owned()),
@@ -272,7 +289,7 @@ async fn update_cover_progress(
             processed_items: Some(combined_processed),
             total_items: Some(combined_total),
             detail: Some(Some(format!(
-                "generated {}, skipped {}, failed {}",
+                "已生成 {}，已跳过 {}，失败 {}",
                 summary.generated_covers, summary.skipped_assets, summary.failed_assets
             ))),
             ..Default::default()
@@ -314,8 +331,10 @@ pub async fn delete_library_covers(
 
 pub async fn analyze_pending_assets(
     db: &DatabaseConnection,
+    task_id: &str,
     library_id: &str,
-) -> Result<(i64, i64), ApiError> {
+    source_type: &str,
+) -> Result<VideoAnalysisSummary, ApiError> {
     let settings = app_setting::Entity::find_by_id("global")
         .one(db)
         .await?
@@ -324,15 +343,39 @@ pub async fn analyze_pending_assets(
         .filter(video_asset::Column::LibraryId.eq(library_id.to_owned()))
         .all(db)
         .await?;
-    let total = assets.len() as i64;
+    let mut summary = VideoAnalysisSummary {
+        total_assets: assets.len() as i64,
+        ..Default::default()
+    };
+    update_analysis_progress(db, task_id, &summary).await?;
     for asset in assets {
+        wait_for_task_permit(db, task_id).await?;
         let Some(file) = media_file::Entity::find_by_id(asset.file_id.clone())
             .one(db)
             .await?
         else {
+            summary.processed_assets += 1;
+            summary.failed_assets += 1;
+            summary.last_error = Some("未找到源媒体文件记录".to_owned());
+            update_analysis_progress(db, task_id, &summary).await?;
             continue;
         };
-        let probe = probe_local_file(&settings, &file).await;
+        let probe = if source_type == crate::modules::sources::WEBDAV {
+            ProbeResult {
+                status: "pending_remote".to_owned(),
+                ..Default::default()
+            }
+        } else {
+            probe_local_file(&settings, &file).await
+        };
+        match probe.status.as_str() {
+            "ready" => summary.analyzed_assets += 1,
+            "failed" => {
+                summary.failed_assets += 1;
+                summary.last_error = probe.error.clone();
+            }
+            _ => summary.skipped_assets += 1,
+        }
         let mut active: video_asset::ActiveModel = asset.into();
         active.duration_seconds = Set(probe.duration_seconds);
         active.width = Set(probe.width);
@@ -344,8 +387,38 @@ pub async fn analyze_pending_assets(
         active.analyzed_at = Set(probe.analyzed_at);
         active.updated_at = Set(Utc::now());
         active.update(db).await?;
+        summary.processed_assets += 1;
+        update_analysis_progress(db, task_id, &summary).await?;
     }
-    Ok((total, total))
+    Ok(summary)
+}
+
+async fn update_analysis_progress(
+    db: &DatabaseConnection,
+    task_id: &str,
+    summary: &VideoAnalysisSummary,
+) -> Result<(), ApiError> {
+    let progress_percent = if summary.total_assets <= 0 {
+        0
+    } else {
+        ((summary.processed_assets * 100) / summary.total_assets).min(99) as i32
+    };
+    update_app_task(
+        db,
+        task_id,
+        UpdateAppTaskParams {
+            progress_percent: Some(progress_percent),
+            processed_items: Some(summary.processed_assets),
+            total_items: Some(summary.total_assets),
+            detail: Some(Some(format!(
+                "已分析 {}，已跳过 {}，失败 {}",
+                summary.analyzed_assets, summary.skipped_assets, summary.failed_assets
+            ))),
+            ..Default::default()
+        },
+    )
+    .await?;
+    Ok(())
 }
 
 #[derive(Default)]
@@ -413,6 +486,12 @@ async fn probe_local_file(settings: &app_setting::Model, file: &media_file::Mode
     {
         Ok(Ok(Ok(output))) if output.status.success() => output,
         Ok(Ok(Ok(output))) => return failed_probe(String::from_utf8_lossy(&output.stderr).trim()),
+        Ok(Ok(Err(error))) if error.kind() == std::io::ErrorKind::NotFound => {
+            return failed_probe(&format!(
+                "找不到 FFprobe 可执行文件“{}”，请在扫描设置中配置正确路径",
+                settings.video_probe_command
+            ));
+        }
         Ok(Ok(Err(error))) => return failed_probe(&error.to_string()),
         Ok(Err(error)) => return failed_probe(&error.to_string()),
         Err(_) => return failed_probe("ffprobe timed out"),

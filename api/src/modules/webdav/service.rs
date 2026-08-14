@@ -252,23 +252,27 @@ fn parse_multistatus(xml: &str) -> Result<Vec<WebDavListingEntry>, ApiError> {
     let mut etag = None;
     let mut in_etag = false;
     let mut result = Vec::new();
+    let mut element_depth = 0_usize;
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) => match event.local_name().as_ref() {
-                b"response" => {
-                    href = None;
-                    collection = false;
-                    file_size = None;
-                    modified_at = None;
-                    etag = None;
+            Ok(Event::Start(event)) => {
+                element_depth += 1;
+                match event.local_name().as_ref() {
+                    b"response" => {
+                        href = None;
+                        collection = false;
+                        file_size = None;
+                        modified_at = None;
+                        etag = None;
+                    }
+                    b"href" => in_href = true,
+                    b"collection" => collection = true,
+                    b"getcontentlength" => in_content_length = true,
+                    b"getlastmodified" => in_last_modified = true,
+                    b"getetag" => in_etag = true,
+                    _ => {}
                 }
-                b"href" => in_href = true,
-                b"collection" => collection = true,
-                b"getcontentlength" => in_content_length = true,
-                b"getlastmodified" => in_last_modified = true,
-                b"getetag" => in_etag = true,
-                _ => {}
-            },
+            }
             Ok(Event::Empty(event)) if event.local_name().as_ref() == b"collection" => {
                 collection = true
             }
@@ -292,25 +296,33 @@ fn parse_multistatus(xml: &str) -> Result<Vec<WebDavListingEntry>, ApiError> {
             Ok(Event::Text(text)) if in_etag => {
                 etag = text.unescape().ok().map(|value| value.into_owned());
             }
-            Ok(Event::End(event)) => match event.local_name().as_ref() {
-                b"href" => in_href = false,
-                b"getcontentlength" => in_content_length = false,
-                b"getlastmodified" => in_last_modified = false,
-                b"getetag" => in_etag = false,
-                b"response" => {
-                    if let Some(value) = href.take() {
-                        result.push(WebDavListingEntry {
-                            href: value,
-                            is_collection: collection,
-                            file_size,
-                            modified_at,
-                            etag: etag.clone(),
-                        });
+            Ok(Event::End(event)) => {
+                element_depth = element_depth.saturating_sub(1);
+                match event.local_name().as_ref() {
+                    b"href" => in_href = false,
+                    b"getcontentlength" => in_content_length = false,
+                    b"getlastmodified" => in_last_modified = false,
+                    b"getetag" => in_etag = false,
+                    b"response" => {
+                        if let Some(value) = href.take() {
+                            result.push(WebDavListingEntry {
+                                href: value,
+                                is_collection: collection,
+                                file_size,
+                                modified_at,
+                                etag: etag.clone(),
+                            });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
-            },
-            Ok(Event::Eof) => break,
+            }
+            Ok(Event::Eof) if element_depth == 0 => break,
+            Ok(Event::Eof) => {
+                return Err(ApiError::BadRequest(
+                    "invalid WebDAV multistatus response: unexpected end of XML".to_owned(),
+                ));
+            }
             Err(error) => {
                 return Err(ApiError::BadRequest(format!(
                     "invalid WebDAV multistatus response: {error}"

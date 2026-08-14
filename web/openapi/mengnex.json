@@ -102,27 +102,17 @@
         }
       }
     },
-    "/api/auth/roles/{role}/permissions": {
-      "put": {
+    "/api/auth/setup": {
+      "post": {
         "tags": [
           "auth"
         ],
-        "operationId": "update_role_permissions",
-        "parameters": [
-          {
-            "name": "role",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "operationId": "setup",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateRolePermissionsRequest"
+                "$ref": "#/components/schemas/SetupRequest"
               }
             }
           },
@@ -134,7 +124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RolePermissionsResponse"
+                  "$ref": "#/components/schemas/AuthenticatedUserResponse"
                 }
               }
             }
@@ -310,6 +300,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/libraries/covers": {
+      "get": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "list_library_covers",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryCoversResponse"
                 }
               }
             }
@@ -811,6 +821,15 @@
               "type": "integer",
               "format": "int64",
               "minimum": 0
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "description": "Return photos after this cursor id",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -1395,6 +1414,17 @@
           "tasks"
         ],
         "operationId": "list_tasks",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "Only return queued, running, and paused tasks",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "List application tasks",
@@ -1425,6 +1455,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeleteTasksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/summary": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "task_summary",
+        "responses": {
+          "200": {
+            "description": "Application task counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSummaryResponse"
                 }
               }
             }
@@ -1614,6 +1664,36 @@
                   "items": {
                     "$ref": "#/components/schemas/VideoAssetResponse"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/analyze/{library_id}": {
+      "post": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "start_analysis",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
                 }
               }
             }
@@ -2186,6 +2266,12 @@
           "display_name": {
             "type": "string"
           },
+          "library_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "password": {
             "type": "string"
           },
@@ -2290,6 +2376,27 @@
         "properties": {
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "LibraryCoversResponse": {
+        "type": "object",
+        "required": [
+          "photos",
+          "videos"
+        ],
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoAssetResponse"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoAssetResponse"
+            }
           }
         }
       },
@@ -3044,17 +3151,6 @@
           }
         }
       },
-      "PreviewGenerationTaskStatus": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "running",
-          "paused",
-          "completed",
-          "canceled",
-          "failed"
-        ]
-      },
       "PurgeRecycleBinItemResponse": {
         "type": "object",
         "required": [
@@ -3230,6 +3326,25 @@
           "canceled",
           "failed"
         ]
+      },
+      "SetupRequest": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "username",
+          "password"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
       },
       "TagResourceResponse": {
         "type": "object",
@@ -3410,6 +3525,37 @@
           "failed"
         ]
       },
+      "TaskSummaryResponse": {
+        "type": "object",
+        "required": [
+          "total",
+          "active",
+          "history",
+          "failed"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "history": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "UpdateLibraryPreviewConfigRequest": {
         "type": "object",
         "required": [
@@ -3547,20 +3693,6 @@
           }
         }
       },
-      "UpdateRolePermissionsRequest": {
-        "type": "object",
-        "required": [
-          "permissions"
-        ],
-        "properties": {
-          "permissions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
       "UpdateTagRequest": {
         "type": "object",
         "required": [
@@ -3616,6 +3748,7 @@
           "username",
           "display_name",
           "role",
+          "library_ids",
           "created_at"
         ],
         "properties": {
@@ -3634,6 +3767,12 @@
           },
           "id": {
             "type": "string"
+          },
+          "library_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "role": {
             "$ref": "#/components/schemas/AuthRole"

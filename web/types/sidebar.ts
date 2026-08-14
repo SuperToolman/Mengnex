@@ -17,6 +17,7 @@ export interface SidebarItem {
     icon?: ComponentType<SVGProps<SVGSVGElement>>;
     label: string;
     href: string;
+    activePrefix?: string;
 }
 
 export const SIDEBAR_CONFIG: SidebarItem[] = [
@@ -82,5 +83,6 @@ export const SIDEBAR_BOTTOM_CONFIG: SidebarItem[] = [
         icon: Gear,
         label: "设置",
         href: "/settings/libraries/list",
+        activePrefix: "/settings",
     },
 ];

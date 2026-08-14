@@ -484,6 +484,7 @@ export default function PhotoViewer({
     return (
         <>
             <Modal state={overlayState}>
+                <Modal.Trigger aria-label="打开图片查看器" className="sr-only"><span /></Modal.Trigger>
                 <Modal.Backdrop
                     isDismissable
                     className="fixed inset-0 z-50 h-screen w-screen bg-black/95 p-0 text-white"
@@ -691,6 +692,7 @@ export default function PhotoViewer({
             </Modal>
 
             <Modal isOpen={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <Modal.Trigger aria-label="打开删除图片确认对话框" className="sr-only"><span /></Modal.Trigger>
                 <Modal.Backdrop className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm">
                 <Modal.Container
                     placement="center"

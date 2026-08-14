@@ -9,6 +9,7 @@ import {
     getPhotos,
     type PhotoAssetResponse,
 } from "@/src/api/client";
+import { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import GalleryGroup, { type GalleryGroupData } from "./components/GalleryGroup";
 import { usePhotoShell } from "./components/PhotoShellContext";
 
@@ -239,7 +240,6 @@ export default function PhotoPage() {
                 setError(null);
                 const photoData = await getPhotos({
                     limit: PAGE_SIZE,
-                    offset: 0,
                 });
 
                 if (!cancelled) {
@@ -278,7 +278,10 @@ export default function PhotoPage() {
         setLoadMoreError(null);
 
         try {
-            const nextPhotos = await getPhotos({ limit: PAGE_SIZE, offset: photos.length });
+            const nextPhotos = await getPhotos({
+                limit: PAGE_SIZE,
+                beforeId: photos.at(-1)?.id,
+            });
             setPhotos((currentPhotos) => [...currentPhotos, ...nextPhotos]);
             setHasMore(nextPhotos.length === PAGE_SIZE);
         } catch (loadError) {
@@ -287,7 +290,7 @@ export default function PhotoPage() {
             isLoadingMoreRef.current = false;
             setIsLoadingMore(false);
         }
-    }, [hasMore, photos.length]);
+    }, [hasMore, photos]);
 
     useEffect(() => {
         loadMoreRef.current = loadMore;
@@ -356,11 +359,7 @@ export default function PhotoPage() {
     }
 
     if (galleryGroups.length === 0) {
-        return (
-            <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/70 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400">
-                暂无照片。请先在设置的媒体库中添加照片目录并完成扫码。
-            </div>
-        );
+        return <ContentPageEmptyState message="暂无照片。请先在设置的媒体库中添加照片目录并完成扫码。" />;
     }
 
     return (

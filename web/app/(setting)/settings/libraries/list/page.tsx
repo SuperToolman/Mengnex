@@ -40,8 +40,8 @@ import {
     generateLibraryPreviews,
     startVideoAnalysis,
     getMediaLibraries,
+    getLibraryCovers,
     getMangaSeries,
-    getPhotos,
     getTasks,
     getVideoCatalog,
     getWebdavConnections,
@@ -56,6 +56,7 @@ import {
     type WebdavConnectionResponse,
 } from "@/src/api/client";
 import LibrarieCard from "../components/LibrarieCard";
+import LibraryScanSettingsDialog from "../components/LibraryScanSettingsDialog";
 import SettingsPage from "../../components/SettingsPage";
 
 type LibrarySource = "local" | "webdav";
@@ -91,9 +92,9 @@ type SelectOption<T extends string> = {
 const fieldLabelClass =
     "mb-2 block text-sm font-medium text-muted";
 const fieldTextClass =
-    "w-full rounded-2xl border border-border bg-white/12 px-4 py-3 text-sm text-foreground outline-none transition focus:border-focus focus:bg-white/16 [&_input]:text-foreground [&_input]:placeholder:text-muted";
+    "w-full rounded-field border border-border bg-field px-4 py-3 text-sm text-field-foreground outline-none transition focus:border-focus [&_input]:text-field-foreground [&_input]:placeholder:text-muted";
 const selectTriggerClass =
-    "flex h-12 w-full items-center justify-between rounded-2xl border border-border bg-white/12 px-4 text-sm text-foreground outline-none transition hover:bg-white/14 focus:border-focus";
+    "flex h-12 w-full items-center justify-between rounded-field border border-border bg-field px-4 text-sm text-field-foreground outline-none transition focus:border-focus";
 const modalSurfaceClass =
     "w-[min(760px,calc(100vw-32px))] p-0";
 const settingPanelClass =
@@ -118,11 +119,6 @@ const mediaTypeOptions: SelectOption<MediaType>[] = [
 const sourceTypeOptions: SelectOption<LibrarySource>[] = [
     { value: "local", label: "Local", description: "读取本地目录", icon: Folder },
     { value: "webdav", label: "WebDAV", description: "连接远程 WebDAV 目录", icon: CloudGear },
-];
-
-const mockWebdavOptions: SelectOption<string>[] = [
-    { value: "dav-home", label: "家庭 NAS", description: "测试数据", icon: CloudGear },
-    { value: "dav-backup", label: "异地备份", description: "测试数据", icon: CloudGear },
 ];
 
 const initialCreateForm: CreateFormState = {
@@ -179,14 +175,14 @@ function VideoFormatAutocomplete({
         >
             <Autocomplete.Trigger className="min-h-12 w-full rounded-field border border-border bg-field px-3 py-2 text-field-foreground outline-none transition focus-within:border-focus">
                 <Autocomplete.Value>
-                    {({ defaultChildren, isPlaceholder, state }: any) => {
+                    {({ defaultChildren, isPlaceholder, state }) => {
                         if (isPlaceholder || state.selectedItems.length === 0) {
                             return defaultChildren;
                         }
                         return (
                             <TagGroup size="sm" onRemove={removeTags}>
                                 <TagGroup.List className="flex flex-wrap gap-1">
-                                    {state.selectedItems.map((selectedItem: any) => {
+                                    {state.selectedItems.map((selectedItem) => {
                                         const item = videoFormatOptions.find(
                                             (option) => option.id === String(selectedItem.key),
                                         );
@@ -504,7 +500,7 @@ export default function MediaLibrariesPage() {
 
         for (const task of tasks) {
             if (
-                ["generate_cache", "video_cover_generate"].includes(task.kind) &&
+                task.kind === "generate_cache" &&
                 task.library_id &&
                 (task.status === "queued" || task.status === "running" || task.status === "paused")
             ) {
@@ -521,7 +517,7 @@ export default function MediaLibrariesPage() {
             const activeVideoCoverLibraryIds = new Set(
                 taskData
                     .filter((task) =>
-                        task.kind === "video_cover_generate"
+                        task.kind === "generate_cache"
                         && task.library_id
                         && ["queued", "running", "paused"].includes(task.status))
                     .map((task) => task.library_id!),
@@ -556,37 +552,23 @@ export default function MediaLibrariesPage() {
 async function loadPageData() {
         try {
             setIsLoading(true);
-            const [libraryData, taskData, connectionData, mangaData] = await Promise.all([
+            const [libraryData, taskData, connectionData, mangaData, covers] = await Promise.all([
                 getMediaLibraries(),
                 getTasks(),
                 getWebdavConnections(),
                 getMangaSeries(),
+                getLibraryCovers(),
             ]);
-            const photoLibraries = libraryData.filter((library) => library.media_type === "photo");
-            const videoLibraries = libraryData.filter((library) => library.media_type === "video");
-            const coverPhotoBatches = await Promise.all(
-                photoLibraries.map((library) => getPhotos({ libraryId: library.id, limit: 5 })),
-            );
-            const coverVideoBatches = await Promise.all(
-                videoLibraries.map((library) => getVideoCatalog({
-                    libraryId: library.id,
-                    sort: "created",
-                    order: "desc",
-                    limit: 3,
-                    offset: 0,
-                }).then((catalog) => catalog.items)),
-            );
-            const photoData = coverPhotoBatches.flat();
 
             setLibraries(libraryData);
-            setPhotos(photoData);
+            setPhotos(covers.photos);
             setMangaSeries(mangaData);
-            setCoverVideos(coverVideoBatches.flat());
+            setCoverVideos(covers.videos);
             setTasks(taskData);
             activeVideoCoverTasksRef.current = new Set(
                 taskData
                     .filter((task) =>
-                        task.kind === "video_cover_generate"
+                        task.kind === "generate_cache"
                         && task.library_id
                         && ["queued", "running", "paused"].includes(task.status))
                     .map((task) => task.library_id!),
@@ -747,11 +729,7 @@ async function loadPageData() {
     async function startGenerateTask(library: LibraryResponse) {
         try {
             setWorkingLibraryId(library.id);
-            if (["video", "mixed_video"].includes(library.media_type)) {
-                await generateVideoCovers(library.id, false);
-            } else {
-                await generateLibraryPreviews(library.id);
-            }
+            await generateLibraryPreviews(library.id);
             toast.success(`已为“${library.name}”创建缓存生成任务，请到任务页查看进度。`);
             await loadPageData();
         } catch (generateError) {
@@ -765,7 +743,7 @@ async function loadPageData() {
         try {
             setWorkingLibraryId(library.id);
             await startVideoAnalysis(library.id);
-            toast.success(`已为“${library.name}”创建视频分析任务，请到任务页查看进度。`);
+            toast.success(`已为“${library.name}”创建视频技术信息读取任务，请到任务页查看进度。`);
             await loadPageData();
         } catch (analysisError) {
             toast.danger(getErrorMessage(analysisError));
@@ -858,12 +836,12 @@ async function loadPageData() {
             group="媒体库"
             title="媒体库列表"
             description="管理本地媒体目录，支持重新扫描、手动生成缓存、修改路径与名称。资源信息和缓存占用统一放在“更多 - 信息”中查看，生成进度统一在任务页跟踪。"
-            actions={<Button
-                    className="rounded-2xl bg-accent px-5 text-accent-foreground hover:opacity-90"
-                    onPress={createModalState.open}
-                >
-                    新建媒体库
-                </Button>}
+            actions={<><Button
+                className="rounded-2xl bg-accent px-5 text-accent-foreground hover:opacity-90"
+                onPress={createModalState.open}
+            >
+                新建媒体库
+            </Button><LibraryScanSettingsDialog /></>}
         >
 
             <div>

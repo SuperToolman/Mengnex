@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use axum::{
     Json,
     body::Body,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -18,6 +20,7 @@ use crate::{
     infra::entities::{media_file, media_item, media_library, photo_asset},
     modules::photos::service::resolve_derivative_path,
     modules::{
+        auth::service::CurrentUser,
         media::dto::{MediaFileResponse, MediaItemResponse},
         sources,
     },
@@ -48,12 +51,16 @@ pub struct ListMediaQuery {
     tag = "media"
 )]
 pub async fn list_media_items(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Query(query): Query<ListMediaQuery>,
 ) -> Result<Json<Vec<MediaItemResponse>>, ApiError> {
     let mut select = media_item::Entity::find()
         .filter(media_item::Column::DeletedAt.is_null())
         .order_by_desc(media_item::Column::CreatedAt);
+    if let Some(library_ids) = current.library_ids {
+        select = select.filter(media_item::Column::LibraryId.is_in(library_ids));
+    }
 
     select = select.limit(bounded_limit(query.limit));
 
@@ -82,6 +89,7 @@ pub async fn list_media_items(
     tag = "media"
 )]
 pub async fn list_media_files(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Query(query): Query<ListMediaQuery>,
 ) -> Result<Json<Vec<MediaFileResponse>>, ApiError> {
@@ -93,6 +101,9 @@ pub async fn list_media_files(
     let mut select = media_file::Entity::find()
         .filter(Expr::col(media_file::Column::ItemId).not_in_subquery(deleted_items))
         .order_by_desc(media_file::Column::CreatedAt);
+    if let Some(library_ids) = current.library_ids {
+        select = select.filter(media_file::Column::LibraryId.is_in(library_ids));
+    }
 
     select = select.limit(bounded_limit(query.limit));
 
@@ -121,6 +132,7 @@ pub async fn list_media_files(
     tag = "media"
 )]
 pub async fn get_media_file_content(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(id): Path<String>,
     Query(query): Query<MediaContentQuery>,
@@ -130,9 +142,12 @@ pub async fn get_media_file_content(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("media file"))?;
+    if !current.can_access_library(&file.library_id) {
+        return Err(ApiError::NotFound("media file"));
+    }
     let requested_variant = query.variant.unwrap_or_else(|| "original".to_owned());
 
-    if requested_variant == "preview" || requested_variant == "preview" {
+    if requested_variant == "preview" {
         let asset = photo_asset::Entity::find()
             .filter(photo_asset::Column::FileId.eq(file.id.clone()))
             .one(&state.db)
@@ -141,6 +156,23 @@ pub async fn get_media_file_content(
         let derivative_path = resolve_derivative_path(&asset, &requested_variant)
             .ok_or(ApiError::NotFound("generated media variant"))?;
         let derivative_file = fs::File::open(derivative_path).await?;
+        let derivative_metadata = derivative_file.metadata().await?;
+        let etag = format!(
+            "\"{}-{}\"",
+            derivative_metadata.len(),
+            derivative_metadata
+                .modified()
+                .ok()
+                .and_then(|v| v.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |v| v.as_secs())
+        );
+        if headers
+            .get(header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+            == Some(etag.as_str())
+        {
+            return Ok((StatusCode::NOT_MODIFIED, [(header::ETAG, etag)]).into_response());
+        }
         let content_type = asset
             .preview_rel_path
             .as_deref()
@@ -152,6 +184,7 @@ pub async fn get_media_file_content(
             [
                 (header::CONTENT_TYPE, content_type.to_owned()),
                 (header::CACHE_CONTROL, DERIVATIVE_CACHE_CONTROL.to_owned()),
+                (header::ETAG, etag),
             ],
             Body::from_stream(ReaderStream::new(derivative_file)),
         )
@@ -163,17 +196,32 @@ pub async fn get_media_file_content(
         .await?
         .ok_or(ApiError::NotFound("media library"))?;
 
-    if library.source_type == "webdav" {
-        if let Some(locator) = file.source_locator.as_deref() {
-            let range = headers
-                .get(header::RANGE)
-                .and_then(|value| value.to_str().ok());
-            return proxy_webdav_content(&state.db, &library, locator, range).await;
-        }
+    if library.source_type == "webdav"
+        && let Some(locator) = file.source_locator.as_deref()
+    {
+        let range = headers
+            .get(header::RANGE)
+            .and_then(|value| value.to_str().ok());
+        return proxy_webdav_content(&state.db, &library, locator, range).await;
     }
 
-    let mut source_file = fs::File::open(&file.full_path).await?;
+    let mut source_file = fs::File::open(PathBuf::from(&file.full_path)).await?;
     let file_size = source_file.metadata().await?.len();
+    let modified = source_file
+        .metadata()
+        .await?
+        .modified()
+        .ok()
+        .and_then(|v| v.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |v| v.as_secs());
+    let etag = format!("\"{}-{modified}\"", file_size);
+    if headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        == Some(etag.as_str())
+    {
+        return Ok((StatusCode::NOT_MODIFIED, [(header::ETAG, etag)]).into_response());
+    }
     let content_type = file
         .mime_type
         .unwrap_or_else(|| "application/octet-stream".to_owned());
@@ -196,6 +244,7 @@ pub async fn get_media_file_content(
             (header::ACCEPT_RANGES, "bytes".to_owned()),
             (header::CONTENT_LENGTH, content_length.to_string()),
             (header::CACHE_CONTROL, ORIGINAL_CACHE_CONTROL.to_owned()),
+            (header::ETAG, etag),
         ],
         Body::from_stream(stream),
     )

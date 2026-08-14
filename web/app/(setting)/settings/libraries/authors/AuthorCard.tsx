@@ -1,4 +1,4 @@
-import { Avatar, Card, Chip } from "@heroui/react";
+import { Avatar, Button, Card, Chip } from "@heroui/react";
 import type { AuthorResponse } from "@/src/api/client";
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = { manga_series: "漫画", photo_asset: "照片" };
@@ -15,13 +15,13 @@ export default function AuthorCard({ author, onPress }: { author: AuthorResponse
     const fallback = fallbackAvatarName(author.name);
 
     return (
-        <button type="button" className="w-full min-w-0 text-left" onClick={onPress}>
-            <Card.Root className="relative aspect-video w-full overflow-hidden transition-transform hover:-translate-y-0.5">
+        <Button variant="ghost" className="group h-auto w-full min-w-0 p-0 text-left" onPress={onPress}>
+            <Card.Root className="relative aspect-video w-full overflow-hidden transition-transform group-hover:-translate-y-0.5">
                 {author.avatar_src ? <div className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${author.avatar_src})` }} /> : null}
-                <Card.Content className="absolute inset-x-0 bottom-0 z-10 !flex !flex-row !items-end !justify-start !gap-3 !p-4">
-                    <Avatar size="lg" className="!h-[68px] !w-[68px] !rounded-lg shrink-0 overflow-hidden [&_img]:!rounded-lg">
-                        {author.avatar_src ? <Avatar.Image src={author.avatar_src} alt={author.name} className="!h-full !w-full object-cover" /> : null}
-                        <Avatar.Fallback className={`!rounded-lg !whitespace-normal !break-all px-1 text-center leading-tight ${fallback.fontSize}`}>{fallback.displayName}</Avatar.Fallback>
+                <Card.Content className="absolute inset-x-0 bottom-0 z-10 flex flex-row items-end justify-start gap-3 p-4">
+                    <Avatar aria-label={author.name} size="lg" className="h-[68px] w-[68px] shrink-0 overflow-hidden rounded-lg [&_img]:rounded-lg">
+                        {author.avatar_src ? <Avatar.Image src={author.avatar_src} alt={author.name} className="h-full w-full object-cover" /> : null}
+                        <Avatar.Fallback className={`rounded-lg px-1 text-center leading-tight whitespace-normal break-all ${fallback.fontSize}`}>{fallback.displayName}</Avatar.Fallback>
                     </Avatar>
                     <div className="min-w-0 flex-1 text-left">
                         <Card.Title className="whitespace-nowrap truncate text-base text-white">{author.name}</Card.Title>
@@ -32,6 +32,6 @@ export default function AuthorCard({ author, onPress }: { author: AuthorResponse
                     </div>
                 </Card.Content>
             </Card.Root>
-        </button>
+        </Button>
     );
 }

@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::infra::entities::media_library;
+use crate::modules::{photos::dto::PhotoAssetResponse, videos::dto::VideoAssetResponse};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -99,32 +100,6 @@ pub struct LibraryPreviewJobResponse {
     pub reclaimed_bytes: i64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PreviewGenerationTaskStatus {
-    Queued,
-    Running,
-    Paused,
-    Completed,
-    Canceled,
-    Failed,
-}
-
-impl std::fmt::Display for PreviewGenerationTaskStatus {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Self::Queued => "queued",
-            Self::Running => "running",
-            Self::Paused => "paused",
-            Self::Completed => "completed",
-            Self::Canceled => "canceled",
-            Self::Failed => "failed",
-        };
-
-        formatter.write_str(value)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PreviewGenerationTaskResponse {
     pub task_id: String,
@@ -168,6 +143,12 @@ pub struct LibraryResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DeleteLibraryResponse {
     pub id: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LibraryCoversResponse {
+    pub photos: Vec<PhotoAssetResponse>,
+    pub videos: Vec<VideoAssetResponse>,
 }
 
 impl LibraryResponse {

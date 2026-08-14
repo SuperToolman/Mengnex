@@ -1,10 +1,10 @@
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
 };
 use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
-    sea_query::Expr,
+    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    QueryTrait, sea_query::Expr,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{media_item, media_library, photo_asset, photo_folder},
+    modules::auth::service::CurrentUser,
     modules::photos::{
         dto::{
             DeletePhotoResponse, PhotoAssetResponse, PhotoFolderContentsResponse,
@@ -26,6 +27,7 @@ use crate::{
 pub struct ListPhotosQuery {
     pub limit: Option<u64>,
     pub offset: Option<u64>,
+    pub before_id: Option<String>,
     pub library_id: Option<String>,
 }
 
@@ -42,12 +44,14 @@ pub struct ListFolderContentsQuery {
     params(
         ("limit" = Option<u64>, Query, description = "Maximum number of photos"),
         ("offset" = Option<u64>, Query, description = "Number of photos to skip"),
+        ("before_id" = Option<String>, Query, description = "Return photos after this cursor id"),
         ("library_id" = Option<String>, Query, description = "Limit results to one media library")
     ),
     responses((status = 200, description = "List scanned photos", body = [PhotoAssetResponse])),
     tag = "photos"
 )]
 pub async fn list_photos(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Query(query): Query<ListPhotosQuery>,
 ) -> Result<Json<Vec<PhotoAssetResponse>>, ApiError> {
@@ -58,10 +62,30 @@ pub async fn list_photos(
         .into_query();
     let mut select = photo_asset::Entity::find()
         .filter(Expr::col(photo_asset::Column::ItemId).not_in_subquery(deleted_items))
-        .order_by_desc(photo_asset::Column::BatchTime);
+        .order_by_desc(photo_asset::Column::BatchTime)
+        .order_by_desc(photo_asset::Column::Id);
+    if let Some(library_ids) = current.library_ids {
+        select = select.filter(photo_asset::Column::LibraryId.is_in(library_ids));
+    }
 
     if let Some(library_id) = query.library_id {
         select = select.filter(photo_asset::Column::LibraryId.eq(library_id));
+    }
+
+    if let Some(before_id) = query.before_id
+        && let Some(cursor) = photo_asset::Entity::find_by_id(before_id)
+            .one(&state.db)
+            .await?
+    {
+        select = select.filter(
+            Condition::any()
+                .add(photo_asset::Column::BatchTime.lt(cursor.batch_time))
+                .add(
+                    Condition::all()
+                        .add(photo_asset::Column::BatchTime.eq(cursor.batch_time))
+                        .add(photo_asset::Column::Id.lt(cursor.id)),
+                ),
+        );
     }
 
     select = select.limit(bounded_limit(query.limit));
@@ -93,10 +117,14 @@ pub async fn list_photos(
     tag = "photos"
 )]
 pub async fn list_folder_contents(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(library_id): Path<String>,
     Query(query): Query<ListFolderContentsQuery>,
 ) -> Result<Json<PhotoFolderContentsResponse>, ApiError> {
+    if !current.can_access_library(&library_id) {
+        return Err(ApiError::NotFound("media library"));
+    }
     let library = media_library::Entity::find_by_id(library_id.clone())
         .one(&state.db)
         .await?
@@ -198,9 +226,17 @@ mod tests {
     tag = "photos"
 )]
 pub async fn delete_photo(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
     Path(photo_id): Path<String>,
 ) -> Result<Json<DeletePhotoResponse>, ApiError> {
+    let existing = photo_asset::Entity::find_by_id(&photo_id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("photo asset"))?;
+    if !current.can_access_library(&existing.library_id) {
+        return Err(ApiError::NotFound("photo asset"));
+    }
     let asset = delete_photo_asset(&state.db, &photo_id).await?;
     let library = media_library::Entity::find_by_id(asset.library_id.clone())
         .one(&state.db)

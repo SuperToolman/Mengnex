@@ -4,30 +4,48 @@ use axum::{
     http::header,
 };
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    TransactionTrait,
+};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
 
 use crate::{
     core::{app::AppState, error::ApiError},
-    infra::entities::{app_user, auth_session, role_permission},
+    infra::entities::{app_user, auth_session, media_library, user_library_permission},
     modules::auth::{
         dto::{
             AuthStatusResponse, AuthenticatedUserResponse, CreateUserRequest, CredentialsRequest,
-            RolePermissionsResponse, UpdateRolePermissionsRequest, UserResponse,
+            RolePermissionsResponse, SetupRequest, UserResponse,
         },
-        service::{self, ADMIN, CurrentUser, OWNER},
+        service::{self, ADMIN, CurrentUser, OWNER, role_permissions},
     },
 };
 
-fn user_response(user: app_user::Model) -> UserResponse {
-    UserResponse {
+async fn user_response(
+    db: &impl sea_orm::ConnectionTrait,
+    user: app_user::Model,
+) -> Result<UserResponse, ApiError> {
+    let library_ids = user_library_permission::Entity::find()
+        .filter(user_library_permission::Column::UserId.eq(user.id.clone()))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|permission| permission.library_id)
+        .collect();
+    Ok(UserResponse {
         id: user.id,
         display_name: user.display_name.unwrap_or_else(|| user.username.clone()),
         avatar_url: user.avatar_url,
         username: user.username,
         role: user.role,
+        library_ids,
         created_at: user.created_at,
-    }
+    })
 }
 fn validate_username(value: &str) -> Result<(), ApiError> {
     if value.trim().len() < 3 || value.len() > 64 {
@@ -39,11 +57,80 @@ fn validate_username(value: &str) -> Result<(), ApiError> {
     }
 }
 
+async fn setup_required(db: &impl sea_orm::ConnectionTrait) -> Result<bool, ApiError> {
+    let users = app_user::Entity::find().all(db).await?;
+    Ok(users.is_empty()
+        || (users.len() == 1
+            && users[0].username == "superadmin"
+            && service::verify_password("Mengnex@2026", &users[0].password_hash)))
+}
+
 #[utoipa::path(get, path = "/api/auth/status", responses((status = 200, body = AuthStatusResponse)), tag = "auth")]
-pub async fn status(_state: State<AppState>) -> Result<Json<AuthStatusResponse>, ApiError> {
+pub async fn status(State(state): State<AppState>) -> Result<Json<AuthStatusResponse>, ApiError> {
     Ok(Json(AuthStatusResponse {
-        setup_required: false,
+        setup_required: setup_required(&state.db).await?,
     }))
+}
+
+#[utoipa::path(post, path = "/api/auth/setup", request_body = SetupRequest, responses((status = 200, body = AuthenticatedUserResponse)), tag = "auth")]
+pub async fn setup(
+    State(state): State<AppState>,
+    Json(payload): Json<SetupRequest>,
+) -> Result<
+    (
+        [(header::HeaderName, header::HeaderValue); 1],
+        Json<AuthenticatedUserResponse>,
+    ),
+    ApiError,
+> {
+    let _guard = state.setup_lock.lock().await;
+    if !setup_required(&state.db).await? {
+        return Err(ApiError::Conflict(
+            "application setup is already complete".to_owned(),
+        ));
+    }
+    validate_username(&payload.username)?;
+    if payload.display_name.trim().is_empty() {
+        return Err(ApiError::BadRequest("display name is required".to_owned()));
+    }
+    let now = Utc::now();
+    let txn = state.db.begin().await?;
+    if let Some(legacy_user) = app_user::Entity::find()
+        .filter(app_user::Column::Username.eq("superadmin"))
+        .one(&txn)
+        .await?
+        .filter(|user| service::verify_password("Mengnex@2026", &user.password_hash))
+    {
+        auth_session::Entity::delete_many()
+            .filter(auth_session::Column::UserId.eq(&legacy_user.id))
+            .exec(&txn)
+            .await?;
+        app_user::Entity::delete_by_id(legacy_user.id)
+            .exec(&txn)
+            .await?;
+    }
+    let user = app_user::ActiveModel {
+        id: Set(Uuid::new_v4().to_string()),
+        username: Set(payload.username.trim().to_owned()),
+        display_name: Set(Some(payload.display_name.trim().to_owned())),
+        avatar_url: Set(None),
+        password_hash: Set(service::hash_password(&payload.password)?),
+        role: Set(OWNER.to_owned()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(&txn)
+    .await?;
+    let token = service::create_session(&txn, user.id.clone()).await?;
+    let response = user_response(&txn, user).await?;
+    txn.commit().await?;
+    Ok((
+        [(
+            header::SET_COOKIE,
+            service::session_cookie(&token, state.secure_cookies),
+        )],
+        Json(AuthenticatedUserResponse { user: response }),
+    ))
 }
 
 #[utoipa::path(post, path = "/api/auth/login", request_body = CredentialsRequest, responses((status = 200, body = AuthenticatedUserResponse)), tag = "auth")]
@@ -57,23 +144,46 @@ pub async fn login(
     ),
     ApiError,
 > {
+    let attempt_key = payload.username.trim().to_ascii_lowercase();
+    {
+        let mut attempts = state.login_attempts.lock().await;
+        let recent = attempts.entry(attempt_key.clone()).or_default();
+        recent.retain(|attempt| attempt.elapsed() < Duration::from_secs(60));
+        if recent.len() >= 5 {
+            return Err(ApiError::TooManyRequests(
+                "too many login attempts; try again later".to_owned(),
+            ));
+        }
+    }
     let user = app_user::Entity::find()
         .filter(app_user::Column::Username.eq(payload.username.trim()))
         .one(&state.db)
-        .await?
-        .ok_or(ApiError::BadRequest(
-            "invalid username or password".to_owned(),
-        ))?;
-    if !service::verify_password(&payload.password, &user.password_hash) {
-        return Err(ApiError::BadRequest(
+        .await?;
+    let valid = user
+        .as_ref()
+        .is_some_and(|user| service::verify_password(&payload.password, &user.password_hash));
+    if !valid {
+        state
+            .login_attempts
+            .lock()
+            .await
+            .entry(attempt_key)
+            .or_default()
+            .push(Instant::now());
+        return Err(ApiError::Unauthorized(
             "invalid username or password".to_owned(),
         ));
     }
+    let user = user.expect("validated user must exist");
+    state.login_attempts.lock().await.remove(&attempt_key);
     let token = service::create_session(&state.db, user.id.clone()).await?;
     Ok((
-        [(header::SET_COOKIE, service::session_cookie(&token))],
+        [(
+            header::SET_COOKIE,
+            service::session_cookie(&token, state.secure_cookies),
+        )],
         Json(AuthenticatedUserResponse {
-            user: user_response(user),
+            user: user_response(&state.db, user).await?,
         }),
     ))
 }
@@ -99,7 +209,10 @@ pub async fn logout(
         })
     {
         auth_session::Entity::delete_many()
-            .filter(auth_session::Column::Token.eq(token))
+            .filter(
+                auth_session::Column::Token
+                    .is_in([service::hash_session_token(token), token.to_owned()]),
+            )
             .exec(&state.db)
             .await?;
     }
@@ -121,7 +234,7 @@ pub async fn me(
         .await?
         .ok_or(ApiError::NotFound("user"))?;
     Ok(Json(AuthenticatedUserResponse {
-        user: user_response(user),
+        user: user_response(&state.db, user).await?,
     }))
 }
 #[utoipa::path(get, path = "/api/auth/users", responses((status = 200, body = [UserResponse])), tag = "auth")]
@@ -134,15 +247,15 @@ pub async fn list_users(
             "administrator role required".to_owned(),
         ));
     }
-    Ok(Json(
-        app_user::Entity::find()
-            .order_by_asc(app_user::Column::Username)
-            .all(&state.db)
-            .await?
-            .into_iter()
-            .map(user_response)
-            .collect(),
-    ))
+    let users = app_user::Entity::find()
+        .order_by_asc(app_user::Column::Username)
+        .all(&state.db)
+        .await?;
+    let mut response = Vec::with_capacity(users.len());
+    for user in users {
+        response.push(user_response(&state.db, user).await?);
+    }
+    Ok(Json(response))
 }
 #[utoipa::path(post, path = "/api/auth/users", request_body = CreateUserRequest, responses((status = 200, body = UserResponse)), tag = "auth")]
 pub async fn create_user(
@@ -162,26 +275,58 @@ pub async fn create_user(
     if payload.display_name.trim().is_empty() {
         return Err(ApiError::BadRequest("display name is required".to_owned()));
     }
+    let library_ids = payload.library_ids.iter().cloned().collect::<HashSet<_>>();
+    if matches!(payload.role.as_str(), "editor" | "viewer") && !library_ids.is_empty() {
+        let found = media_library::Entity::find()
+            .filter(media_library::Column::Id.is_in(library_ids.iter().cloned()))
+            .count(&state.db)
+            .await? as usize;
+        if found != library_ids.len() {
+            return Err(ApiError::BadRequest(
+                "one or more media libraries do not exist".to_owned(),
+            ));
+        }
+    }
     let now = Utc::now();
+    let txn = state.db.begin().await?;
     let user = app_user::ActiveModel {
         id: Set(Uuid::new_v4().to_string()),
         username: Set(payload.username.trim().to_owned()),
         display_name: Set(Some(payload.display_name.trim().to_owned())),
         avatar_url: Set(payload.avatar_url.filter(|value| !value.trim().is_empty())),
         password_hash: Set(service::hash_password(&payload.password)?),
-        role: Set(payload.role),
+        role: Set(payload.role.clone()),
         created_at: Set(now),
         updated_at: Set(now),
     }
-    .insert(&state.db)
+    .insert(&txn)
     .await?;
-    Ok(Json(user_response(user)))
+    for library_id in library_ids {
+        user_library_permission::ActiveModel {
+            id: Set(Uuid::new_v4().to_string()),
+            user_id: Set(user.id.clone()),
+            library_id: Set(library_id),
+            access_level: Set(if payload.role == "editor" {
+                "write"
+            } else {
+                "read"
+            }
+            .to_owned()),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&txn)
+        .await?;
+    }
+    let response = user_response(&txn, user).await?;
+    txn.commit().await?;
+    Ok(Json(response))
 }
 
 #[utoipa::path(get, path = "/api/auth/roles", responses((status = 200, body = [RolePermissionsResponse])), tag = "auth")]
 pub async fn list_role_permissions(
     Extension(current): Extension<CurrentUser>,
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
 ) -> Result<Json<Vec<RolePermissionsResponse>>, ApiError> {
     if !matches!(current.role.as_str(), OWNER | ADMIN) {
         return Err(ApiError::BadRequest(
@@ -190,13 +335,9 @@ pub async fn list_role_permissions(
     }
     let mut response = Vec::new();
     for role in [OWNER, ADMIN, "editor", "viewer"] {
-        let permissions = role_permission::Entity::find()
-            .filter(role_permission::Column::Role.eq(role))
-            .order_by_asc(role_permission::Column::Permission)
-            .all(&state.db)
-            .await?
-            .into_iter()
-            .map(|item| item.permission)
+        let permissions = role_permissions(role)
+            .iter()
+            .map(|value| (*value).to_owned())
             .collect();
         response.push(RolePermissionsResponse {
             role: role.to_owned(),
@@ -204,52 +345,4 @@ pub async fn list_role_permissions(
         });
     }
     Ok(Json(response))
-}
-
-#[utoipa::path(put, path = "/api/auth/roles/{role}/permissions", params(("role" = String, Path)), request_body = UpdateRolePermissionsRequest, responses((status = 200, body = RolePermissionsResponse)), tag = "auth")]
-pub async fn update_role_permissions(
-    Extension(current): Extension<CurrentUser>,
-    State(state): State<AppState>,
-    axum::extract::Path(role): axum::extract::Path<String>,
-    Json(payload): Json<UpdateRolePermissionsRequest>,
-) -> Result<Json<RolePermissionsResponse>, ApiError> {
-    if current.role != OWNER {
-        return Err(ApiError::BadRequest("owner role required".to_owned()));
-    }
-    if !service::valid_role(&role)
-        || (role == OWNER
-            && !payload
-                .permissions
-                .iter()
-                .any(|permission| permission == "role.manage"))
-    {
-        return Err(ApiError::BadRequest("invalid role permissions".to_owned()));
-    }
-    if payload
-        .permissions
-        .iter()
-        .any(|permission| !service::valid_permission(permission))
-    {
-        return Err(ApiError::BadRequest("invalid permission".to_owned()));
-    }
-    role_permission::Entity::delete_many()
-        .filter(role_permission::Column::Role.eq(role.clone()))
-        .exec(&state.db)
-        .await?;
-    let now = Utc::now();
-    for permission in &payload.permissions {
-        role_permission::ActiveModel {
-            id: Set(Uuid::new_v4().to_string()),
-            role: Set(role.clone()),
-            permission: Set(permission.clone()),
-            created_at: Set(now),
-            updated_at: Set(now),
-        }
-        .insert(&state.db)
-        .await?;
-    }
-    Ok(Json(RolePermissionsResponse {
-        role,
-        permissions: payload.permissions,
-    }))
 }

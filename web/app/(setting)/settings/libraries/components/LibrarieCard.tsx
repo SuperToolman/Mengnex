@@ -71,6 +71,12 @@ type MenuAction = {
     onPress?: () => void;
 };
 
+type MenuActionGroup = {
+    key: string;
+    label: string;
+    actions: MenuAction[];
+};
+
 const mediaTypeStyles: Record<string, MediaTypeStyle> = {
     photo: {
         label: "照片",
@@ -408,7 +414,7 @@ export function StatusPill({ enabled }: { enabled: boolean }) {
     );
 }
 
-function LibraryMenu({ actions }: { actions: MenuAction[] }) {
+function LibraryMenu({ actionGroups }: { actionGroups: MenuActionGroup[] }) {
     const [isOpen, setIsOpen] = useState(false);
 
     function handleAction(action: MenuAction) {
@@ -436,51 +442,56 @@ function LibraryMenu({ actions }: { actions: MenuAction[] }) {
             </Popover.Trigger>
             <Popover.Content
                 placement="bottom end"
-                className="z-50 max-h-[min(360px,calc(100vh-96px))] w-[220px] overflow-hidden p-2"
+                className="z-50 max-h-[min(420px,calc(100vh-96px))] overflow-hidden"
             >
                 <Popover.Arrow />
                 <Popover.Dialog className="outline-none">
-                    <div className="max-h-[min(344px,calc(100vh-112px))] space-y-1 overflow-y-auto pr-1">
-                        {actions.map((action) => {
-                            const Icon = action.icon;
+                    <div className="max-h-[min(404px,calc(100vh-112px))] space-y-2 overflow-y-auto p-1">
+                        {actionGroups.map((group) => (
+                            <section key={group.key}>
+                                <h4 className="px-2 text-xs font-medium text-muted">{group.label}</h4>
+                                <div className="grid grid-cols-2 gap-1">
+                                    {group.actions.map((action) => {
+                                        const Icon = action.icon;
 
-                            return (
-                                <button
-                                    key={action.key}
-                                    type="button"
-                                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                                        action.disabled
-                                            ? "cursor-not-allowed opacity-45"
-                                            : action.danger
-                                              ? "hover:bg-red-500/12"
-                                              : "hover:bg-white/10"
-                                    }`}
-                                    disabled={action.disabled}
-                                    onClick={() => handleAction(action)}
-                                >
-                                    <span
-                                        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                                            action.danger
-                                                ? "bg-red-500/14 text-red-200"
-                                                : "bg-white/10 text-foreground"
-                                        }`}
-                                    >
-                                        <Icon className="h-4 w-4 shrink-0" />
-                                    </span>
-                                    <span className="min-w-0 truncate">
-                                        <span
-                                            className={`block text-sm font-semibold ${
-                                                action.danger
-                                                    ? "text-red-100 dark:text-red-200"
-                                                    : "text-foreground"
-                                            }`}
-                                        >
-                                            {action.title}
-                                        </span>
-                                    </span>
-                                </button>
-                            );
-                        })}
+                                        return (
+                                            <button
+                                                key={action.key}
+                                                type="button"
+                                                className={`flex min-w-0 items-center gap-2 rounded-xl px-2 py-2 text-left transition ${
+                                                    action.disabled
+                                                        ? "cursor-not-allowed opacity-45"
+                                                        : action.danger
+                                                          ? "hover:bg-red-500/12"
+                                                          : "hover:bg-white/10"
+                                                }`}
+                                                disabled={action.disabled}
+                                                onClick={() => handleAction(action)}
+                                            >
+                                                <span
+                                                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                                                        action.danger
+                                                            ? "bg-red-500/14 text-red-200"
+                                                            : "bg-white/10 text-foreground"
+                                                    }`}
+                                                >
+                                                    <Icon className="h-4 w-4 shrink-0" />
+                                                </span>
+                                                <span
+                                                    className={`min-w-0 truncate text-sm font-semibold ${
+                                                        action.danger
+                                                            ? "text-red-100 dark:text-red-200"
+                                                            : "text-foreground"
+                                                    }`}
+                                                >
+                                                    {action.title}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        ))}
                     </div>
                 </Popover.Dialog>
             </Popover.Content>
@@ -510,7 +521,7 @@ export default function LibrarieCard({
     const sourceStyle = getLibrarySourceStyle(library.source_type);
     const SourceIcon = sourceStyle.icon;
     const isVideoLibrary = ["video", "mixed_video"].includes(library.media_type);
-    const menuActions: MenuAction[] = [
+    const commonMenuActions: MenuAction[] = [
         {
             key: "rescan",
             title: "重新扫描",
@@ -539,23 +550,6 @@ export default function LibrarieCard({
             disabled: isBusy || hasActiveCacheTask,
             onPress: onDeletePreviews,
         },
-        ...(isVideoLibrary
-            ? [{
-                key: "analyze-video",
-                title: "分析视频媒体",
-                description: "读取时长、分辨率与音视频编码信息。",
-                icon: Filmstrip,
-                disabled: isBusy || !library.enabled,
-                onPress: onAnalyzeVideos,
-            }, {
-                key: "regenerate-video-covers",
-                title: "重新生成视频封面",
-                description: "覆盖当前媒体库已有的封面缓存。",
-                icon: ArrowsRotateRight,
-                disabled: isBusy || hasActiveCacheTask || !library.enabled,
-                onPress: onRegenerateVideoCovers,
-            }]
-            : []),
         {
             key: "settings",
             title: "媒体库设置",
@@ -589,6 +583,30 @@ export default function LibrarieCard({
             disabled: isBusy || hasActiveCacheTask,
             onPress: onDeleteLibrary,
         },
+    ];
+    const mediaSpecificMenuActions: MenuAction[] = isVideoLibrary ? [
+        {
+            key: "analyze-video",
+            title: "读取视频技术信息",
+            description: "使用 FFprobe 读取时长、分辨率与音视频编码，不生成浏览缓存。",
+            icon: Filmstrip,
+            disabled: isBusy || !library.enabled,
+            onPress: onAnalyzeVideos,
+        },
+        {
+            key: "regenerate-video-covers",
+            title: "重新生成视频封面",
+            description: "覆盖当前媒体库已有的封面缓存。",
+            icon: ArrowsRotateRight,
+            disabled: isBusy || hasActiveCacheTask || !library.enabled,
+            onPress: onRegenerateVideoCovers,
+        },
+    ] : [];
+    const menuActionGroups: MenuActionGroup[] = [
+        { key: "common", label: "通用功能", actions: commonMenuActions },
+        ...(mediaSpecificMenuActions.length > 0
+            ? [{ key: "media-specific", label: "视频专属功能", actions: mediaSpecificMenuActions }]
+            : []),
     ];
 
     return (
@@ -653,7 +671,7 @@ export default function LibrarieCard({
                                 <span>{sourceStyle.label}</span>
                             </Chip>
                         </div>
-                        <LibraryMenu actions={menuActions} />
+                        <LibraryMenu actionGroups={menuActionGroups} />
                     </div>
                 </div>
 

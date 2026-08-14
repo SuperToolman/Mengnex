@@ -2,7 +2,7 @@
 
 import { Button } from "@heroui/react";
 import { useEffect, useMemo, useState } from "react";
-import MediaLibraryLayout, { MediaLibraryEmptyState } from "@/app/components/MediaLibraryLayout";
+import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import ContentZoomSlider from "@/app/components/ContentZoomSlider";
 import { getMangaSeries, type MangaSeriesResponse } from "@/src/api/client";
 import MangaCard from "./components/MangaCard";
@@ -53,7 +53,7 @@ export default function MangaPage() {
     const zoom = MANGA_ZOOM_LEVELS[zoomLevel] ?? MANGA_ZOOM_LEVELS[2];
 
     return (
-        <MediaLibraryLayout
+        <ContentPageLayout
             title="漫画"
             description="浏览已扫描的漫画作品。"
             actions={(
@@ -61,7 +61,7 @@ export default function MangaPage() {
             )}
         >
             {error ? <p className="text-sm text-red-500">{error}</p> : null}
-            {!error && series.length === 0 ? <MediaLibraryEmptyState message="暂无漫画。创建漫画媒体库并完成扫描后会显示在这里。" /> : null}
+            {!error && series.length === 0 ? <ContentPageEmptyState message="暂无漫画。创建漫画媒体库并完成扫描后会显示在这里。" /> : null}
             {!error && series.length > 0 ? (
                 <div className="space-y-10 pb-8">
                     {recentSeries.length > 0 ? <MangaGroup title="最近阅读" series={recentSeries} gridClassName={zoom.gridClassName} columnCount={zoom.columnCount} /> : null}
@@ -70,6 +70,6 @@ export default function MangaPage() {
                     <MangaGroup title="全部漫画" series={series} maxRows={4} gridClassName={zoom.gridClassName} columnCount={zoom.columnCount} />
                 </div>
             ) : null}
-        </MediaLibraryLayout>
+        </ContentPageLayout>
     );
 }

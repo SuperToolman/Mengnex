@@ -1,11 +1,17 @@
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::{Extension, State},
+};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use uuid::Uuid;
 
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{media_library, scan_task},
+    modules::auth::service::CurrentUser,
+    modules::libraries::cache::start_cache_generation,
+    modules::media_types::processor_for,
     modules::scanner::{
         dto::{CreateScanTaskRequest, ScanTaskResponse, ScanTaskStatus},
         service::{self, ScanProgress},
@@ -13,8 +19,8 @@ use crate::{
     modules::tasks::{
         dto::TaskKind,
         service::{
-            CreateAppTaskParams, UpdateAppTaskParams, create_app_task, find_running_library_task,
-            update_app_task,
+            CreateAppTaskParams, UpdateAppTaskParams, create_app_task,
+            find_running_library_background_task, update_app_task,
         },
     },
 };
@@ -26,9 +32,14 @@ use crate::{
     tag = "scanner"
 )]
 pub async fn list_scan_tasks(
+    Extension(current): Extension<CurrentUser>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ScanTaskResponse>>, ApiError> {
-    let tasks = scan_task::Entity::find()
+    let mut select = scan_task::Entity::find();
+    if let Some(library_ids) = current.library_ids {
+        select = select.filter(scan_task::Column::LibraryId.is_in(library_ids));
+    }
+    let tasks = select
         .order_by_desc(scan_task::Column::CreatedAt)
         .all(&state.db)
         .await?
@@ -62,15 +73,9 @@ pub async fn start_scan(
         return Err(ApiError::BadRequest("media library is disabled".to_owned()));
     }
 
-    if find_running_library_task(&state.db, &library.id, TaskKind::ScanLibrary)
+    if find_running_library_background_task(&state.db, &library.id)
         .await?
         .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::GenerateCache)
-            .await?
-            .is_some()
-        || find_running_library_task(&state.db, &library.id, TaskKind::VideoCoverGenerate)
-            .await?
-            .is_some()
     {
         return Err(ApiError::BadRequest(
             "library already has a running background task".to_owned(),
@@ -130,7 +135,10 @@ pub async fn start_scan(
             })
             .await;
 
-        let _ = complete_scan_task(&state_for_task.db, &task_id, result).await;
+        if let Err(error) = complete_scan_task(&state_for_task.db, &library, &task_id, result).await
+        {
+            tracing::error!(task_id, ?error, "scan task failed to finalize");
+        }
     });
 
     Ok(Json(ScanTaskResponse::from(task)))
@@ -156,14 +164,7 @@ async fn update_scan_task_progress(
     active_task.removed_files = Set(progress.removed_files);
     active_task.updated_at = Set(Utc::now());
     active_task.update(db).await?;
-    // The scan continues with media-specific browse-cache generation.
-    // Reserve the final percent for task completion so progress never claims
-    // success while that work is still running.
-    let total_items = if progress.has_preview_phase {
-        progress.discovered_files.saturating_mul(2)
-    } else {
-        progress.discovered_files
-    };
+    let total_items = progress.discovered_files;
     let progress_percent =
         calculate_progress_percent(progress.processed_files, total_items).min(99);
     let detail = format!(
@@ -191,6 +192,7 @@ async fn update_scan_task_progress(
 
 async fn complete_scan_task(
     db: &sea_orm::DatabaseConnection,
+    library: &media_library::Model,
     task_id: &str,
     result: Result<service::ScanSummary, ApiError>,
 ) -> Result<(), ApiError> {
@@ -203,6 +205,7 @@ async fn complete_scan_task(
 
     let finished_at = Utc::now();
     let mut active_task: scan_task::ActiveModel = task.into();
+    let should_generate_cache = result.is_ok();
 
     match result {
         Ok(summary) => {
@@ -213,37 +216,21 @@ async fn complete_scan_task(
             active_task.updated_files = Set(summary.updated_files);
             active_task.removed_files = Set(summary.removed_files);
             active_task.error_message = Set(None);
-            let progress_percent =
-                calculate_progress_percent(summary.processed_files, summary.discovered_files);
             let detail = format!(
-                "已发现 {}，已新增 {}，已更新 {}，已移除 {}，已生成浏览缓存 {}，失败 {}",
+                "已发现 {}，已新增 {}，已更新 {}，已移除 {}",
                 summary.discovered_files,
                 summary.inserted_items,
                 summary.updated_files,
-                summary.removed_files,
-                summary.previews_generated,
-                summary.preview_failed
+                summary.removed_files
             );
             let _ = update_app_task(
                 db,
                 task_id,
                 UpdateAppTaskParams {
                     status: Some(ScanTaskStatus::Completed.to_string()),
-                    progress_percent: Some(progress_percent),
-                    processed_items: Some(if summary.has_preview_phase {
-                        summary
-                            .processed_files
-                            .saturating_add(summary.preview_processed)
-                    } else {
-                        summary.processed_files
-                    }),
-                    total_items: Some(if summary.has_preview_phase {
-                        summary
-                            .discovered_files
-                            .saturating_add(summary.preview_total)
-                    } else {
-                        summary.discovered_files
-                    }),
+                    progress_percent: Some(100),
+                    processed_items: Some(summary.processed_files),
+                    total_items: Some(summary.discovered_files),
                     detail: Some(Some(detail)),
                     error_message: Some(None),
                     finished_at: Some(Some(finished_at)),
@@ -288,12 +275,20 @@ async fn complete_scan_task(
     active_task.updated_at = Set(finished_at);
     active_task.update(db).await?;
 
+    if should_generate_cache
+        && library.previews_enabled
+        && processor_for(&library.media_type)
+            .is_some_and(|processor| processor.creates_derived_assets())
+    {
+        start_cache_generation(db, library.clone(), false).await?;
+    }
+
     Ok(())
 }
 
 fn calculate_progress_percent(processed_items: i64, total_items: i64) -> i32 {
     if total_items <= 0 {
-        return 100;
+        return 0;
     }
 
     ((processed_items as f64 / total_items as f64) * 100.0)

@@ -1,7 +1,13 @@
+use std::{collections::HashMap, sync::Arc, time::Instant};
+
 use axum::http::{HeaderValue, Method, header};
 use axum::{Json, Router, middleware, response::Html, routing::get};
 use sea_orm::DatabaseConnection;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::{
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    trace::TraceLayer,
+};
 use utoipa::OpenApi;
 
 use crate::{
@@ -15,10 +21,20 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub login_attempts: Arc<tokio::sync::Mutex<HashMap<String, Vec<Instant>>>>,
+    pub setup_lock: Arc<tokio::sync::Mutex<()>>,
+    pub secure_cookies: bool,
 }
 
 pub fn router(db: DatabaseConnection) -> Router {
-    let state = AppState { db };
+    let secure_cookies = std::env::var("COOKIE_SECURE")
+        .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE"));
+    let state = AppState {
+        db,
+        login_attempts: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+        setup_lock: Arc::new(tokio::sync::Mutex::new(())),
+        secure_cookies,
+    };
 
     let protected = Router::new()
         .merge(auth::protected_routes())
@@ -45,6 +61,12 @@ pub fn router(db: DatabaseConnection) -> Router {
         .route("/openapi.json", get(openapi_json))
         .merge(auth::public_routes())
         .merge(protected)
+        .layer(PropagateRequestIdLayer::x_request_id())
+        .layer(TraceLayer::new_for_http())
+        .layer(SetRequestIdLayer::new(
+            header::HeaderName::from_static("x-request-id"),
+            MakeRequestUuid,
+        ))
         .layer(
             CorsLayer::new()
                 .allow_origin(AllowOrigin::list([

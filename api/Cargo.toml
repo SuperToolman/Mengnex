@@ -22,9 +22,11 @@ serde_json = "1"
 sha2 = "0.10"
 quick-xml = { version = "0.37", features = ["serialize"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "0.7", features = ["io"] }
-tower-http = { version = "0.6", features = ["cors"] }
+tower-http = { version = "0.6", features = ["cors", "request-id", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 uuid = { version = "1", features = ["serde", "v4"] }
 webp = "0.3"

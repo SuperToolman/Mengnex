@@ -77,3 +77,11 @@ pub struct TaskResponse {
 pub struct DeleteTasksResponse {
     pub deleted_count: u64,
 }
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TaskSummaryResponse {
+    pub total: u64,
+    pub active: u64,
+    pub history: u64,
+    pub failed: u64,
+}

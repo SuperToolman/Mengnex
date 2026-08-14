@@ -12,6 +12,9 @@ Mengnex 是一个本地优先的媒体管理项目，设计目标参考了 Emby�
 - 为照片生成并管理 `preview` 缓存，加快列表与查看器加载
 - 通过统一任务中心跟踪扫描、缓存生成等后台任务
 - 支持后台任务暂停、继续、取消
+- 支持本地目录与 WebDAV 远程数据源
+- 支持视频浏览、播放、播放进度、封面生成与视频集合
+- 支持账户、角色权限和媒体库级访问隔离
 
 ## 项目结构
 
@@ -22,7 +25,7 @@ Mengnex 是一个本地优先的媒体管理项目，设计目标参考了 Emby�
 |   `-- src/
 |       |-- core/         # 路由、错误处理、健康检查、OpenAPI
 |       |-- infra/        # SQLite/SeaORM 连接、实体、基础设施
-|       `-- modules/      # libraries、media、photos、preferences、scanner、tasks
+|       `-- modules/      # auth、libraries、media、photos、videos、manga、scanner、tasks 等
 |-- web/                  # Next.js Web 客户端
 |   |-- app/              # App Router 页面
 |   |-- openapi/          # 导出的 OpenAPI 规范
@@ -50,12 +53,18 @@ cargo run
 - Swagger UI: `http://127.0.0.1:3001/docs`
 - OpenAPI JSON: `http://127.0.0.1:3001/openapi.json`
 
+首次启动不会创建固定默认账户。打开 Web 页面后按初始化界面创建第一个 Owner 账户。通过 HTTPS 或反向代理部署时必须设置 `COOKIE_SECURE=true`；日志级别可通过 `RUST_LOG` 调整。
+
+视频浏览缓存使用 FFmpeg 按视频抽帧，视频技术信息读取使用 FFprobe 获取时长、分辨率和音视频编码。二者需要相应程序位于系统 `PATH`，也可以在扫描设置中配置可执行文件路径；缺失时任务会明确标记为失败并显示原因。
+
 数据目录：
 
 - `api/data/app.db`: SQLite 应用数据库
 - `api/data/preview/`: 按媒体库分组的图片浏览缓存目录，包含照片预览图和视频封面
+- `api/data/avatars/`: 用户、作者与标签头像
+- `api/data/webdav-transient/`: 远程媒体处理过程中生成的临时文件
 
-仓库中只保留 `preview` 的目录占位文件，实际生成的缓存资源不会提交到 Git。
+数据库、预览图、头像、WebDAV 临时文件等新增运行数据均已配置 Git 忽略规则。
 
 ## 一键启动
 
@@ -98,6 +107,13 @@ Web 端当前通过 `web/src/api/client.ts` 维护手写的类型和请求封装
 
 ## 功能概览
 
+### 账户与权限
+
+- 首次打开 Web 页面时创建第一个 Owner，不提供固定默认密码
+- 支持 Owner、Admin、Editor、Viewer 四类角色及系统内置权限
+- Owner 与 Admin 可访问全部媒体库；Editor 与 Viewer 仅能访问创建账户时授权的媒体库
+- 会话 Cookie 使用 `HttpOnly` 与 `SameSite=Lax`，HTTPS 部署时通过 `COOKIE_SECURE=true` 启用 `Secure`
+
 ### 媒体库
 
 - 从设置页的 `媒体库 -> 媒体库列表` 创建和管理媒体库
@@ -111,6 +127,7 @@ Web 端当前通过 `web/src/api/client.ts` 维护手写的类型和请求封装
 
 - 在 `媒体库 -> 扫描设置` 中统一配置预览图生成参数
 - 支持设置预览图质量和最大分辨率
+- 默认最大分辨率为 `640px`、质量为 `45`；项目只生成一份 `preview`，不会额外生成独立缩略图
 - 这些参数通过 `/api/preferences` 持久化到数据库
 - 后续扫描任务和手动生成缓存任务都会读取这组全局参数
 
@@ -121,6 +138,7 @@ Web 端当前通过 `web/src/api/client.ts` 维护手写的类型和请求封装
 - 统一使用 WebP 作为当前主缓存格式
 - 列表页使用 `preview` 缓存
 - 大图查看时先显示 `preview`，原图加载完成后再渐进替换
+- 媒体响应支持 ETag 条件缓存，重复访问未变化资源时不会重复传输内容
 - 缓存生成与缓存删除可独立于媒体库创建流程单独执行
 
 ### 照片浏览
@@ -130,18 +148,48 @@ Web 端当前通过 `web/src/api/client.ts` 维护手写的类型和请求封装
 - 文件夹卡片支持拼图式封面和子项计数，照片与文件夹都可通过头部搜索快速过滤
 - 图片查看器提供右上角操作栏，支持信息查看、原图下载、真实删除和自动隐藏交互
 
+### 视频
+
+- `/video` 提供视频目录、搜索、排序、观看状态筛选和分页
+- `/video/{id}` 提供视频播放、进度保存、前后视频切换和集合成员切换
+- “生成浏览缓存”会根据媒体类型选择实现：照片缩放编码为 Preview，视频通过 FFmpeg 抽帧生成封面
+- “读取视频技术信息”通过 FFprobe 获取时长、分辨率和音视频编码，不负责生成浏览缓存
+- 支持按目录规则建立视频集合
+
+### 远程数据源
+
+- 在 `媒体库 -> 远程数据源` 中配置和验证 WebDAV 连接
+- WebDAV 媒体支持远程扫描和按需读取，长期仅保存本地 Preview 与视频封面
+- 远程媒体路径会限制在已配置连接根目录内
+
 ### 任务中心
 
-- 在统一任务中心中查看媒体库扫描任务和缓存生成任务
+- 在统一任务中心中查看媒体库扫描、浏览缓存生成和视频技术信息读取任务
 - 后端通过 `/api/tasks` 输出统一任务数据
-- 扫描任务与缓存任务都持久化到数据库，应用重启后历史仍可查看
+- 扫描只负责建立媒体索引；扫描成功且已启用缓存时，会继续创建独立的“生成浏览缓存”任务
+- 浏览缓存任务统一使用 `generate_cache` 类型，再根据媒体类型分派照片 Preview 或视频封面实现
+- 任务会持久化到数据库，失败原因和处理明细可在任务中心查看，应用重启后历史仍可查看
 - 支持暂停、继续、取消运行中的后台任务
+- 应用重启时会将失去执行器的未完成任务标记为失败，避免任务永久占用媒体库
 
 ### 分页与性能
 
-- `/api/photos`、`/api/media/items`、`/api/media/files` 支持 `limit` / `offset`
-- 照片页改为分批加载，避免一次拉取全量照片
-- 设置页只拉取有限数量的照片封面用于媒体库卡片展示
+- `/api/photos` 支持基于 `before_id` 的稳定游标分页，同时保留 `limit` / `offset` 兼容参数
+- 照片页使用游标分批加载，翻页成本不会随媒体库规模持续增加
+- 视频目录的搜索、观看状态、集合代表项、排序、计数和分页均在 SQLite 中完成
+- 设置页通过 `/api/libraries/covers` 一次获取各媒体库封面，避免按媒体库产生请求扇出
+- WebDAV 派生图源文件分块写入临时文件并在生成后清理；原图按需流式读取，视频 Range 请求保持直连
+- SQLite 使用 12 连接上限，并为池内连接统一启用 WAL、NORMAL synchronous、busy timeout 和外键检查
+
+## 质量检查
+
+仓库通过 `.github/workflows/ci.yml` 自动执行以下检查：
+
+- `cargo fmt --check`
+- `cargo test --locked`
+- `cargo clippy --locked --all-targets --all-features -- -D warnings`
+- `pnpm lint`
+- `pnpm build`
 
 ## 说明
 

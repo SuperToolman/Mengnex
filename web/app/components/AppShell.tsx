@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getCurrentUser } from "@/src/api/client";
-import Head from "./Head";
 import SideBar from "./SideBar";
 
 const PUBLIC_PATHS = new Set(["/login"]);
@@ -18,6 +17,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isPublicPath) {
+            // A failed check can redirect here. Reset so a later successful login
+            // always validates the new session before rendering protected content.
+            hasCheckedSessionRef.current = false;
             return;
         }
 
@@ -56,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         return (
             <div
                 className="flex min-h-dvh items-center justify-center text-sm"
-                style={{ background: "var(--theme-app-background)", color: "var(--muted)" }}
+                style={{ background: "var(--app-canvas)", color: "var(--muted)" }}
             >
                 正在验证登录状态...
             </div>
@@ -69,7 +71,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: "var(--background)" }}>
-            <Head />
             <div className="m-1 min-h-0 flex-1 rounded-lg overflow-hidden">
                 <div className="flex h-full min-h-0 overflow-hidden rounded-lg">
                     <SideBar />

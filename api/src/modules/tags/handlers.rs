@@ -262,7 +262,7 @@ pub async fn list_tags(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        select = select.filter(tag::Column::NormalizedName.contains(&query.to_lowercase()));
+        select = select.filter(tag::Column::NormalizedName.contains(query.to_lowercase()));
     }
     Ok(Json(
         responses_for_tags(&state.db, select.all(&state.db).await?).await?,
@@ -319,12 +319,11 @@ pub async fn update_tag(
         .filter(tag::Column::NormalizedName.eq(normalized_name.clone()))
         .one(&state.db)
         .await?
+        && existing.id != id
     {
-        if existing.id != id {
-            return Err(ApiError::BadRequest(
-                "a tag with this name already exists".to_owned(),
-            ));
-        }
+        return Err(ApiError::BadRequest(
+            "a tag with this name already exists".to_owned(),
+        ));
     }
     let mut active: tag::ActiveModel = current.into();
     active.name = Set(name);

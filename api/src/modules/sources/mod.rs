@@ -7,6 +7,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use reqwest::{Response, Url};
 use sea_orm::{DatabaseConnection, EntityTrait};
+use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
 use crate::{
@@ -17,6 +18,32 @@ use crate::{
 
 pub const LOCAL: &str = "local";
 pub const WEBDAV: &str = "webdav";
+
+fn transient_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("data")
+        .join("webdav-transient")
+}
+
+pub async fn cleanup_transient_media_files() -> Result<u64, ApiError> {
+    let root = transient_root();
+    let mut entries = match tokio::fs::read_dir(&root).await {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => return Err(error.into()),
+    };
+    let mut removed = 0_u64;
+
+    while let Some(entry) = entries.next_entry().await? {
+        if !entry.file_type().await?.is_file() || entry.file_name() == ".gitkeep" {
+            continue;
+        }
+        tokio::fs::remove_file(entry.path()).await?;
+        removed += 1;
+    }
+
+    Ok(removed)
+}
 
 /// A source-owned media entry. `locator` is the persistent identity used by
 /// indexing; `local_path` exists only while a source can provide local access.
@@ -31,10 +58,41 @@ pub struct SourceEntry {
     pub etag: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MaterializedMediaFile {
     pub path: PathBuf,
     pub temporary: bool,
+}
+
+impl Drop for MaterializedMediaFile {
+    fn drop(&mut self) {
+        if self.temporary {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+struct IncompleteTransientFile {
+    path: PathBuf,
+    keep: bool,
+}
+
+impl IncompleteTransientFile {
+    fn new(path: PathBuf) -> Self {
+        Self { path, keep: false }
+    }
+
+    fn keep(&mut self) {
+        self.keep = true;
+    }
+}
+
+impl Drop for IncompleteTransientFile {
+    fn drop(&mut self) {
+        if !self.keep {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
 }
 
 /// Storage backends enumerate media independently of scanner and media-type
@@ -240,7 +298,7 @@ pub async fn materialize_media_file_for_derivative(
             let locator = file.source_locator.as_deref().ok_or_else(|| {
                 ApiError::BadRequest("WebDAV media file has no source locator".to_owned())
             })?;
-            let response = open_webdav_content(db, library, locator, None).await?;
+            let mut response = open_webdav_content(db, library, locator, None).await?;
             if !response.status().is_success() {
                 return Err(ApiError::BadRequest(format!(
                     "WebDAV preview source returned {} for {locator}",
@@ -248,16 +306,41 @@ pub async fn materialize_media_file_for_derivative(
                 )));
             }
 
-            let bytes = response.bytes().await.map_err(|error| {
-                ApiError::BadRequest(format!("WebDAV preview source read failed: {error}"))
-            })?;
-            let extension = file.extension.as_deref().unwrap_or("media");
-            let transient_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("data")
-                .join("webdav-transient");
+            let extension = file
+                .extension
+                .as_deref()
+                .filter(|value| {
+                    value
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric())
+                })
+                .unwrap_or("media");
+            let transient_root = transient_root();
             tokio::fs::create_dir_all(&transient_root).await?;
             let path = transient_root.join(format!("{}.{}", Uuid::new_v4(), extension));
-            tokio::fs::write(&path, bytes).await?;
+            let partial_path = path.with_extension(format!("{extension}.part"));
+            let mut partial_guard = IncompleteTransientFile::new(partial_path.clone());
+            let mut output = tokio::fs::File::create(&partial_path).await?;
+            let mut written = 0_u64;
+
+            while let Some(chunk) = response.chunk().await.map_err(|error| {
+                ApiError::BadRequest(format!("WebDAV preview source read failed: {error}"))
+            })? {
+                output.write_all(&chunk).await?;
+                written = written.saturating_add(chunk.len() as u64);
+            }
+            output.flush().await?;
+            drop(output);
+
+            if file.file_size > 0 && written != file.file_size as u64 {
+                return Err(ApiError::BadRequest(format!(
+                    "WebDAV preview source size mismatch: expected {}, received {written}",
+                    file.file_size
+                )));
+            }
+
+            tokio::fs::rename(&partial_path, &path).await?;
+            partial_guard.keep();
 
             Ok(MaterializedMediaFile {
                 path,
@@ -267,5 +350,25 @@ pub async fn materialize_media_file_for_derivative(
         source_type => Err(ApiError::BadRequest(format!(
             "unsupported library source type: {source_type}"
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MaterializedMediaFile;
+    use std::fs;
+    use uuid::Uuid;
+
+    #[test]
+    fn temporary_materialized_file_is_removed_when_dropped() {
+        let path = std::env::temp_dir().join(format!("mengnex-{}.tmp", Uuid::new_v4()));
+        fs::write(&path, b"temporary media").expect("create temporary media file");
+
+        drop(MaterializedMediaFile {
+            path: path.clone(),
+            temporary: true,
+        });
+
+        assert!(!path.exists());
     }
 }
