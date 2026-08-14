@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
     SIDEBAR_BOTTOM_CONFIG,
     SIDEBAR_CONFIG,
@@ -19,246 +19,27 @@ type ActiveFrame = {
     opacity: number;
 };
 
-type BlobState = {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    opacity: number;
-};
-
-function FluidFocus({
+function ActiveFocus({
     frame,
 }: {
     frame: ActiveFrame | null;
 }) {
-    const filterId = useId().replace(/:/g, "");
-    const sourceBlobRef = useRef<HTMLDivElement | null>(null);
-    const bridgeBlobRef = useRef<HTMLDivElement | null>(null);
-    const leadBlobRef = useRef<HTMLDivElement | null>(null);
-    const glowRef = useRef<HTMLDivElement | null>(null);
-    const targetRef = useRef<BlobState>({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        opacity: 0,
-    });
-    const previousTargetRef = useRef<BlobState | null>(null);
-    const transitionRef = useRef<{
-        from: BlobState;
-        startedAt: number;
-        duration: number;
-    } | null>(null);
-
-    useEffect(() => {
-        if (!frame) {
-            targetRef.current = {
-                ...targetRef.current,
-                opacity: 0,
-            };
-            previousTargetRef.current = null;
-            transitionRef.current = null;
-            return;
-        }
-
-        const nextTarget = {
-            x: frame.left + frame.width / 2,
-            y: frame.top + frame.height / 2,
-            width: frame.width,
-            height: frame.height,
-            opacity: frame.opacity,
-        };
-
-        const previousTarget = previousTargetRef.current;
-
-        if (
-            previousTarget &&
-            (previousTarget.x !== nextTarget.x ||
-                previousTarget.y !== nextTarget.y ||
-                previousTarget.width !== nextTarget.width ||
-                previousTarget.height !== nextTarget.height)
-        ) {
-            transitionRef.current = {
-                from: previousTarget,
-                startedAt: performance.now(),
-                duration: 420,
-            };
-        }
-
-        targetRef.current = nextTarget;
-        previousTargetRef.current = nextTarget;
-    }, [frame]);
-
-    useEffect(() => {
-        const sourceBlob = sourceBlobRef.current;
-        const bridgeBlob = bridgeBlobRef.current;
-        const leadBlob = leadBlobRef.current;
-        const glow = glowRef.current;
-
-        if (!sourceBlob || !bridgeBlob || !leadBlob || !glow) {
-            return;
-        }
-
-        let animationFrame = 0;
-
-        const state = {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-            opacity: 0,
-            velocityX: 0,
-            velocityY: 0,
-            ready: false,
-        };
-
-        const renderBlob = (node: HTMLDivElement, blob: BlobState) => {
-            node.style.opacity = `${Math.max(0, blob.opacity)}`;
-            node.style.width = `${Math.max(0, blob.width)}px`;
-            node.style.height = `${Math.max(0, blob.height)}px`;
-            node.style.transform = `translate(${blob.x - blob.width / 2}px, ${blob.y - blob.height / 2}px)`;
-        };
-
-        const animate = (now: number) => {
-            const target = targetRef.current;
-
-            if (!state.ready) {
-                state.x = target.x;
-                state.y = target.y;
-                state.width = target.width;
-                state.height = target.height;
-                state.opacity = target.opacity;
-                state.ready = true;
-            }
-
-            state.velocityX += (target.x - state.x) * 0.14;
-            state.velocityX *= 0.72;
-            state.x += state.velocityX;
-
-            state.velocityY += (target.y - state.y) * 0.18;
-            state.velocityY *= 0.68;
-            state.y += state.velocityY;
-
-            state.width += (target.width - state.width) * 0.18;
-            state.height += (target.height - state.height) * 0.18;
-            state.opacity += (target.opacity - state.opacity) * 0.15;
-
-            const travel = Math.min(
-                Math.hypot(state.velocityX * 1.1, state.velocityY * 1.35),
-                26,
-            );
-            const leadWidth = state.width * Math.max(0.9, 1 - travel * 0.0045);
-            const leadHeight = state.height * (1 + travel * 0.02);
-
-            renderBlob(leadBlob, {
-                x: state.x,
-                y: state.y,
-                width: leadWidth,
-                height: leadHeight,
-                opacity: state.opacity,
-            });
-
-            const transition = transitionRef.current;
-
-            if (transition) {
-                const rawProgress = Math.min(1, (now - transition.startedAt) / transition.duration);
-                const easedProgress = 1 - Math.pow(1 - rawProgress, 3);
-                const sourceX = transition.from.x + (state.x - transition.from.x) * easedProgress;
-                const sourceY = transition.from.y + (state.y - transition.from.y) * easedProgress;
-                const sourceWidth = transition.from.width + (leadWidth - transition.from.width) * easedProgress;
-                const sourceHeight = transition.from.height + (leadHeight - transition.from.height) * easedProgress;
-
-                renderBlob(sourceBlob, {
-                    x: sourceX,
-                    y: sourceY,
-                    width: sourceWidth,
-                    height: sourceHeight,
-                    opacity: state.opacity * (1 - easedProgress) * 0.92,
-                });
-
-                const dx = Math.abs(state.x - sourceX);
-                const dy = Math.abs(state.y - sourceY);
-
-                renderBlob(bridgeBlob, {
-                    x: (state.x + sourceX) / 2,
-                    y: (state.y + sourceY) / 2,
-                    width: Math.max(leadWidth, dx + leadWidth * 0.85),
-                    height: Math.max(state.height * 0.78, Math.max(leadHeight, sourceHeight) + dy * 0.22),
-                    opacity: state.opacity * Math.sin(rawProgress * Math.PI) * 0.78,
-                });
-
-                if (rawProgress >= 1) {
-                    transitionRef.current = null;
-                }
-            } else {
-                renderBlob(sourceBlob, {
-                    x: state.x,
-                    y: state.y,
-                    width: 0,
-                    height: 0,
-                    opacity: 0,
-                });
-                renderBlob(bridgeBlob, {
-                    x: state.x,
-                    y: state.y,
-                    width: 0,
-                    height: 0,
-                    opacity: 0,
-                });
-            }
-
-            glow.style.opacity = `${state.opacity}`;
-            glow.style.width = `${state.width + 18}px`;
-            glow.style.height = `${state.height + 22}px`;
-            glow.style.transform = `translate(${state.x - (state.width + 18) / 2}px, ${state.y - (state.height + 22) / 2}px)`;
-
-            animationFrame = window.requestAnimationFrame(animate);
-        };
-
-        animationFrame = window.requestAnimationFrame(animate);
-
-        return () => {
-            window.cancelAnimationFrame(animationFrame);
-        };
-    }, []);
+    if (!frame) {
+        return null;
+    }
 
     return (
-        <>
-            <svg className="pointer-events-none absolute h-0 w-0">
-                <defs>
-                    <filter id={filterId}>
-                        <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-                        <feColorMatrix
-                            in="blur"
-                            mode="matrix"
-                            values="
-                                1 0 0 0 0
-                                0 1 0 0 0
-                                0 0 1 0 0
-                                0 0 0 24 -11
-                            "
-                            result="goo"
-                        />
-                        <feComposite in="SourceGraphic" in2="goo" operator="atop" />
-                    </filter>
-                </defs>
-            </svg>
-
-            <div
-                className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[24px]"
-                style={{ filter: `url(#${filterId})` }}
-            >
-                <div ref={sourceBlobRef} className="sidebar-fluid-blob sidebar-fluid-blob-source" />
-                <div ref={bridgeBlobRef} className="sidebar-fluid-blob sidebar-fluid-blob-bridge" />
-                <div ref={leadBlobRef} className="sidebar-fluid-blob sidebar-fluid-blob-lead" />
-            </div>
-
-            <div
-                ref={glowRef}
-                className="pointer-events-none absolute z-0 rounded-[24px] sidebar-fluid-glow"
-            />
-        </>
+        <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 z-0 rounded-[20px] sidebar-active-focus"
+            style={{
+                width: frame.width,
+                height: frame.height,
+                opacity: frame.opacity,
+                transform: `translate3d(${frame.left + frame.width / 2}px, ${frame.top + frame.height / 2}px, 0) translate3d(-50%, -50%, 0)`,
+                transformOrigin: "center",
+            }}
+        />
     );
 }
 
@@ -311,7 +92,7 @@ function SidebarRow({
                 aria-label={title}
                 title={title}
                 onClick={onClick}
-                className={`${baseClass} hover:bg-white/60 dark:hover:bg-white/10`}
+                className={baseClass}
             >
                 {children}
             </button>
@@ -344,17 +125,13 @@ function SidebarSection({
     const listRef = useRef<HTMLUListElement | null>(null);
     const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
     const [activeFrame, setActiveFrame] = useState<ActiveFrame | null>(null);
-    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+    const [preview, setPreview] = useState<{ index: number; pathname: string } | null>(null);
 
     const matchedIndex = items.findIndex(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
     const routeIndex = pathname === "/" && items.length > 0 ? 0 : matchedIndex;
-    const focusIndex = previewIndex ?? routeIndex;
-
-    useEffect(() => {
-        setPreviewIndex(null);
-    }, [pathname]);
+    const focusIndex = preview?.pathname === pathname ? preview.index : routeIndex;
 
     const measureItem = (index: number | null) => {
         if (!listRef.current || index === null || index < 0) {
@@ -430,7 +207,7 @@ function SidebarSection({
                 expanded ? "w-full" : "w-fit"
             }`}
         >
-            <FluidFocus frame={activeFrame} />
+            <ActiveFocus frame={activeFrame} />
 
             {items.map((item, index) => {
                 const isActive = index === focusIndex;
@@ -447,7 +224,7 @@ function SidebarSection({
                             title={item.label}
                             onClick={() => {
                                 if (index !== routeIndex) {
-                                    setPreviewIndex(index);
+                                    setPreview({ index, pathname });
                                 }
                             }}
                             itemRef={(node) => {
@@ -467,29 +244,28 @@ function SidebarSection({
 export default function SideBar() {
     const pathname = usePathname();
     const [expanded, setExpanded] = useState(true);
-    const loadedPreferenceRef = useRef(false);
+    const [preferenceLoaded, setPreferenceLoaded] = useState(false);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const cachedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
 
-        if (cachedValue === "0") {
-            setExpanded(false);
-        }
-
-        loadedPreferenceRef.current = true;
+        // Restore before paint so a saved collapsed state never flashes expanded.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setExpanded(cachedValue !== "0");
+        setPreferenceLoaded(true);
     }, []);
 
     useEffect(() => {
-        if (!loadedPreferenceRef.current) {
+        if (!preferenceLoaded) {
             return;
         }
 
         window.localStorage.setItem(SIDEBAR_STORAGE_KEY, expanded ? "1" : "0");
-    }, [expanded]);
+    }, [expanded, preferenceLoaded]);
 
     return (
         <aside
-            className={`flex h-full min-h-0 shrink-0 flex-col justify-between overflow-hidden py-2 backdrop-blur-sm transition-[width] duration-300 ${
+            className={`flex h-full min-h-0 shrink-0 flex-col justify-between overflow-hidden py-2 transition-[width] duration-300 ${
                 expanded ? "w-[168px]" : "w-[64px]"
             }`}
         >

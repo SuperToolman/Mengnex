@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import GalleryItem, { type GalleryItemData } from "./GalleryItem";
 
 export type GalleryGroupData = {
@@ -13,6 +14,7 @@ type GalleryGroupProps = {
     className?: string;
     onItemOpen?: (item: GalleryItemData) => void;
     itemHeight?: number;
+    titleDensity?: "small" | "medium";
 };
 
 const ITEM_GAP = 4;
@@ -55,11 +57,12 @@ function getGroupBasis(items: GalleryItemData[], itemHeight: number) {
     return `min(${groupWidth}px, 100%)`;
 }
 
-export default function GalleryGroup({
+function GalleryGroup({
     group,
     className,
     onItemOpen,
     itemHeight = 168,
+    titleDensity,
 }: GalleryGroupProps) {
     if (group.items.length === 0) {
         return null;
@@ -74,9 +77,11 @@ export default function GalleryGroup({
                 flexBasis: groupBasis,
                 width: groupBasis,
                 maxWidth: "100%",
+                contentVisibility: "auto",
+                containIntrinsicSize: "320px",
             }}
         >
-            <h2 className="mb-3 text-lg font-medium text-slate-800 dark:text-slate-200">
+            <h2 className={`mb-3 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200 ${titleDensity === "small" ? "text-xs" : titleDensity === "medium" ? "text-sm" : "text-lg"}`}>
                 {formatBatchTitle(group.batchTime)}
             </h2>
             <div className="flex flex-wrap items-start gap-1">
@@ -94,3 +99,5 @@ export default function GalleryGroup({
         </section>
     );
 }
+
+export default memo(GalleryGroup);

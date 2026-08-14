@@ -18,19 +18,19 @@ pub fn routes() -> Router<AppState> {
                 .delete(handlers::delete_library),
         )
         .route(
-            "/api/libraries/{id}/thumbnails/settings",
-            axum::routing::put(handlers::update_library_thumbnail_config),
+            "/api/libraries/{id}/previews/settings",
+            axum::routing::put(handlers::update_library_preview_config),
         )
         .route(
-            "/api/libraries/{id}/thumbnails/generate",
-            axum::routing::post(handlers::generate_library_thumbnail_assets),
+            "/api/libraries/{id}/previews/generate",
+            axum::routing::post(handlers::generate_library_preview_assets),
         )
         .route(
-            "/api/libraries/{id}/thumbnails/tasks/{task_id}",
-            get(handlers::get_library_thumbnail_generation_task),
+            "/api/libraries/{id}/previews/tasks/{task_id}",
+            get(handlers::get_library_preview_generation_task),
         )
         .route(
-            "/api/libraries/{id}/thumbnails",
-            axum::routing::delete(handlers::delete_library_thumbnail_assets),
+            "/api/libraries/{id}/previews",
+            axum::routing::delete(handlers::delete_library_preview_assets),
         )
 }

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Head from "./components/Head";
-import SideBar from "./components/SideBar";
+import AppShell from "./components/AppShell";
 import { ThemeProvider } from "./components/ThemeProvider";
+import GlobalToastProvider from "./components/GlobalToastProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,13 +23,47 @@ export const metadata: Metadata = {
 const themeInitScript = `
 (() => {
   const key = "mengnex.theme";
+  const appearanceKey = "mengnex.appearance";
   const stored = window.localStorage.getItem(key);
   const mode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
   const resolved = mode === "system"
     ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
     : mode;
-  document.documentElement.classList.toggle("dark", resolved === "dark");
-  document.documentElement.dataset.theme = resolved;
+  const root = document.documentElement;
+  root.classList.toggle("dark", resolved === "dark");
+  root.dataset.theme = resolved;
+
+  try {
+    const appearance = JSON.parse(window.localStorage.getItem(appearanceKey) || "null");
+    const accents = {
+      sky: ["oklch(68.5% 0.169 237.3)", "#ffffff"],
+      blue: ["oklch(62.3% 0.214 259.8)", "#ffffff"],
+      violet: ["oklch(60.6% 0.25 292.7)", "#ffffff"],
+      rose: ["oklch(64.5% 0.246 16.4)", "#ffffff"],
+      emerald: ["oklch(69.6% 0.17 162.5)", "#052e16"],
+      orange: ["oklch(70.5% 0.213 47.6)", "#431407"],
+    };
+    const bases = {
+      slate: ["#f8fafc", "#0f172a"], gray: ["#f9fafb", "#111827"],
+      zinc: ["#fafafa", "#18181b"], neutral: ["#fafafa", "#171717"], stone: ["#fafaf9", "#1c1917"],
+    };
+    const fonts = {
+      geist: "var(--font-geist-sans), Arial, sans-serif", inter: "Inter, ui-sans-serif, system-ui, sans-serif",
+      system: "ui-sans-serif, system-ui, sans-serif", serif: "Georgia, Cambria, 'Times New Roman', serif",
+    };
+    const radii = { none: "0rem", small: "0.25rem", medium: "0.5rem", large: "0.75rem" };
+    if (appearance && accents[appearance.accent] && bases[appearance.base] && fonts[appearance.fontFamily] && radii[appearance.radius] && radii[appearance.radiusForm]) {
+      const accent = accents[appearance.accent];
+      root.style.setProperty("--accent", accent[0]);
+      root.style.setProperty("--accent-foreground", accent[1]);
+      root.style.setProperty("--focus", accent[0]);
+      root.style.setProperty("--link", accent[0]);
+      root.style.setProperty("--background", bases[appearance.base][resolved === "dark" ? 1 : 0]);
+      root.style.setProperty("--font-sans", fonts[appearance.fontFamily]);
+      root.style.setProperty("--radius", radii[appearance.radius]);
+      root.style.setProperty("--field-radius", radii[appearance.radiusForm]);
+    }
+  } catch {}
 })();
 `;
 
@@ -47,19 +81,8 @@ export default function RootLayout({
       <body className="h-full overflow-hidden">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <ThemeProvider>
-          <div className="flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: "var(--theme-bg-app)" }}>
-            <Head />
-            <div className="m-1 min-h-0 flex-1 rounded-lg overflow-hidden">
-              <div className="flex h-full min-h-0 overflow-hidden rounded-lg">
-                <SideBar />
-                <main
-                  className="content-body relative my-2 mr-2 min-h-0 min-w-0 flex-1 overflow-auto rounded-lg p-4 shadow-inner backdrop-blur-xl"
-                >
-                  {children}
-                </main>
-              </div>
-            </div>
-          </div>
+          <AppShell>{children}</AppShell>
+          <GlobalToastProvider />
         </ThemeProvider>
       </body>
     </html>

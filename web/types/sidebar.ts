@@ -8,6 +8,7 @@ import {
     Picture,
     Snail,
     Stopwatch,
+    TrashBin,
 } from "@gravity-ui/icons";
 import type { ComponentType, SVGProps } from "react";
 
@@ -65,6 +66,12 @@ export const SIDEBAR_CONFIG: SidebarItem[] = [
 
 export const SIDEBAR_BOTTOM_CONFIG: SidebarItem[] = [
     {
+        id: "recycle-bin",
+        icon: TrashBin,
+        label: "回收站",
+        href: "/recycle-bin",
+    },
+    {
         id: "tasks",
         icon: Stopwatch,
         label: "任务",
@@ -74,6 +81,6 @@ export const SIDEBAR_BOTTOM_CONFIG: SidebarItem[] = [
         id: "settings",
         icon: Gear,
         label: "设置",
-        href: "/settings",
+        href: "/settings/libraries/list",
     },
 ];

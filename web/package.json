@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "api:schema": "cargo run --quiet --bin export_openapi --manifest-path ../api/Cargo.toml -- ../web/openapi/mengnex.json",
     "api:generate": "openapi-ts",
+    "api:sync": "pnpm api:schema && pnpm api:generate",
     "lint": "eslint"
   },
   "dependencies": {
@@ -14,6 +16,7 @@
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-easy-crop": "^6.2.3",
     "three": "^0.180.0"
   },
   "devDependencies": {

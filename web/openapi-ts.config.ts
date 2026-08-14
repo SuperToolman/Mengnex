@@ -12,6 +12,9 @@ export default defineConfig({
       bundle: true,
     },
     "@hey-api/typescript",
-    "@hey-api/sdk",
+    {
+      name: "@hey-api/sdk",
+      responseStyle: "data",
+    },
   ],
 });

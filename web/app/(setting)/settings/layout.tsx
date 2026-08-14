@@ -26,12 +26,27 @@ const settingSections: SettingSection[] = [
             {
                 href: "/settings/libraries/scan-settings",
                 label: "扫描设置",
-                description: "预览图与缩略图生成参数",
+                description: "预览图缓存与视频分析参数",
             },
             {
                 href: "/settings/libraries/metadata",
                 label: "元数据管理",
                 description: "媒体识别与元数据维护",
+            },
+            {
+                href: "/settings/libraries/remote-sources",
+                label: "远程数据源",
+                description: "管理 WebDAV 等远程媒体连接",
+            },
+            {
+                href: "/settings/libraries/authors",
+                label: "作者库",
+                description: "查看扫描识别出的媒体作者",
+            },
+            {
+                href: "/settings/libraries/tags",
+                label: "标签库",
+                description: "管理所有媒体类型共用的标签",
             },
         ],
     },
@@ -73,24 +88,12 @@ export default function SettingsLayout({
 
     return (
         <div className="flex h-full min-h-0 gap-4">
-            <aside
-                className="w-72 shrink-0 overflow-auto rounded-3xl p-3 shadow-sm backdrop-blur-xl"
-                style={{
-                    border: "1px solid var(--theme-border-heavy)",
-                    backgroundColor: "var(--theme-bg-overlay-heavy)",
-                }}
-            >
+            <aside className="w-72 shrink-0 overflow-auto rounded-3xl bg-surface p-3 shadow-surface">
                 <div className="px-3 py-2">
-                    <p
-                        className="text-xs font-medium uppercase tracking-[0.22em]"
-                        style={{ color: "var(--theme-text-muted)" }}
-                    >
+                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">
                         设置
                     </p>
-                    <h1
-                        className="mt-1 text-xl font-semibold"
-                        style={{ color: "var(--theme-text-primary)" }}
-                    >
+                    <h1 className="mt-1 text-xl font-semibold text-foreground">
                         设置
                     </h1>
                 </div>
@@ -98,16 +101,10 @@ export default function SettingsLayout({
                     {settingSections.map((section) => (
                         <section key={section.label} className="rounded-3xl bg-white/6 px-3 py-3">
                             <div className="px-2">
-                                <h2
-                                    className="text-sm font-semibold"
-                                    style={{ color: "var(--theme-text-primary)" }}
-                                >
+                                <h2 className="text-sm font-semibold text-foreground">
                                     {section.label}
                                 </h2>
-                                <p
-                                    className="mt-1 text-xs leading-5"
-                                    style={{ color: "var(--theme-text-secondary)" }}
-                                >
+                                <p className="mt-1 text-xs leading-5 text-muted">
                                     {section.description}
                                 </p>
                             </div>
@@ -119,23 +116,12 @@ export default function SettingsLayout({
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className="rounded-2xl px-3 py-3 text-left transition"
-                                            style={{
-                                                backgroundColor: active
-                                                    ? "var(--theme-bg-overlay-heavy)"
-                                                    : "transparent",
-                                            }}
+                                            className={`rounded-2xl px-3 py-3 text-left transition ${active ? "bg-accent-soft" : "hover:bg-default"}`}
                                         >
-                                            <span
-                                                className="block text-sm font-medium"
-                                                style={{ color: "var(--theme-text-primary)" }}
-                                            >
+                                            <span className={`block text-sm font-medium ${active ? "text-accent-soft-foreground" : "text-foreground"}`}>
                                                 {item.label}
                                             </span>
-                                            <span
-                                                className="mt-1 block text-xs"
-                                                style={{ color: "var(--theme-text-secondary)" }}
-                                            >
+                                            <span className="mt-1 block text-xs text-muted">
                                                 {item.description}
                                             </span>
                                         </Link>
@@ -146,13 +132,7 @@ export default function SettingsLayout({
                     ))}
                 </div>
             </aside>
-            <section
-                className="min-w-0 flex-1 overflow-auto rounded-3xl p-6 shadow-sm backdrop-blur-xl"
-                style={{
-                    border: "1px solid var(--theme-border-heavy)",
-                    backgroundColor: "var(--theme-bg-overlay-heavy)",
-                }}
-            >
+            <section className="min-w-0 flex-1 overflow-auto rounded-3xl bg-surface p-6 shadow-surface">
                 {children}
             </section>
         </div>

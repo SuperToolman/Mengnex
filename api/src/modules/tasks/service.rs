@@ -6,9 +6,9 @@ use tokio::time::sleep;
 
 use crate::{
     core::error::ApiError,
-    infra::entities::app_task,
+    infra::entities::{app_task, scan_task},
     modules::{
-        libraries::dto::ThumbnailGenerationTaskResponse,
+        libraries::dto::PreviewGenerationTaskResponse,
         tasks::dto::{TaskKind, TaskResponse},
     },
 };
@@ -43,8 +43,7 @@ pub struct UpdateAppTaskParams {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ThumbnailTaskMetadata {
-    pub generated_thumbnails: i64,
+pub struct PreviewTaskMetadata {
     pub generated_previews: i64,
     pub skipped_assets: i64,
 }
@@ -78,7 +77,10 @@ pub async fn update_app_task(
     task_id: &str,
     params: UpdateAppTaskParams,
 ) -> Result<Option<app_task::Model>, ApiError> {
-    let Some(task) = app_task::Entity::find_by_id(task_id.to_owned()).one(db).await? else {
+    let Some(task) = app_task::Entity::find_by_id(task_id.to_owned())
+        .one(db)
+        .await?
+    else {
         return Ok(None);
     };
 
@@ -139,13 +141,12 @@ pub async fn get_app_task(
     db: &DatabaseConnection,
     task_id: &str,
 ) -> Result<Option<app_task::Model>, ApiError> {
-    Ok(app_task::Entity::find_by_id(task_id.to_owned()).one(db).await?)
+    Ok(app_task::Entity::find_by_id(task_id.to_owned())
+        .one(db)
+        .await?)
 }
 
-pub async fn wait_for_task_permit(
-    db: &DatabaseConnection,
-    task_id: &str,
-) -> Result<(), ApiError> {
+pub async fn wait_for_task_permit(db: &DatabaseConnection, task_id: &str) -> Result<(), ApiError> {
     loop {
         let Some(task) = get_app_task(db, task_id).await? else {
             return Err(ApiError::TaskCanceled);
@@ -159,13 +160,13 @@ pub async fn wait_for_task_permit(
                 return Err(ApiError::BadRequest(format!(
                     "task is no longer executable: {}",
                     task.status
-                )))
+                )));
             }
             _ => {
                 return Err(ApiError::BadRequest(format!(
                     "task has unsupported execution status: {}",
                     task.status
-                )))
+                )));
             }
         }
     }
@@ -190,7 +191,37 @@ pub fn can_cancel_status(status: &str) -> bool {
 pub fn task_response_from_model(
     value: app_task::Model,
     library_name: Option<String>,
+    scan: Option<&scan_task::Model>,
 ) -> TaskResponse {
+    let (scan_processed_items, scan_total_items, preview_processed_items, preview_total_items) =
+        if value.kind == TaskKind::ScanLibrary.to_string() {
+            let scan_total = scan.map(|item| item.discovered_files).unwrap_or(0).max(0);
+            let scan_processed = scan
+                .map(|item| item.processed_files)
+                .unwrap_or(0)
+                .max(0)
+                .min(scan_total);
+            let preview_total = value.total_items.saturating_sub(scan_total).max(0);
+            let preview_processed = value
+                .processed_items
+                .saturating_sub(scan_processed)
+                .max(0)
+                .min(preview_total);
+            (
+                Some(scan_processed),
+                Some(scan_total),
+                Some(preview_processed),
+                Some(preview_total),
+            )
+        } else {
+            (
+                None,
+                None,
+                Some(value.processed_items.max(0)),
+                Some(value.total_items.max(0)),
+            )
+        };
+
     TaskResponse {
         id: value.id,
         kind: value.kind,
@@ -199,8 +230,10 @@ pub fn task_response_from_model(
         library_name,
         status: value.status,
         progress_percent: value.progress_percent,
-        processed_items: value.processed_items,
-        total_items: value.total_items,
+        scan_processed_items,
+        scan_total_items,
+        preview_processed_items,
+        preview_total_items,
         detail: value.detail,
         error_message: value.error_message,
         created_at: value.created_at,
@@ -209,18 +242,15 @@ pub fn task_response_from_model(
     }
 }
 
-pub fn thumbnail_task_response_from_model(
-    value: app_task::Model,
-) -> ThumbnailGenerationTaskResponse {
-    let metadata = parse_thumbnail_metadata(value.metadata_json.as_deref());
+pub fn preview_task_response_from_model(value: app_task::Model) -> PreviewGenerationTaskResponse {
+    let metadata = parse_preview_metadata(value.metadata_json.as_deref());
 
-    ThumbnailGenerationTaskResponse {
+    PreviewGenerationTaskResponse {
         task_id: value.id,
         library_id: value.library_id.unwrap_or_default(),
         status: value.status,
         total_assets: value.total_items,
         processed_assets: value.processed_items,
-        generated_thumbnails: metadata.generated_thumbnails,
         generated_previews: metadata.generated_previews,
         skipped_assets: metadata.skipped_assets,
         progress_percent: value.progress_percent,
@@ -231,17 +261,14 @@ pub fn thumbnail_task_response_from_model(
     }
 }
 
-pub fn serialize_thumbnail_metadata(
-    metadata: &ThumbnailTaskMetadata,
-) -> Result<String, ApiError> {
-    serde_json::to_string(metadata)
-        .map_err(|err| ApiError::BadRequest(format!("failed to serialize thumbnail task metadata: {err}")))
+pub fn serialize_preview_metadata(metadata: &PreviewTaskMetadata) -> Result<String, ApiError> {
+    serde_json::to_string(metadata).map_err(|err| {
+        ApiError::BadRequest(format!("failed to serialize preview task metadata: {err}"))
+    })
 }
 
-pub fn parse_thumbnail_metadata(
-    metadata_json: Option<&str>,
-) -> ThumbnailTaskMetadata {
+pub fn parse_preview_metadata(metadata_json: Option<&str>) -> PreviewTaskMetadata {
     metadata_json
-        .and_then(|value| serde_json::from_str::<ThumbnailTaskMetadata>(value).ok())
+        .and_then(|value| serde_json::from_str::<PreviewTaskMetadata>(value).ok())
         .unwrap_or_default()
 }

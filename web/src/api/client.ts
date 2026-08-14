@@ -1,205 +1,188 @@
-export type MediaType =
-    | "photo"
-    | "game"
-    | "manga"
-    | "anime"
-    | "movie"
-    | "series"
-    | "novel"
-    | "music"
-    | "other";
+import { client as generatedClient } from "./generated/client.gen";
+import {
+    cancelTask as cancelTaskSdk,
+    clearCompletedTasks as clearCompletedTasksSdk,
+    clearTags as clearTagsSdk,
+    createTag as createTagSdk,
+    createLibrary as createLibrarySdk,
+    create as createWebdavConnectionSdk,
+    createUser as createUserSdk,
+    deleteLibrary as deleteLibrarySdk,
+    deleteTask as deleteTaskSdk,
+    deleteLibraryPreviewAssets,
+    deletePhoto as deletePhotoSdk,
+    deleteTag as deleteTagSdk,
+    generateLibraryPreviewAssets,
+    getLibraryPreviewGenerationTask as getLibraryPreviewGenerationTaskSdk,
+    getAuthor as getAuthorSdk,
+    getPreferences as getPreferencesSdk,
+    getReader,
+    getSeries,
+    getVideo as getVideoSdk,
+    listLibraries,
+    listAuthors,
+    listSeries,
+    list as listWebdavConnectionsSdk,
+    listFolderContents,
+    listPhotos,
+    listRecycleBin,
+    listResourceTags,
+    listRolePermissions,
+    listScanTasks,
+    listTasks,
+    listVideos,
+    listVideoCatalog,
+    listTagResources as listTagResourcesSdk,
+    listTags as listTagsSdk,
+    listUsers,
+    login as loginSdk,
+    logout as logoutSdk,
+    me,
+    pauseTask as pauseTaskSdk,
+    purgeItem,
+    restoreItem,
+    resumeTask as resumeTaskSdk,
+    replaceResourceTags,
+    startScan,
+    status,
+    updateLibrary as updateLibrarySdk,
+    updateLibraryPreviewConfig as updateLibraryPreviewConfigSdk,
+    updatePreferences as updatePreferencesSdk,
+    updateRolePermissions as updateRolePermissionsSdk,
+    updateTag as updateTagSdk,
+    updatePlayback as updateVideoPlaybackSdk,
+} from "./generated/sdk.gen";
+import type {
+    AuthRole,
+    AuthorResponse,
+    AuthorDetailResponse,
+    AuthorAvatarResponse,
+    CreateLibraryRequest,
+    CreateUserRequest,
+    CredentialsRequest,
+    CreateScanTaskRequest,
+    DeleteLibraryResponse,
+    DeletePhotoResponse,
+    LibraryResponse,
+    LibraryPreviewJobResponse,
+    LibraryPreviewStatusResponse,
+    MediaType,
+    MangaDetailResponse,
+    MangaReaderResponse,
+    MangaSeriesResponse,
+    PhotoAssetResponse,
+    PhotoFolderContentsResponse,
+    PhotoFolderResponse,
+    PreferencesResponse,
+    RecycleBinItemResponse,
+    RolePermissionsResponse,
+    ScanTaskResponse,
+    TaskResponse,
+    TagResponse,
+    TagResourceResponse,
+    PreviewGenerationTaskResponse,
+    UpdateLibraryRequest,
+    UpdatePreferencesRequest,
+    UpdateTagRequest,
+    CreateWebdavConnectionRequest,
+    WebdavConnectionResponse,
+    UserResponse,
+    VideoAssetResponse,
+    VideoCoverJobResponse,
+    VideoCatalogResponse,
+    VideoDetailResponse,
+    VideoPlaybackResponse,
+    UpdateVideoPlaybackRequest,
+} from "./generated/types.gen";
 
-export type CreateLibraryRequest = {
-    name: string;
-    media_type: MediaType;
-    root_path: string;
-    thumbnails_enabled: boolean;
+export type {
+    AuthRole,
+    AuthorResponse,
+    AuthorDetailResponse,
+    AuthorAvatarResponse,
+    CreateLibraryRequest,
+    CreateUserRequest,
+    CredentialsRequest,
+    CreateScanTaskRequest,
+    DeleteLibraryResponse,
+    DeletePhotoResponse,
+    LibraryResponse,
+    LibraryPreviewJobResponse,
+    LibraryPreviewStatusResponse,
+    MediaType,
+    MangaDetailResponse,
+    MangaReaderResponse,
+    MangaSeriesResponse,
+    PhotoAssetResponse,
+    PhotoFolderContentsResponse,
+    PhotoFolderResponse,
+    PreferencesResponse,
+    RecycleBinItemResponse,
+    ScanTaskResponse,
+    TaskResponse,
+    TagResponse,
+    TagResourceResponse,
+    PreviewGenerationTaskResponse,
+    UpdateLibraryRequest,
+    UpdatePreferencesRequest,
+    UpdateTagRequest,
+    VideoAssetResponse,
+    VideoCoverJobResponse,
+    VideoCatalogResponse,
+    VideoDetailResponse,
+    VideoPlaybackResponse,
+    UpdateVideoPlaybackRequest,
 };
 
-export type UpdateLibraryRequest = {
-    name?: string;
-    root_path?: string;
-    enabled?: boolean;
-    thumbnails_enabled?: boolean;
+export type AuthUser = UserResponse;
+export type RolePermissions = RolePermissionsResponse;
+export type { WebdavConnectionResponse, CreateWebdavConnectionRequest };
+export type ListPhotosParams = { limit?: number; offset?: number; libraryId?: string };
+export type ListPhotoFolderContentsParams = { path?: string; limit?: number; offset?: number };
+export type ListVideosParams = { libraryId?: string; limit?: number; offset?: number };
+export type VideoCatalogParams = ListVideosParams & {
+    search?: string;
+    sort?: "created" | "title" | "duration" | "updated";
+    order?: "asc" | "desc";
+    watched?: "all" | "unwatched" | "in_progress" | "completed";
 };
 
-export type CreateScanTaskRequest = {
-    library_id: string;
-};
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const sdkOptions = { throwOnError: true as const };
 
-export type ScanTaskResponse = {
-    id: string;
-    library_id: string;
-    status: string;
-    discovered_files: number;
-    processed_files: number;
-    inserted_items: number;
-    updated_files: number;
-    removed_files: number;
-    error_message?: string | null;
-    started_at: string;
-    finished_at?: string | null;
-    created_at: string;
-    updated_at: string;
-};
+generatedClient.setConfig({
+    baseUrl: API_BASE_URL,
+    credentials: "include",
+});
 
-export type TaskResponse = {
-    id: string;
-    kind: "scan_library" | "generate_cache";
-    title: string;
-    library_id?: string | null;
-    library_name?: string | null;
-    status: string;
-    progress_percent: number;
-    processed_items: number;
-    total_items: number;
-    detail?: string | null;
-    error_message?: string | null;
-    created_at: string;
-    updated_at: string;
-    finished_at?: string | null;
-};
-
-export type LibraryThumbnailStatusResponse = {
-    total_assets: number;
-    thumb_ready_assets: number;
-    preview_ready_assets: number;
-    pending_assets: number;
-    thumb_total_bytes: number;
-    preview_total_bytes: number;
-    last_generated_at?: string | null;
-};
-
-export type LibraryThumbnailJobResponse = {
-    library_id: string;
-    processed_assets: number;
-    generated_thumbnails: number;
-    generated_previews: number;
-    skipped_assets: number;
-    deleted_thumbnails: number;
-    deleted_previews: number;
-    reclaimed_bytes: number;
-};
-
-export type ThumbnailGenerationTaskResponse = {
-    task_id: string;
-    library_id: string;
-    status: "queued" | "running" | "completed" | "failed";
-    total_assets: number;
-    processed_assets: number;
-    generated_thumbnails: number;
-    generated_previews: number;
-    skipped_assets: number;
-    progress_percent: number;
-    error_message?: string | null;
-    created_at: string;
-    updated_at: string;
-    finished_at?: string | null;
-};
-
-export type LibraryResponse = {
-    id: string;
-    name: string;
-    media_type: string;
-    root_path: string;
-    enabled: boolean;
-    thumbnails_enabled: boolean;
-    thumbnail_status: LibraryThumbnailStatusResponse;
-    created_at: string;
-    updated_at: string;
-};
-
-export type DeleteLibraryResponse = {
-    id: string;
-};
-
-export type PhotoAssetResponse = {
-    id: string;
-    item_id: string;
-    file_id: string;
-    library_id: string;
-    title: string;
-    file_name: string;
-    src: string;
-    original_src: string;
-    thumbnail_src?: string | null;
-    preview_src?: string | null;
-    source_path: string;
-    mime_type?: string | null;
-    file_size: number;
-    width?: number | null;
-    height?: number | null;
-    taken_at?: string | null;
-    batch_time: string;
-};
-
-export type DeletePhotoResponse = {
-    id: string;
-    file_id: string;
-    item_id: string;
-    source_path: string;
-};
-
-export type ListPhotosParams = {
-    limit?: number;
-    offset?: number;
-};
-
-export type PreferencesResponse = {
-    thumb_max_dimension: number;
-    preview_max_dimension: number;
-    thumb_quality: number;
-    preview_quality: number;
-    created_at: string;
-    updated_at: string;
-};
-
-export type UpdatePreferencesRequest = {
-    thumb_max_dimension?: number;
-    preview_max_dimension?: number;
-    thumb_quality?: number;
-    preview_quality?: number;
-};
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3001";
-
-async function requestJson<T>(
-    path: string,
-    init?: RequestInit,
-): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-            "Content-Type": "application/json",
-            ...(init?.headers ?? {}),
-        },
-    });
-
-    if (!response.ok) {
-        let message = `Request failed with status ${response.status}`;
-
-        try {
-            const data = await response.json();
-
-            if (data && typeof data === "object" && "message" in data) {
-                message = String(data.message);
-            }
-        } catch {
-            // Keep the generic fallback if the response body is not JSON.
-        }
-
-        throw new Error(message);
+generatedClient.interceptors.response.use((response) => {
+    if (response.status === 401 && typeof window !== "undefined") {
+        const path = new URL(response.url).pathname;
+        if (!path.startsWith("/api/auth/")) window.location.assign("/login");
     }
+    return response;
+});
 
-    return response.json() as Promise<T>;
+async function execute<T>(request: Promise<T>): Promise<T> {
+    try {
+        return await request;
+    } catch (error) {
+        if (error instanceof Error) {
+            if (/failed to fetch|networkerror|load failed/i.test(error.message)) {
+                throw new Error("无法连接 API 服务，请先启动后端服务");
+            }
+            throw error;
+        }
+        if (error && typeof error === "object" && "message" in error) {
+            throw new Error(String(error.message));
+        }
+        throw new Error("API 请求失败，请检查后端服务日志");
+    }
 }
 
 function toAbsoluteUrl(url?: string | null) {
-    if (!url) {
-        return undefined;
-    }
-
-    return url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+    if (!url) return undefined;
+    return url.startsWith("http") || !API_BASE_URL ? url : `${API_BASE_URL}${url}`;
 }
 
 function normalizePhoto(photo: PhotoAssetResponse): PhotoAssetResponse {
@@ -207,140 +190,314 @@ function normalizePhoto(photo: PhotoAssetResponse): PhotoAssetResponse {
         ...photo,
         src: toAbsoluteUrl(photo.src) ?? photo.src,
         original_src: toAbsoluteUrl(photo.original_src) ?? photo.original_src,
-        thumbnail_src: toAbsoluteUrl(photo.thumbnail_src),
         preview_src: toAbsoluteUrl(photo.preview_src),
     };
 }
 
 export async function getMediaLibraries() {
-    return requestJson<LibraryResponse[]>("/api/libraries");
+    return execute(listLibraries(sdkOptions));
+}
+export async function getAuthors() { return execute(listAuthors(sdkOptions)); }
+export async function getTags(query?: string) {
+    return execute(listTagsSdk({ ...sdkOptions, query: { query } }));
+}
+export async function getTagResources(tagId: string) {
+    return execute<TagResourceResponse[]>(listTagResourcesSdk({ ...sdkOptions, path: { id: tagId } }));
+}
+export async function createTag(name: string) {
+    return execute(createTagSdk({ ...sdkOptions, body: { name } }));
+}
+export async function updateTag(tagId: string, payload: UpdateTagRequest) {
+    return execute(updateTagSdk({ ...sdkOptions, path: { id: tagId }, body: payload }));
+}
+export async function deleteTag(tagId: string) {
+    return execute(deleteTagSdk({ ...sdkOptions, path: { id: tagId } }));
+}
+export async function clearTags() { return execute(clearTagsSdk(sdkOptions)); }
+export async function uploadTagAvatar(tagId: string, file: File) {
+    const response = await fetch(`${API_BASE_URL}/api/tags/${tagId}/avatar`, { method: "PUT", credentials: "include", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "头像上传失败");
+    return response.json() as Promise<TagResponse>;
+}
+export async function getResourceTags(resourceType: string, resourceId: string) {
+    return execute(listResourceTags({ ...sdkOptions, path: { resource_type: resourceType, resource_id: resourceId } }));
+}
+export async function replaceTagsForResource(resourceType: string, resourceId: string, tagIds: string[]) {
+    return execute(replaceResourceTags({ ...sdkOptions, path: { resource_type: resourceType, resource_id: resourceId }, body: { tag_ids: tagIds } }));
+}
+export async function getAuthor(authorId: string) { return execute(getAuthorSdk({ ...sdkOptions, path: { id: authorId } })); }
+export async function uploadAuthorAvatar(authorId: string, file: File) {
+    const response = await fetch(`${API_BASE_URL}/api/authors/${authorId}/avatar`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+    });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "头像上传失败");
+    return response.json() as Promise<AuthorResponse>;
+}
+export async function selectAuthorAvatar(authorId: string, avatarId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/authors/${authorId}/avatars/${avatarId}/select`, { method: "PUT", credentials: "include" });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "头像切换失败");
+    return response.json() as Promise<AuthorResponse>;
+}
+export async function deleteAuthorAvatar(authorId: string, avatarId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/authors/${authorId}/avatars/${avatarId}`, { method: "DELETE", credentials: "include" });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "头像删除失败");
+    return response.json() as Promise<AuthorResponse>;
 }
 
 export async function createMediaLibrary(payload: CreateLibraryRequest) {
-    return requestJson<LibraryResponse>("/api/libraries", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    });
+    return execute(createLibrarySdk({ ...sdkOptions, body: payload }));
 }
 
-export async function updateMediaLibrary(
-    libraryId: string,
-    payload: UpdateLibraryRequest,
-) {
-    return requestJson<LibraryResponse>(`/api/libraries/${libraryId}`, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-    });
+export async function getWebdavConnections() {
+    return execute<WebdavConnectionResponse[]>(listWebdavConnectionsSdk(sdkOptions));
+}
+
+export async function createWebdavConnection(payload: CreateWebdavConnectionRequest) {
+    return execute<WebdavConnectionResponse>(createWebdavConnectionSdk({ ...sdkOptions, body: payload }));
+}
+
+export async function updateMediaLibrary(libraryId: string, payload: UpdateLibraryRequest) {
+    return execute(updateLibrarySdk({ ...sdkOptions, path: { id: libraryId }, body: payload }));
 }
 
 export async function deleteMediaLibrary(libraryId: string) {
-    return requestJson<DeleteLibraryResponse>(`/api/libraries/${libraryId}`, {
-        method: "DELETE",
-    });
+    return execute(deleteLibrarySdk({ ...sdkOptions, path: { id: libraryId } }));
 }
 
-export async function updateLibraryThumbnailConfig(
-    libraryId: string,
-    thumbnailsEnabled: boolean,
-) {
-    return requestJson<LibraryResponse>(`/api/libraries/${libraryId}/thumbnails/settings`, {
-        method: "PUT",
-        body: JSON.stringify({
-            thumbnails_enabled: thumbnailsEnabled,
-        }),
-    });
+export async function updateLibraryPreviewConfig(libraryId: string, previewsEnabled: boolean) {
+    return execute(updateLibraryPreviewConfigSdk({ ...sdkOptions, path: { id: libraryId }, body: { previews_enabled: previewsEnabled } }));
 }
 
-export async function generateLibraryThumbnails(libraryId: string) {
-    return requestJson<ThumbnailGenerationTaskResponse>(
-        `/api/libraries/${libraryId}/thumbnails/generate`,
-        {
-            method: "POST",
-        },
-    );
+export async function generateLibraryPreviews(libraryId: string) {
+    return execute(generateLibraryPreviewAssets({ ...sdkOptions, path: { id: libraryId } }));
 }
 
-export async function getLibraryThumbnailGenerationTask(
-    libraryId: string,
-    taskId: string,
-) {
-    return requestJson<ThumbnailGenerationTaskResponse>(
-        `/api/libraries/${libraryId}/thumbnails/tasks/${taskId}`,
-    );
+export async function getLibraryPreviewGenerationTask(libraryId: string, taskId: string) {
+    return execute(getLibraryPreviewGenerationTaskSdk({ ...sdkOptions, path: { id: libraryId, task_id: taskId } }));
 }
 
-export async function deleteLibraryThumbnails(libraryId: string) {
-    return requestJson<LibraryThumbnailJobResponse>(
-        `/api/libraries/${libraryId}/thumbnails`,
-        {
-            method: "DELETE",
-        },
-    );
+export async function deleteLibraryPreviews(libraryId: string) {
+    return execute(deleteLibraryPreviewAssets({ ...sdkOptions, path: { id: libraryId } }));
 }
 
 export async function scanMediaLibrary(payload: CreateScanTaskRequest) {
-    return requestJson<ScanTaskResponse>("/api/scans", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    });
+    return execute(startScan({ ...sdkOptions, body: payload }));
 }
 
 export async function getScanTasks() {
-    return requestJson<ScanTaskResponse[]>("/api/scans");
+    return execute(listScanTasks(sdkOptions));
 }
 
 export async function getTasks() {
-    return requestJson<TaskResponse[]>("/api/tasks");
+    return execute(listTasks(sdkOptions));
 }
 
 export async function pauseTask(taskId: string) {
-    return requestJson<TaskResponse>(`/api/tasks/${taskId}/pause`, {
-        method: "POST",
-    });
+    return execute(pauseTaskSdk({ ...sdkOptions, path: { id: taskId } }));
 }
 
 export async function resumeTask(taskId: string) {
-    return requestJson<TaskResponse>(`/api/tasks/${taskId}/resume`, {
-        method: "POST",
-    });
+    return execute(resumeTaskSdk({ ...sdkOptions, path: { id: taskId } }));
 }
 
 export async function cancelTask(taskId: string) {
-    return requestJson<TaskResponse>(`/api/tasks/${taskId}/cancel`, {
-        method: "POST",
-    });
+    return execute(cancelTaskSdk({ ...sdkOptions, path: { id: taskId } }));
+}
+
+export async function deleteTask(taskId: string) {
+    return execute(deleteTaskSdk({ ...sdkOptions, path: { id: taskId } }));
+}
+
+export async function clearCompletedTasks() {
+    return execute(clearCompletedTasksSdk(sdkOptions));
 }
 
 export async function getPhotos(params?: ListPhotosParams) {
-    const query = new URLSearchParams();
-
-    if (typeof params?.limit === "number") {
-        query.set("limit", String(params.limit));
-    }
-
-    if (typeof params?.offset === "number") {
-        query.set("offset", String(params.offset));
-    }
-
-    const path = query.size > 0 ? `/api/photos?${query.toString()}` : "/api/photos";
-    const photos = await requestJson<PhotoAssetResponse[]>(path);
+    const photos = await execute(listPhotos({
+        ...sdkOptions,
+        query: {
+            limit: params?.limit,
+            offset: params?.offset,
+            library_id: params?.libraryId,
+        },
+    }));
     return photos.map(normalizePhoto);
 }
 
-export async function deletePhoto(photoId: string) {
-    return requestJson<DeletePhotoResponse>(`/api/photos/${photoId}`, {
-        method: "DELETE",
+export async function getVideos(params?: ListVideosParams) {
+    const videos = await execute(listVideos({
+        ...sdkOptions,
+        query: {
+            library_id: params?.libraryId,
+            limit: params?.limit,
+            offset: params?.offset,
+        },
+    }));
+    return videos.map((video) => ({
+        ...video,
+        stream_src: toAbsoluteUrl(video.stream_src) ?? video.stream_src,
+        poster_src: toAbsoluteUrl(video.poster_src),
+    }));
+}
+
+function normalizeVideo<T extends VideoAssetResponse>(video: T): T {
+    return {
+        ...video,
+        stream_src: toAbsoluteUrl(video.stream_src) ?? video.stream_src,
+        poster_src: toAbsoluteUrl(video.poster_src),
+    };
+}
+
+export async function getVideoCatalog(params?: VideoCatalogParams) {
+    const catalog = await execute(listVideoCatalog({
+        ...sdkOptions,
+        query: {
+            library_id: params?.libraryId,
+            search: params?.search,
+            sort: params?.sort,
+            order: params?.order,
+            watched: params?.watched === "all" ? undefined : params?.watched,
+            limit: params?.limit,
+            offset: params?.offset,
+        },
+    }));
+    return { ...catalog, items: catalog.items.map(normalizeVideo) };
+}
+
+export async function getVideo(id: string) {
+    const detail = await execute(getVideoSdk({ ...sdkOptions, path: { id } }));
+    return normalizeVideo(detail);
+}
+
+export async function updateVideoPlayback(id: string, body: UpdateVideoPlaybackRequest) {
+    return execute(updateVideoPlaybackSdk({ ...sdkOptions, path: { id }, body }));
+}
+
+export async function startVideoAnalysis(libraryId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/videos/analyze/${libraryId}`, {
+        method: "POST",
+        credentials: "include",
     });
+    if (!response.ok) {
+        throw new Error((await response.json().catch(() => null))?.message ?? "无法创建视频分析任务");
+    }
+    return response.json() as Promise<TaskResponse>;
+}
+
+export async function generateVideoCovers(libraryId: string, force = false) {
+    const query = new URLSearchParams({ force: String(force) });
+    const response = await fetch(`${API_BASE_URL}/api/videos/covers/${libraryId}?${query}`, {
+        method: "POST",
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error((await response.json().catch(() => null))?.message ?? "无法创建视频封面任务");
+    }
+    return response.json() as Promise<TaskResponse>;
+}
+
+export async function deleteVideoCovers(libraryId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/videos/covers/${libraryId}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error((await response.json().catch(() => null))?.message ?? "无法清理视频封面");
+    }
+    return response.json() as Promise<VideoCoverJobResponse>;
+}
+
+export async function getMangaSeries() {
+    const series = await execute(listSeries(sdkOptions));
+    return series.map((item) => ({
+        ...item,
+        cover_src: toAbsoluteUrl(item.cover_src),
+    }));
+}
+export async function getMangaDetail(id: string) { return execute(getSeries({ ...sdkOptions, path: { id } })); }
+export async function getMangaReader(chapterId: string) { return execute(getReader({ ...sdkOptions, path: { id: chapterId } })); }
+
+export async function getPhotoFolderContents(
+    libraryId: string,
+    params?: ListPhotoFolderContentsParams,
+) {
+    const contents = await execute(listFolderContents({
+        ...sdkOptions,
+        path: { library_id: libraryId },
+        query: {
+            path: params?.path,
+            limit: params?.limit,
+            offset: params?.offset,
+        },
+    }));
+
+    return {
+        ...contents,
+        folders: contents.folders.map((folder) => ({
+            ...folder,
+            cover: folder.cover ? normalizePhoto(folder.cover) : null,
+        })),
+        photos: contents.photos.map(normalizePhoto),
+    };
+}
+
+export async function deletePhoto(photoId: string) {
+    return execute(deletePhotoSdk({ ...sdkOptions, path: { photo_id: photoId } }));
+}
+
+export async function getRecycleBinItems() {
+    const items = await execute(listRecycleBin(sdkOptions));
+    return items.map((item) => ({ ...item, image_src: toAbsoluteUrl(item.image_src) }));
+}
+
+export async function restoreRecycleBinItem(itemId: string) {
+    return execute(restoreItem({ ...sdkOptions, path: { item_id: itemId } }));
+}
+
+export async function purgeRecycleBinItem(itemId: string) {
+    return execute(purgeItem({ ...sdkOptions, path: { item_id: itemId } }));
+}
+
+export async function getAuthStatus() {
+    return execute(status(sdkOptions));
+}
+
+export async function login(payload: CredentialsRequest) {
+    const result = await execute(loginSdk({ ...sdkOptions, body: payload }));
+    return result;
+}
+
+export async function logout() {
+    return execute(logoutSdk(sdkOptions));
+}
+
+export async function getCurrentUser() {
+    return execute(me(sdkOptions));
+}
+
+export async function getUsers() {
+    return execute(listUsers(sdkOptions));
+}
+
+export async function createUser(payload: CreateUserRequest) {
+    return execute(createUserSdk({ ...sdkOptions, body: payload }));
+}
+
+export async function getRolePermissions() {
+    return execute(listRolePermissions(sdkOptions));
+}
+
+export async function updateRolePermissions(role: AuthRole, permissions: string[]) {
+    return execute(updateRolePermissionsSdk({ ...sdkOptions, path: { role }, body: { permissions } }));
 }
 
 export async function getPreferences() {
-    return requestJson<PreferencesResponse>("/api/preferences");
+    return execute(getPreferencesSdk(sdkOptions));
 }
 
 export async function updatePreferences(payload: UpdatePreferencesRequest) {
-    return requestJson<PreferencesResponse>("/api/preferences", {
-        method: "PUT",
-        body: JSON.stringify(payload),
-    });
+    return execute(updatePreferencesSdk({ ...sdkOptions, body: payload }));
 }
-export { API_BASE_URL };

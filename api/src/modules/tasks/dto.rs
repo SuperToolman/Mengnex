@@ -7,6 +7,8 @@ use utoipa::ToSchema;
 pub enum TaskKind {
     ScanLibrary,
     GenerateCache,
+    VideoAnalyze,
+    VideoCoverGenerate,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
@@ -40,6 +42,8 @@ impl std::fmt::Display for TaskKind {
         let value = match self {
             Self::ScanLibrary => "scan_library",
             Self::GenerateCache => "generate_cache",
+            Self::VideoAnalyze => "video_analyze",
+            Self::VideoCoverGenerate => "video_cover_generate",
         };
 
         formatter.write_str(value)
@@ -55,8 +59,10 @@ pub struct TaskResponse {
     pub library_name: Option<String>,
     pub status: String,
     pub progress_percent: i32,
-    pub processed_items: i64,
-    pub total_items: i64,
+    pub scan_processed_items: Option<i64>,
+    pub scan_total_items: Option<i64>,
+    pub preview_processed_items: Option<i64>,
+    pub preview_total_items: Option<i64>,
     pub detail: Option<String>,
     pub error_message: Option<String>,
     #[schema(value_type = String, format = DateTime)]
@@ -65,4 +71,9 @@ pub struct TaskResponse {
     pub updated_at: DateTime<Utc>,
     #[schema(value_type = Option<String>, format = DateTime)]
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DeleteTasksResponse {
+    pub deleted_count: u64,
 }

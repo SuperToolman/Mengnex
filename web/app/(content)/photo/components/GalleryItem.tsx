@@ -2,13 +2,13 @@
 
 import { Card } from "@heroui/react";
 import Image from "next/image";
+import { memo, useEffect, useState } from "react";
 
 export type GalleryItemData = {
     id: string;
     src: string;
     viewerSrc?: string;
     originalSrc?: string;
-    thumbnailSrc?: string;
     previewSrc?: string;
     alt?: string;
     width?: number;
@@ -28,7 +28,7 @@ type GalleryItemProps = {
     onOpen?: () => void;
 };
 
-export default function GalleryItem({
+function GalleryItem({
     item,
     className,
     styleWidth,
@@ -36,6 +36,21 @@ export default function GalleryItem({
     onOpen,
 }: GalleryItemProps) {
     const aspectRatio = item.width && item.height ? `${item.width} / ${item.height}` : "1 / 1";
+    const preferredSource = item.src || item.originalSrc || "";
+    const [displaySource, setDisplaySource] = useState(preferredSource);
+
+    useEffect(() => {
+        setDisplaySource(preferredSource);
+    }, [preferredSource]);
+
+    function handleImageError() {
+        if (item.originalSrc && displaySource !== item.originalSrc) {
+            setDisplaySource(item.originalSrc);
+            return;
+        }
+
+        setDisplaySource("");
+    }
 
     return (
         <Card
@@ -57,16 +72,24 @@ export default function GalleryItem({
         >
             <Card.Content className="h-full overflow-hidden p-0">
                 <div className="relative h-full w-full">
-                    <Image
-                        src={item.src}
-                        alt={item.alt ?? ""}
-                        fill
-                        sizes={styleWidth ?? styleHeight ?? "168px"}
-                        unoptimized
-                        className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                    />
+                    {displaySource ? (
+                        <Image
+                            src={displaySource}
+                            alt={item.alt ?? ""}
+                            fill
+                            sizes={styleWidth ?? styleHeight ?? "168px"}
+                            loading="lazy"
+                            unoptimized
+                            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                            onError={handleImageError}
+                        />
+                    ) : (
+                        <div className="h-full w-full bg-slate-200 dark:bg-slate-700" />
+                    )}
                 </div>
             </Card.Content>
         </Card>
     );
 }
+
+export default memo(GalleryItem);

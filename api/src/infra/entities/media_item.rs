@@ -13,6 +13,8 @@ pub struct Model {
     pub original_path: String,
     pub year: Option<i32>,
     pub metadata_json: Option<String>,
+    pub deleted_at: Option<DateTimeUtc>,
+    pub source_missing_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

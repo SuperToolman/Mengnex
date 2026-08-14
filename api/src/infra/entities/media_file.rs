@@ -10,11 +10,13 @@ pub struct Model {
     pub library_id: String,
     pub scan_task_id: Option<String>,
     pub full_path: String,
+    pub source_locator: Option<String>,
     pub file_name: String,
     pub extension: Option<String>,
     pub mime_type: Option<String>,
     pub file_size: i64,
     pub modified_at: Option<DateTimeUtc>,
+    pub etag: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

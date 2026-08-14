@@ -1,1 +1,4071 @@
-{"openapi":"3.1.0","info":{"title":"api","description":"","license":{"name":""},"version":"0.1.0"},"paths":{"/api/libraries":{"get":{"tags":["libraries"],"operationId":"list_libraries","responses":{"200":{"description":"List media libraries","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/LibraryResponse"}}}}}}},"post":{"tags":["libraries"],"operationId":"create_library","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateLibraryRequest"}}},"required":true},"responses":{"200":{"description":"Created media library","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LibraryResponse"}}}}}}},"/api/libraries/{id}":{"get":{"tags":["libraries"],"operationId":"get_library","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Media library detail","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LibraryResponse"}}}},"404":{"description":"Media library not found"}}},"put":{"tags":["libraries"],"operationId":"update_library","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateLibraryRequest"}}},"required":true},"responses":{"200":{"description":"Updated media library","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LibraryResponse"}}}},"404":{"description":"Media library not found"}}},"delete":{"tags":["libraries"],"operationId":"delete_library","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Deleted media library","content":{"application/json":{"schema":{"$ref":"#/components/schemas/DeleteLibraryResponse"}}}},"404":{"description":"Media library not found"}}}},"/api/libraries/{id}/thumbnails":{"delete":{"tags":["libraries"],"operationId":"delete_library_thumbnail_assets","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Deleted thumbnails for library","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LibraryThumbnailJobResponse"}}}},"404":{"description":"Media library not found"}}}},"/api/libraries/{id}/thumbnails/generate":{"post":{"tags":["libraries"],"operationId":"generate_library_thumbnail_assets","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Started thumbnail generation task for library","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ThumbnailGenerationTaskResponse"}}}},"404":{"description":"Media library not found"}}}},"/api/libraries/{id}/thumbnails/settings":{"put":{"tags":["libraries"],"operationId":"update_library_thumbnail_config","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateLibraryThumbnailConfigRequest"}}},"required":true},"responses":{"200":{"description":"Updated media library thumbnail config","content":{"application/json":{"schema":{"$ref":"#/components/schemas/LibraryResponse"}}}},"404":{"description":"Media library not found"}}}},"/api/libraries/{id}/thumbnails/tasks/{task_id}":{"get":{"tags":["libraries"],"operationId":"get_library_thumbnail_generation_task","parameters":[{"name":"id","in":"path","description":"Library id","required":true,"schema":{"type":"string"}},{"name":"task_id","in":"path","description":"Thumbnail generation task id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Thumbnail generation task status","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ThumbnailGenerationTaskResponse"}}}},"404":{"description":"Thumbnail generation task not found"}}}},"/api/media/files":{"get":{"tags":["media"],"operationId":"list_media_files","responses":{"200":{"description":"List scanned media files","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/MediaFileResponse"}}}}}}}},"/api/media/files/{id}/content":{"get":{"tags":["media"],"operationId":"get_media_file_content","parameters":[{"name":"id","in":"path","description":"Media file id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Media file content"},"404":{"description":"Media file not found"}}}},"/api/media/items":{"get":{"tags":["media"],"operationId":"list_media_items","responses":{"200":{"description":"List scanned media items","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/MediaItemResponse"}}}}}}}},"/api/photos":{"get":{"tags":["photos"],"operationId":"list_photos","responses":{"200":{"description":"List scanned photos","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/PhotoAssetResponse"}}}}}}}},"/api/preferences":{"get":{"tags":["preferences"],"operationId":"get_preferences","responses":{"200":{"description":"Application preferences","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PreferencesResponse"}}}}}},"put":{"tags":["preferences"],"operationId":"update_preferences","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdatePreferencesRequest"}}},"required":true},"responses":{"200":{"description":"Updated application preferences","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PreferencesResponse"}}}}}}},"/api/scans":{"get":{"tags":["scanner"],"operationId":"list_scan_tasks","responses":{"200":{"description":"List scan tasks","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/ScanTaskResponse"}}}}}}},"post":{"tags":["scanner"],"operationId":"start_scan","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateScanTaskRequest"}}},"required":true},"responses":{"200":{"description":"Started scan task","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ScanTaskResponse"}}}},"404":{"description":"Media library not found"}}}},"/api/tasks":{"get":{"tags":["tasks"],"operationId":"list_tasks","responses":{"200":{"description":"List application tasks","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/TaskResponse"}}}}}}}},"/api/tasks/{id}/cancel":{"post":{"tags":["tasks"],"operationId":"cancel_task","parameters":[{"name":"id","in":"path","description":"Task id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Canceled task","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TaskResponse"}}}},"404":{"description":"Task not found"}}}},"/api/tasks/{id}/pause":{"post":{"tags":["tasks"],"operationId":"pause_task","parameters":[{"name":"id","in":"path","description":"Task id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Paused task","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TaskResponse"}}}},"404":{"description":"Task not found"}}}},"/api/tasks/{id}/resume":{"post":{"tags":["tasks"],"operationId":"resume_task","parameters":[{"name":"id","in":"path","description":"Task id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Resumed task","content":{"application/json":{"schema":{"$ref":"#/components/schemas/TaskResponse"}}}},"404":{"description":"Task not found"}}}},"/health":{"get":{"tags":["health"],"operationId":"health","responses":{"200":{"description":"API health status","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HealthResponse"}}}}}}}},"components":{"schemas":{"CreateLibraryRequest":{"type":"object","required":["name","media_type","root_path","thumbnails_enabled"],"properties":{"media_type":{"$ref":"#/components/schemas/MediaType"},"name":{"type":"string"},"root_path":{"type":"string"},"thumbnails_enabled":{"type":"boolean"}}},"CreateScanTaskRequest":{"type":"object","required":["library_id"],"properties":{"library_id":{"type":"string"}}},"DeleteLibraryResponse":{"type":"object","required":["id"],"properties":{"id":{"type":"string"}}},"HealthResponse":{"type":"object","required":["status"],"properties":{"status":{"type":"string"}}},"LibraryResponse":{"type":"object","required":["id","name","media_type","root_path","enabled","thumbnails_enabled","thumbnail_status","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"enabled":{"type":"boolean"},"id":{"type":"string"},"media_type":{"type":"string"},"name":{"type":"string"},"root_path":{"type":"string"},"thumbnail_status":{"$ref":"#/components/schemas/LibraryThumbnailStatusResponse"},"thumbnails_enabled":{"type":"boolean"},"updated_at":{"type":"string","format":"date-time"}}},"LibraryThumbnailJobResponse":{"type":"object","required":["library_id","processed_assets","generated_thumbnails","generated_previews","skipped_assets","deleted_thumbnails","deleted_previews","reclaimed_bytes"],"properties":{"deleted_previews":{"type":"integer","format":"int64"},"deleted_thumbnails":{"type":"integer","format":"int64"},"generated_previews":{"type":"integer","format":"int64"},"generated_thumbnails":{"type":"integer","format":"int64"},"library_id":{"type":"string"},"processed_assets":{"type":"integer","format":"int64"},"reclaimed_bytes":{"type":"integer","format":"int64"},"skipped_assets":{"type":"integer","format":"int64"}}},"LibraryThumbnailStatusResponse":{"type":"object","required":["total_assets","thumb_ready_assets","preview_ready_assets","pending_assets","thumb_total_bytes","preview_total_bytes"],"properties":{"last_generated_at":{"type":["string","null"],"format":"date-time"},"pending_assets":{"type":"integer","format":"int64"},"preview_ready_assets":{"type":"integer","format":"int64"},"preview_total_bytes":{"type":"integer","format":"int64"},"thumb_ready_assets":{"type":"integer","format":"int64"},"thumb_total_bytes":{"type":"integer","format":"int64"},"total_assets":{"type":"integer","format":"int64"}}},"MediaFileResponse":{"type":"object","required":["id","item_id","library_id","full_path","file_name","file_size","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"extension":{"type":["string","null"]},"file_name":{"type":"string"},"file_size":{"type":"integer","format":"int64"},"full_path":{"type":"string"},"id":{"type":"string"},"item_id":{"type":"string"},"library_id":{"type":"string"},"mime_type":{"type":["string","null"]},"modified_at":{"type":["string","null"],"format":"date-time"},"scan_task_id":{"type":["string","null"]},"updated_at":{"type":"string","format":"date-time"}}},"MediaItemResponse":{"type":"object","required":["id","library_id","media_type","title","original_path","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"id":{"type":"string"},"library_id":{"type":"string"},"media_type":{"type":"string"},"metadata_json":{"type":["string","null"]},"original_path":{"type":"string"},"sort_title":{"type":["string","null"]},"title":{"type":"string"},"updated_at":{"type":"string","format":"date-time"},"year":{"type":["integer","null"],"format":"int32"}}},"MediaType":{"type":"string","enum":["photo","game","manga","anime","movie","series","novel","music","other"]},"PhotoAssetResponse":{"type":"object","required":["id","item_id","file_id","library_id","title","file_name","src","original_src","source_path","file_size","batch_time"],"properties":{"batch_time":{"type":"string","format":"date-time"},"file_id":{"type":"string"},"file_name":{"type":"string"},"file_size":{"type":"integer","format":"int64"},"height":{"type":["integer","null"],"format":"int32"},"id":{"type":"string"},"item_id":{"type":"string"},"library_id":{"type":"string"},"mime_type":{"type":["string","null"]},"original_src":{"type":"string"},"preview_src":{"type":["string","null"]},"source_path":{"type":"string"},"src":{"type":"string"},"taken_at":{"type":["string","null"],"format":"date-time"},"thumbnail_src":{"type":["string","null"]},"title":{"type":"string"},"width":{"type":["integer","null"],"format":"int32"}}},"PhotoDisplaySource":{"type":"string","enum":["thumbnail","original"]},"PreferencesResponse":{"type":"object","required":["photo_display_source","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"photo_display_source":{"type":"string"},"updated_at":{"type":"string","format":"date-time"}}},"ScanTaskResponse":{"type":"object","required":["id","library_id","status","discovered_files","processed_files","inserted_items","updated_files","removed_files","started_at","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"discovered_files":{"type":"integer","format":"int64"},"error_message":{"type":["string","null"]},"finished_at":{"type":["string","null"],"format":"date-time"},"id":{"type":"string"},"inserted_items":{"type":"integer","format":"int64"},"library_id":{"type":"string"},"processed_files":{"type":"integer","format":"int64"},"removed_files":{"type":"integer","format":"int64"},"started_at":{"type":"string","format":"date-time"},"status":{"type":"string"},"updated_at":{"type":"string","format":"date-time"},"updated_files":{"type":"integer","format":"int64"}}},"ScanTaskStatus":{"type":"string","enum":["running","paused","completed","canceled","failed"]},"TaskResponse":{"type":"object","required":["id","kind","title","status","progress_percent","processed_items","total_items","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"detail":{"type":["string","null"]},"error_message":{"type":["string","null"]},"finished_at":{"type":["string","null"],"format":"date-time"},"id":{"type":"string"},"kind":{"type":"string"},"library_id":{"type":["string","null"]},"library_name":{"type":["string","null"]},"processed_items":{"type":"integer","format":"int64"},"progress_percent":{"type":"integer","format":"int32"},"status":{"type":"string"},"title":{"type":"string"},"total_items":{"type":"integer","format":"int64"},"updated_at":{"type":"string","format":"date-time"}}},"TaskStatus":{"type":"string","enum":["queued","running","paused","completed","canceled","failed"]},"ThumbnailGenerationTaskResponse":{"type":"object","required":["task_id","library_id","status","total_assets","processed_assets","generated_thumbnails","generated_previews","skipped_assets","progress_percent","created_at","updated_at"],"properties":{"created_at":{"type":"string","format":"date-time"},"error_message":{"type":["string","null"]},"finished_at":{"type":["string","null"],"format":"date-time"},"generated_previews":{"type":"integer","format":"int64"},"generated_thumbnails":{"type":"integer","format":"int64"},"library_id":{"type":"string"},"processed_assets":{"type":"integer","format":"int64"},"progress_percent":{"type":"integer","format":"int32"},"skipped_assets":{"type":"integer","format":"int64"},"status":{"type":"string"},"task_id":{"type":"string"},"total_assets":{"type":"integer","format":"int64"},"updated_at":{"type":"string","format":"date-time"}}},"ThumbnailGenerationTaskStatus":{"type":"string","enum":["queued","running","paused","completed","canceled","failed"]},"UpdateLibraryRequest":{"type":"object","properties":{"enabled":{"type":["boolean","null"]},"name":{"type":["string","null"]},"root_path":{"type":["string","null"]},"thumbnails_enabled":{"type":["boolean","null"]}}},"UpdateLibraryThumbnailConfigRequest":{"type":"object","required":["thumbnails_enabled"],"properties":{"thumbnails_enabled":{"type":"boolean"}}},"UpdatePreferencesRequest":{"type":"object","required":["photo_display_source"],"properties":{"photo_display_source":{"$ref":"#/components/schemas/PhotoDisplaySource"}}}}},"tags":[{"name":"libraries","description":"Media library source directories"},{"name":"media","description":"Scanned media items and files"},{"name":"photos","description":"Photo gallery assets"},{"name":"preferences","description":"Application preferences"},{"name":"scanner","description":"Filesystem scan tasks"},{"name":"tasks","description":"Unified application task feed"}]}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "api",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/roles": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "list_role_permissions",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RolePermissionsResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/roles/{role}/permissions": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "update_role_permissions",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRolePermissionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePermissionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/status": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/users": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "operationId": "list_authors",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors/{id}": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "operationId": "get_author",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/libraries": {
+      "get": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "list_libraries",
+        "responses": {
+          "200": {
+            "description": "List media libraries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "create_library",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLibraryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Created media library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/libraries/{id}": {
+      "get": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "get_library",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Media library detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "update_library",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLibraryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated media library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "delete_library",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted media library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteLibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      }
+    },
+    "/api/libraries/{id}/previews": {
+      "delete": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "delete_library_preview_assets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted previews for library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPreviewJobResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      }
+    },
+    "/api/libraries/{id}/previews/generate": {
+      "post": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "generate_library_preview_assets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Started preview generation task for library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewGenerationTaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      }
+    },
+    "/api/libraries/{id}/previews/settings": {
+      "put": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "update_library_preview_config",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLibraryPreviewConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated media library preview config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      }
+    },
+    "/api/libraries/{id}/previews/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "libraries"
+        ],
+        "operationId": "get_library_preview_generation_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Library id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "description": "Preview generation task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preview generation task status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewGenerationTaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Preview generation task not found"
+          }
+        }
+      }
+    },
+    "/api/manga": {
+      "get": {
+        "tags": [
+          "manga"
+        ],
+        "operationId": "list_series",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MangaSeriesResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/manga/chapters/{id}/reader": {
+      "get": {
+        "tags": [
+          "manga"
+        ],
+        "operationId": "get_reader",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaReaderResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/manga/{id}": {
+      "get": {
+        "tags": [
+          "manga"
+        ],
+        "operationId": "get_series",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MangaDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/files": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "list_media_files",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of files",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of files to skip",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scanned media files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MediaFileResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/files/{id}/content": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "get_media_file_content",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Media file id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Media file content"
+          },
+          "404": {
+            "description": "Media file not found"
+          }
+        }
+      }
+    },
+    "/api/media/items": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "list_media_items",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of items to skip",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scanned media items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MediaItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "operationId": "list_photos",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of photos",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of photos to skip",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "library_id",
+            "in": "query",
+            "description": "Limit results to one media library",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scanned photos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoAssetResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/folders/{library_id}": {
+      "get": {
+        "tags": [
+          "photos"
+        ],
+        "operationId": "list_folder_contents",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "description": "Media library ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Relative folder path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum direct photos",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of direct photos to skip",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Folder contents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoFolderContentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/{photo_id}": {
+      "delete": {
+        "tags": [
+          "photos"
+        ],
+        "operationId": "delete_photo",
+        "parameters": [
+          {
+            "name": "photo_id",
+            "in": "path",
+            "description": "Photo asset ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Move photo asset to recycle bin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePhotoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "operationId": "get_preferences",
+        "responses": {
+          "200": {
+            "description": "Application preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "preferences"
+        ],
+        "operationId": "update_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated application preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle-bin": {
+      "get": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "operationId": "list_recycle_bin",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecycleBinItemResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle-bin/{item_id}": {
+      "delete": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "operationId": "purge_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeRecycleBinItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle-bin/{item_id}/restore": {
+      "post": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "operationId": "restore_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreRecycleBinItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scans": {
+      "get": {
+        "tags": [
+          "scanner"
+        ],
+        "operationId": "list_scan_tasks",
+        "responses": {
+          "200": {
+            "description": "List scan tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScanTaskResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "scanner"
+        ],
+        "operationId": "start_scan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScanTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Started scan task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanTaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Media library not found"
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "list_tags",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Filter tags by name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Global tag library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "create_tag",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "clear_tags",
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/tags/resources/{resource_type}/{resource_id}": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "list_resource_tags",
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "replace_resource_tags",
+        "parameters": [
+          {
+            "name": "resource_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceResourceTagsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/tags/{id}": {
+      "put": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "update_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Tag id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "delete_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Tag id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/tags/{id}/resources": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "operationId": "list_tag_resources",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagResourceResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "list_tasks",
+        "responses": {
+          "200": {
+            "description": "List application tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/completed": {
+      "delete": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "clear_completed_tasks",
+        "responses": {
+          "200": {
+            "description": "Deleted terminal tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTasksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}": {
+      "delete": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "delete_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTasksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/cancel": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "cancel_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canceled task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/pause": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "pause_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paused task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/resume": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "resume_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumed task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/api/videos": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "list_videos",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "description": "Restrict results to a media library",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of videos",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of videos to skip",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List indexed video assets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VideoAssetResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/catalog": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "list_video_catalog",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "watched",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/covers/{library_id}": {
+      "post": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "start_cover_generation",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "delete_covers",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoCoverJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/{id}": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "get_video",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/videos/{id}/playback": {
+      "put": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "update_playback",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVideoPlaybackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoPlaybackResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/{id}/poster": {
+      "get": {
+        "tags": [
+          "videos"
+        ],
+        "operationId": "get_poster",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated video poster"
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/webdav-connections": {
+      "get": {
+        "tags": [
+          "webdav"
+        ],
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WebdavConnectionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "webdav"
+        ],
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebdavConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebdavConnectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "API health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin",
+          "editor",
+          "viewer"
+        ]
+      },
+      "AuthStatusResponse": {
+        "type": "object",
+        "required": [
+          "setup_required"
+        ],
+        "properties": {
+          "setup_required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuthenticatedUserResponse": {
+        "type": "object",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        }
+      },
+      "AuthorAvatarResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "src",
+          "is_current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "is_current": {
+            "type": "boolean"
+          },
+          "src": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthorDetailResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "avatar_history",
+          "resource_count",
+          "resource_types",
+          "manga",
+          "photos"
+        ],
+        "properties": {
+          "avatar_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthorAvatarResponse"
+            }
+          },
+          "avatar_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "manga": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaSeriesResponse"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoAssetResponse"
+            }
+          },
+          "resource_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resource_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AuthorResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "resource_count",
+          "resource_types",
+          "created_at"
+        ],
+        "properties": {
+          "avatar_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "resource_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resource_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateLibraryRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "media_type",
+          "root_path",
+          "previews_enabled"
+        ],
+        "properties": {
+          "collection_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collections_enabled": {
+            "type": "boolean"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/MediaType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "previews_enabled": {
+            "type": "boolean"
+          },
+          "root_path": {
+            "type": "string"
+          },
+          "scan_extensions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "webdav_connection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreateScanTaskRequest": {
+        "type": "object",
+        "required": [
+          "library_id"
+        ],
+        "properties": {
+          "library_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateTagRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "background_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "username",
+          "password",
+          "role"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateWebdavConnectionRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "username",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "CredentialsRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteLibraryResponse": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "DeletePhotoResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "file_id",
+          "item_id",
+          "source_path"
+        ],
+        "properties": {
+          "file_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "source_path": {
+            "type": "string"
+          }
+        }
+      },
+      "DeleteTasksResponse": {
+        "type": "object",
+        "required": [
+          "deleted_count"
+        ],
+        "properties": {
+          "deleted_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "LibraryPreviewJobResponse": {
+        "type": "object",
+        "required": [
+          "library_id",
+          "processed_assets",
+          "generated_previews",
+          "skipped_assets",
+          "deleted_previews",
+          "reclaimed_bytes"
+        ],
+        "properties": {
+          "deleted_previews": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "generated_previews": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "processed_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reclaimed_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped_assets": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LibraryPreviewStatusResponse": {
+        "type": "object",
+        "required": [
+          "total_assets",
+          "preview_ready_assets",
+          "pending_assets",
+          "preview_total_bytes"
+        ],
+        "properties": {
+          "last_generated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "pending_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "preview_ready_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "preview_total_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total_assets": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LibraryResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "root_path",
+          "enabled",
+          "previews_enabled",
+          "source_type",
+          "scan_extensions",
+          "collections_enabled",
+          "resource_count",
+          "preview_status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "collection_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collections_enabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "preview_status": {
+            "$ref": "#/components/schemas/LibraryPreviewStatusResponse"
+          },
+          "previews_enabled": {
+            "type": "boolean"
+          },
+          "resource_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "root_path": {
+            "type": "string"
+          },
+          "scan_extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "webdav_connection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MangaChapterResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "page_count"
+        ],
+        "properties": {
+          "cover_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "page_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaDetailResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "title",
+          "layout",
+          "chapter_count",
+          "page_count",
+          "chapters"
+        ],
+        "properties": {
+          "chapter_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaChapterResponse"
+            }
+          },
+          "cover_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "page_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaPageResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "src",
+          "file_name",
+          "page_number"
+        ],
+        "properties": {
+          "file_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "page_number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "src": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaReaderResponse": {
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "series_id",
+          "title",
+          "pages"
+        ],
+        "properties": {
+          "chapter_id": {
+            "type": "string"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MangaPageResponse"
+            }
+          },
+          "series_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "MangaSeriesResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "title",
+          "layout",
+          "tags",
+          "chapter_count",
+          "page_count"
+        ],
+        "properties": {
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chapter_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cover_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "page_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "MediaFileResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "item_id",
+          "library_id",
+          "full_path",
+          "file_name",
+          "file_size",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extension": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "file_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "full_path": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "scan_task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MediaItemResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "media_type",
+          "title",
+          "original_path",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "metadata_json": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "original_path": {
+            "type": "string"
+          },
+          "sort_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MediaType": {
+        "type": "string",
+        "enum": [
+          "photo",
+          "video",
+          "mixed_video",
+          "game",
+          "manga",
+          "anime",
+          "movie",
+          "series",
+          "novel",
+          "music",
+          "other"
+        ]
+      },
+      "PhotoAssetResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "item_id",
+          "file_id",
+          "library_id",
+          "title",
+          "file_name",
+          "src",
+          "original_src",
+          "source_path",
+          "file_size",
+          "batch_time"
+        ],
+        "properties": {
+          "batch_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "file_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "original_src": {
+            "type": "string"
+          },
+          "preview_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_path": {
+            "type": "string"
+          },
+          "src": {
+            "type": "string"
+          },
+          "taken_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PhotoFolderContentsResponse": {
+        "type": "object",
+        "required": [
+          "library_id",
+          "path",
+          "folders",
+          "photos",
+          "total_photos"
+        ],
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoFolderResponse"
+            }
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "next_offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoAssetResponse"
+            }
+          },
+          "total_photos": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PhotoFolderResponse": {
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "photo_count"
+        ],
+        "properties": {
+          "cover": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PhotoAssetResponse"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "photo_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PreferencesResponse": {
+        "type": "object",
+        "required": [
+          "preview_max_dimension",
+          "preview_quality",
+          "media_cache_max_bytes",
+          "video_probe_enabled",
+          "video_probe_command",
+          "video_probe_timeout_seconds",
+          "video_ffmpeg_command",
+          "video_cover_time_percent",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "media_cache_directory": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_cache_max_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "preview_max_dimension": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "preview_quality": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "video_cover_time_percent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "video_ffmpeg_command": {
+            "type": "string"
+          },
+          "video_probe_command": {
+            "type": "string"
+          },
+          "video_probe_enabled": {
+            "type": "boolean"
+          },
+          "video_probe_timeout_seconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PreviewGenerationTaskResponse": {
+        "type": "object",
+        "required": [
+          "task_id",
+          "library_id",
+          "status",
+          "total_assets",
+          "processed_assets",
+          "generated_previews",
+          "skipped_assets",
+          "progress_percent",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "generated_previews": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "processed_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "progress_percent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "total_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PreviewGenerationTaskStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "paused",
+          "completed",
+          "canceled",
+          "failed"
+        ]
+      },
+      "PurgeRecycleBinItemResponse": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "RecycleBinItemResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "media_type",
+          "title",
+          "original_path",
+          "deleted_at"
+        ],
+        "properties": {
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "file_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "image_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "original_path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ReplaceResourceTagsRequest": {
+        "type": "object",
+        "required": [
+          "tag_ids"
+        ],
+        "properties": {
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RestoreRecycleBinItemResponse": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "RolePermissionsResponse": {
+        "type": "object",
+        "required": [
+          "role",
+          "permissions"
+        ],
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          }
+        }
+      },
+      "ScanTaskResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "status",
+          "discovered_files",
+          "processed_files",
+          "inserted_items",
+          "updated_files",
+          "removed_files",
+          "started_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "discovered_files": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "inserted_items": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "processed_files": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "removed_files": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_files": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ScanTaskStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "paused",
+          "completed",
+          "canceled",
+          "failed"
+        ]
+      },
+      "TagResourceResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "resource_type",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "image_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "TagResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "normalized_name",
+          "resource_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "background_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "normalized_name": {
+            "type": "string"
+          },
+          "resource_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TaskResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "progress_percent",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "library_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preview_processed_items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "preview_total_items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "progress_percent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scan_processed_items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "scan_total_items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "paused",
+          "completed",
+          "canceled",
+          "failed"
+        ]
+      },
+      "UpdateLibraryPreviewConfigRequest": {
+        "type": "object",
+        "required": [
+          "previews_enabled"
+        ],
+        "properties": {
+          "previews_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateLibraryRequest": {
+        "type": "object",
+        "properties": {
+          "collection_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collections_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previews_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "root_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scan_extensions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "webdav_connection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdatePreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "media_cache_directory": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_cache_max_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "preview_max_dimension": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "preview_quality": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "video_cover_time_percent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "video_ffmpeg_command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "video_probe_command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "video_probe_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "video_probe_timeout_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateRolePermissionsRequest": {
+        "type": "object",
+        "required": [
+          "permissions"
+        ],
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateTagRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "background_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateVideoPlaybackRequest": {
+        "type": "object",
+        "required": [
+          "position_seconds"
+        ],
+        "properties": {
+          "completed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "position_seconds": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "role",
+          "created_at"
+        ],
+        "properties": {
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "VideoAssetResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "item_id",
+          "file_id",
+          "library_id",
+          "title",
+          "analysis_status",
+          "stream_src",
+          "playback_position_seconds",
+          "playback_completed",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "analysis_status": {
+            "type": "string"
+          },
+          "audio_codec": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collection_member_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "collection_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collection_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "container": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "playback_completed": {
+            "type": "boolean"
+          },
+          "playback_position_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "poster_file_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "poster_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stream_src": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "video_codec": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "VideoCatalogResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoAssetResponse"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "VideoCollectionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "collection_type",
+          "default_video_asset_id",
+          "members"
+        ],
+        "properties": {
+          "collection_type": {
+            "type": "string"
+          },
+          "default_video_asset_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoAssetResponse"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "VideoCoverJobResponse": {
+        "type": "object",
+        "required": [
+          "library_id",
+          "processed_assets",
+          "generated_covers",
+          "skipped_assets",
+          "failed_assets",
+          "deleted_covers",
+          "reclaimed_bytes"
+        ],
+        "properties": {
+          "deleted_covers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "generated_covers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "processed_assets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reclaimed_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped_assets": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "VideoDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/VideoAssetResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "library_name",
+              "file_name",
+              "file_size",
+              "source_path",
+              "source_missing"
+            ],
+            "properties": {
+              "analysis_error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "collection": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VideoCollectionResponse"
+                  }
+                ]
+              },
+              "file_name": {
+                "type": "string"
+              },
+              "file_size": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "library_name": {
+                "type": "string"
+              },
+              "next_video_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "poster_error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "previous_video_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_missing": {
+                "type": "boolean"
+              },
+              "source_path": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "VideoPlaybackResponse": {
+        "type": "object",
+        "required": [
+          "video_asset_id",
+          "position_seconds",
+          "completed",
+          "last_played_at"
+        ],
+        "properties": {
+          "completed": {
+            "type": "boolean"
+          },
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "last_played_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "position_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "video_asset_id": {
+            "type": "string"
+          }
+        }
+      },
+      "WebdavConnectionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "username",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "libraries",
+      "description": "Media library source directories"
+    },
+    {
+      "name": "auth",
+      "description": "Authentication, users, roles and permissions"
+    },
+    {
+      "name": "media",
+      "description": "Scanned media items and files"
+    },
+    {
+      "name": "videos",
+      "description": "Reusable video assets for video, movie and series catalogues"
+    },
+    {
+      "name": "manga",
+      "description": "Image manga series, chapters and reader pages"
+    },
+    {
+      "name": "authors",
+      "description": "Shared media author library"
+    },
+    {
+      "name": "photos",
+      "description": "Photo gallery assets"
+    },
+    {
+      "name": "recycle-bin",
+      "description": "Soft-deleted media resources"
+    },
+    {
+      "name": "preferences",
+      "description": "Application preferences"
+    },
+    {
+      "name": "scanner",
+      "description": "Filesystem scan tasks"
+    },
+    {
+      "name": "webdav",
+      "description": "Remote WebDAV connections"
+    },
+    {
+      "name": "tasks",
+      "description": "Unified application task feed"
+    },
+    {
+      "name": "tags",
+      "description": "Global tag library and media resource associations"
+    }
+  ]
+}

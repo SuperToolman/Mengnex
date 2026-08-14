@@ -1,19 +1,25 @@
 "use client";
 
 import { Magnifier } from "@gravity-ui/icons";
+import dynamic from "next/dynamic";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     deletePhoto,
     getPhotos,
-    type ListPhotosParams,
     type PhotoAssetResponse,
 } from "@/src/api/client";
 import GalleryGroup, { type GalleryGroupData } from "./components/GalleryGroup";
-import PhotoViewer from "./components/PhotoViewer";
 import { usePhotoShell } from "./components/PhotoShellContext";
 
-const PHOTO_HEIGHT_LEVELS = [128, 168, 220, 280] as const;
+const PHOTO_HEIGHT_LEVELS = [128, 168, 220, 280, 340] as const;
+const PAGE_SIZE = 200;
+const AUTO_LOAD_LIMIT = 1_000;
+const SEARCH_DEBOUNCE_MS = 180;
+
+const PhotoViewer = dynamic(() => import("./components/PhotoViewer"), {
+    ssr: false,
+});
 
 function getBatchKey(value: string) {
     const date = new Date(value);
@@ -30,11 +36,11 @@ function getBatchKey(value: string) {
 }
 
 function getGridSource(photo: PhotoAssetResponse) {
-    return photo.thumbnail_src ?? photo.preview_src ?? photo.original_src ?? photo.src;
+    return photo.preview_src ?? photo.original_src ?? photo.src;
 }
 
 function getViewerSource(photo: PhotoAssetResponse) {
-    return photo.preview_src ?? photo.thumbnail_src ?? photo.original_src ?? photo.src;
+    return photo.preview_src ?? photo.original_src ?? photo.src;
 }
 
 function toGalleryItem(photo: PhotoAssetResponse) {
@@ -43,7 +49,6 @@ function toGalleryItem(photo: PhotoAssetResponse) {
         src: getGridSource(photo),
         viewerSrc: getViewerSource(photo),
         originalSrc: photo.original_src ?? photo.src,
-        thumbnailSrc: photo.thumbnail_src ?? undefined,
         previewSrc: photo.preview_src ?? undefined,
         alt: photo.title,
         width: photo.width ?? undefined,
@@ -189,7 +194,6 @@ function SearchResults({
 }
 
 export default function PhotoPage() {
-    const pageSize = 200;
     const {
         scaleLevel,
         searchQuery,
@@ -202,6 +206,11 @@ export default function PhotoPage() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+    const loadMoreRef = useRef<(manual?: boolean) => Promise<void>>(async () => {});
+    const isLoadingMoreRef = useRef(false);
+    const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setScaleMode("photo-height");
@@ -214,29 +223,28 @@ export default function PhotoPage() {
     }, [setBreadcrumbs, setScaleMode]);
 
     useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, SEARCH_DEBOUNCE_MS);
+
+        return () => window.clearTimeout(timer);
+    }, [searchQuery]);
+
+    useEffect(() => {
         let cancelled = false;
 
-        async function loadPhotos(params?: ListPhotosParams) {
-            const offset = params?.offset ?? 0;
-            const limit = params?.limit ?? pageSize;
-
+        async function loadInitialPhotos() {
             try {
-                if (offset === 0) {
-                    setIsLoading(true);
-                } else {
-                    setIsLoadingMore(true);
-                }
+                setIsLoading(true);
                 setError(null);
                 const photoData = await getPhotos({
-                    limit,
-                    offset,
+                    limit: PAGE_SIZE,
+                    offset: 0,
                 });
 
                 if (!cancelled) {
-                    setPhotos((currentPhotos) => (
-                        offset === 0 ? photoData : [...currentPhotos, ...photoData]
-                    ));
-                    setHasMore(photoData.length === limit);
+                    setPhotos(photoData);
+                    setHasMore(photoData.length === PAGE_SIZE);
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -244,21 +252,65 @@ export default function PhotoPage() {
                 }
             } finally {
                 if (!cancelled) {
-                    if (offset === 0) {
-                        setIsLoading(false);
-                    } else {
-                        setIsLoadingMore(false);
-                    }
+                    setIsLoading(false);
                 }
             }
         }
 
-        void loadPhotos();
+        void loadInitialPhotos();
 
         return () => {
             cancelled = true;
         };
     }, []);
+
+    const loadMore = useCallback(async (manual = false) => {
+        if (
+            isLoadingMoreRef.current
+            || !hasMore
+            || (!manual && photos.length >= AUTO_LOAD_LIMIT)
+        ) {
+            return;
+        }
+
+        isLoadingMoreRef.current = true;
+        setIsLoadingMore(true);
+        setLoadMoreError(null);
+
+        try {
+            const nextPhotos = await getPhotos({ limit: PAGE_SIZE, offset: photos.length });
+            setPhotos((currentPhotos) => [...currentPhotos, ...nextPhotos]);
+            setHasMore(nextPhotos.length === PAGE_SIZE);
+        } catch (loadError) {
+            setLoadMoreError(getErrorMessage(loadError));
+        } finally {
+            isLoadingMoreRef.current = false;
+            setIsLoadingMore(false);
+        }
+    }, [hasMore, photos.length]);
+
+    useEffect(() => {
+        loadMoreRef.current = loadMore;
+    }, [loadMore]);
+
+    const normalizedSearchQuery = normalizeKeyword(debouncedSearchQuery);
+    const isSearchActive = normalizedSearchQuery.length > 0;
+
+    useEffect(() => {
+        const sentinel = loadMoreSentinelRef.current;
+        if (!sentinel || isSearchActive || !hasMore || photos.length >= AUTO_LOAD_LIMIT) {
+            return;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+                void loadMoreRef.current();
+            }
+        }, { rootMargin: "800px 0px" });
+
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasMore, isSearchActive, photos.length]);
 
     const galleryGroups = useMemo(
         () => buildGalleryGroups(photos),
@@ -269,14 +321,23 @@ export default function PhotoPage() {
         [galleryGroups],
     );
     const searchResults = useMemo(
-        () => photos.filter((photo) => matchesSearch(photo, searchQuery)),
-        [photos, searchQuery],
+        () => photos.filter((photo) => matchesSearch(photo, normalizedSearchQuery)),
+        [normalizedSearchQuery, photos],
     );
     const activeIndex = activeItemId
         ? galleryItems.findIndex((item) => item.id === activeItemId)
         : -1;
     const itemHeight = PHOTO_HEIGHT_LEVELS[scaleLevel] ?? PHOTO_HEIGHT_LEVELS[1];
-    const isSearchActive = normalizeKeyword(searchQuery).length > 0;
+    const handleOpen = useCallback((photoId: string) => setActiveItemId(photoId), []);
+    const handleViewerChange = useCallback((nextIndex: number) => {
+        setActiveItemId(galleryItems[nextIndex]?.id ?? null);
+    }, [galleryItems]);
+    const handleDelete = useCallback(async (photoId: string) => {
+        await deletePhoto(photoId);
+        setPhotos((currentPhotos) => currentPhotos.filter((photo) => photo.id !== photoId));
+        setActiveItemId(null);
+    }, []);
+    const handleCloseViewer = useCallback(() => setActiveItemId(null), []);
 
     if (isLoading) {
         return (
@@ -307,7 +368,7 @@ export default function PhotoPage() {
             {isSearchActive ? (
                 <SearchResults
                     photos={searchResults}
-                    onOpen={(photoId) => setActiveItemId(photoId)}
+                    onOpen={handleOpen}
                 />
             ) : (
                 <>
@@ -317,35 +378,34 @@ export default function PhotoPage() {
                                 key={group.id}
                                 group={group}
                                 itemHeight={itemHeight}
-                                onItemOpen={(item) => setActiveItemId(item.id)}
+                                titleDensity={scaleLevel === 0 ? "small" : scaleLevel === 1 ? "medium" : undefined}
+                                onItemOpen={(item) => handleOpen(item.id)}
                             />
                         ))}
                     </div>
                     {hasMore ? (
                         <div className="flex justify-center pb-8">
-                            <button
-                                type="button"
-                                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800"
-                                disabled={isLoadingMore}
-                                onClick={async () => {
-                                    try {
-                                        setIsLoadingMore(true);
-                                        setError(null);
-                                        const nextPhotos = await getPhotos({
-                                            limit: pageSize,
-                                            offset: photos.length,
-                                        });
-                                        setPhotos((currentPhotos) => [...currentPhotos, ...nextPhotos]);
-                                        setHasMore(nextPhotos.length === pageSize);
-                                    } catch (loadError) {
-                                        setError(getErrorMessage(loadError));
-                                    } finally {
-                                        setIsLoadingMore(false);
-                                    }
-                                }}
-                            >
-                                {isLoadingMore ? "Loading..." : "Load More"}
-                            </button>
+                            <div ref={loadMoreSentinelRef} className="flex min-h-10 flex-col items-center gap-2">
+                                {isLoadingMore ? <span className="text-sm text-slate-500 dark:text-slate-400">Loading...</span> : null}
+                                {loadMoreError ? (
+                                    <button
+                                        type="button"
+                                        className="rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                                        onClick={() => void loadMore(true)}
+                                    >
+                                        Retry loading photos
+                                    </button>
+                                ) : null}
+                                {photos.length >= AUTO_LOAD_LIMIT && !isLoadingMore ? (
+                                    <button
+                                        type="button"
+                                        className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                                        onClick={() => void loadMore(true)}
+                                    >
+                                        Continue loading
+                                    </button>
+                                ) : null}
+                            </div>
                         </div>
                     ) : null}
                 </>
@@ -353,15 +413,9 @@ export default function PhotoPage() {
             <PhotoViewer
                 items={galleryItems}
                 activeIndex={activeIndex >= 0 ? activeIndex : null}
-                onChange={(nextIndex) => {
-                    setActiveItemId(galleryItems[nextIndex]?.id ?? null);
-                }}
-                onDelete={async (photoId) => {
-                    await deletePhoto(photoId);
-                    setPhotos((currentPhotos) => currentPhotos.filter((photo) => photo.id !== photoId));
-                    setActiveItemId(null);
-                }}
-                onClose={() => setActiveItemId(null)}
+                onChange={handleViewerChange}
+                onDelete={handleDelete}
+                onClose={handleCloseViewer}
             />
         </>
     );

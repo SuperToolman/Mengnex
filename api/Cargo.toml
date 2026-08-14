@@ -2,10 +2,13 @@
 name = "api"
 version = "0.1.0"
 edition = "2024"
+default-run = "api"
 
 [dependencies]
 axum = "0.8"
+argon2 = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
+kamadak-exif = "0.6"
 image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 sea-orm = { version = "1.1", default-features = false, features = [
     "macros",
@@ -16,6 +19,9 @@ sea-orm = { version = "1.1", default-features = false, features = [
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+quick-xml = { version = "0.37", features = ["serialize"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tower-http = { version = "0.6", features = ["cors"] }

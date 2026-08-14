@@ -18,6 +18,7 @@ import {
     type WheelEvent,
 } from "react";
 import type { GalleryItemData } from "./GalleryItem";
+import { formatSourceLocation, isWebDavSourcePath } from "./photoSource";
 
 type PhotoViewerProps = {
     items: GalleryItemData[];
@@ -194,6 +195,8 @@ export default function PhotoViewer({
     const [actionError, setActionError] = useState<string | null>(null);
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const dragStateRef = useRef<DragState | null>(null);
+    const dragAnimationFrameRef = useRef<number | null>(null);
+    const pendingDragPositionRef = useRef<ViewportPosition | null>(null);
     const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isInfoOpenRef = useRef(false);
     const isDeleteDialogOpenRef = useRef(false);
@@ -249,14 +252,33 @@ export default function PhotoViewer({
         onChange(getSafeIndex(activeIndex + offset, items.length));
     }, [activeIndex, items.length, onChange]);
 
+    const flushPendingDragPosition = useCallback(() => {
+        if (dragAnimationFrameRef.current !== null) {
+            window.cancelAnimationFrame(dragAnimationFrameRef.current);
+            dragAnimationFrameRef.current = null;
+        }
+
+        const nextPosition = pendingDragPositionRef.current;
+        pendingDragPositionRef.current = null;
+
+        if (nextPosition) {
+            setPosition(nextPosition);
+        }
+    }, []);
+
     const resetViewport = useCallback(() => {
+        flushPendingDragPosition();
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setIsDragging(false);
         setIsOriginalLoaded(false);
         setIsOriginalRevealActive(false);
         dragStateRef.current = null;
-    }, []);
+    }, [flushPendingDragPosition]);
+
+    useEffect(() => () => {
+        flushPendingDragPosition();
+    }, [flushPendingDragPosition]);
 
     function handleWheel(event: WheelEvent<HTMLDivElement>) {
         event.preventDefault();
@@ -323,16 +345,26 @@ export default function PhotoViewer({
         }
 
         const rect = viewportRef.current?.getBoundingClientRect();
-        setPosition(
-            constrainPosition(
-                {
-                    x: dragState.originX + event.clientX - dragState.startX,
-                    y: dragState.originY + event.clientY - dragState.startY,
-                },
-                scale,
-                rect,
-            ),
+        pendingDragPositionRef.current = constrainPosition(
+            {
+                x: dragState.originX + event.clientX - dragState.startX,
+                y: dragState.originY + event.clientY - dragState.startY,
+            },
+            scale,
+            rect,
         );
+
+        if (dragAnimationFrameRef.current === null) {
+            dragAnimationFrameRef.current = window.requestAnimationFrame(() => {
+                dragAnimationFrameRef.current = null;
+                const nextPosition = pendingDragPositionRef.current;
+                pendingDragPositionRef.current = null;
+
+                if (nextPosition) {
+                    setPosition(nextPosition);
+                }
+            });
+        }
     }
 
     function stopDragging(event?: PointerEvent<HTMLDivElement>) {
@@ -344,6 +376,7 @@ export default function PhotoViewer({
             event.currentTarget.releasePointerCapture(event.pointerId);
         }
 
+        flushPendingDragPosition();
         dragStateRef.current = null;
         setIsDragging(false);
     }
@@ -436,13 +469,14 @@ export default function PhotoViewer({
     const originalSrc = activeItem.originalSrc ?? activeItem.src;
     const shouldProgressivelyReveal = Boolean(previewSrc && originalSrc && previewSrc !== originalSrc);
     const fileName = getFileName(activeItem);
+    const isWebDavSource = isWebDavSourcePath(activeItem.sourcePath);
+    const sourceLocation = formatSourceLocation(activeItem.sourcePath);
     const infoRows = [
         { label: "文件名", value: fileName },
         { label: "拍摄时间", value: formatTakenAt(activeItem.takenAt) },
         { label: "尺寸", value: dimensions },
         { label: "类型", value: activeItem.mimeType ?? "Unknown" },
         { label: "大小", value: formatFileSize(activeItem.fileSize) },
-        { label: "缩略图", value: activeItem.thumbnailSrc ? "已生成" : "未生成" },
         { label: "预览图", value: activeItem.previewSrc ? "已生成" : "未生成" },
         { label: "源路径", value: activeItem.sourcePath ?? "Unknown" },
     ];
@@ -542,6 +576,11 @@ export default function PhotoViewer({
                                             </button>
                                         </div>
                                     </div>
+                                    {isWebDavSource ? (
+                                        <div className="mx-5 mt-4 inline-flex items-center rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-xs font-medium text-cyan-100">
+                                            WebDAV remote source
+                                        </div>
+                                    ) : null}
                                     <div className="space-y-2 px-5 py-4">
                                         {infoRows.map((row) => (
                                             <div
@@ -652,7 +691,7 @@ export default function PhotoViewer({
             </Modal>
 
             <Modal isOpen={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <Modal.Backdrop className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" />
+                <Modal.Backdrop className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm">
                 <Modal.Container
                     placement="center"
                     className="z-[61] w-[min(460px,calc(100vw-32px))] rounded-[28px] border border-white/10 bg-slate-950/96 p-0 text-white shadow-2xl"
@@ -663,14 +702,14 @@ export default function PhotoViewer({
                                 确认删除
                             </Modal.Heading>
                             <p className="mt-1 text-sm text-white/55">
-                                该操作会真实删除原始文件，并移除缩略图、预览图和数据库记录。
+                                该操作会真实删除原始文件，并移除预览图缓存和数据库记录。
                             </p>
                         </Modal.Header>
                         <Modal.Body className="space-y-3 px-6 py-5">
                             <div className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                                 <p className="font-medium">{fileName}</p>
                                 <p className="mt-1 break-all text-red-100/75">
-                                    {activeItem.sourcePath ?? "Unknown"}
+                                    {sourceLocation}
                                 </p>
                             </div>
                         </Modal.Body>
@@ -713,6 +752,7 @@ export default function PhotoViewer({
                         </Modal.Footer>
                     </Modal.Dialog>
                 </Modal.Container>
+                </Modal.Backdrop>
             </Modal>
 
         </>

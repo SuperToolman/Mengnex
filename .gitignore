@@ -31,6 +31,9 @@ web/next-env.d.ts
 .parcel-cache/
 .idea/
 
+# Locally downloaded media tools (copied into desktop resources during packaging)
+tools/ffmpeg-full_build/
+
 # Environment
 .env*
 !.env.example

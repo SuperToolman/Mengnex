@@ -1,6 +1,15 @@
+pub mod auth;
+pub mod authors;
 pub mod libraries;
+pub mod manga;
 pub mod media;
+pub mod media_types;
 pub mod photos;
 pub mod preferences;
+pub mod recycle_bin;
 pub mod scanner;
+pub mod sources;
+pub mod tags;
 pub mod tasks;
+pub mod videos;
+pub mod webdav;

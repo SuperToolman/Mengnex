@@ -12,7 +12,10 @@ use crate::{
     },
     modules::tasks::{
         dto::TaskKind,
-        service::{CreateAppTaskParams, UpdateAppTaskParams, create_app_task, find_running_library_task, update_app_task},
+        service::{
+            CreateAppTaskParams, UpdateAppTaskParams, create_app_task, find_running_library_task,
+            update_app_task,
+        },
     },
 };
 
@@ -65,6 +68,9 @@ pub async fn start_scan(
         || find_running_library_task(&state.db, &library.id, TaskKind::GenerateCache)
             .await?
             .is_some()
+        || find_running_library_task(&state.db, &library.id, TaskKind::VideoCoverGenerate)
+            .await?
+            .is_some()
     {
         return Err(ApiError::BadRequest(
             "library already has a running background task".to_owned(),
@@ -95,13 +101,13 @@ pub async fn start_scan(
         CreateAppTaskParams {
             id: task.id.clone(),
             kind: TaskKind::ScanLibrary.to_string(),
-            title: "Scan library".to_owned(),
+            title: "扫描媒体库".to_owned(),
             library_id: Some(library.id.clone()),
             status: ScanTaskStatus::Running.to_string(),
             progress_percent: 0,
             processed_items: 0,
             total_items: 0,
-            detail: Some("discovered 0, inserted 0, updated 0, removed 0".to_owned()),
+            detail: Some("已发现 0，已新增 0，已更新 0，已移除 0".to_owned()),
             error_message: None,
             metadata_json: None,
             created_at: now,
@@ -114,19 +120,15 @@ pub async fn start_scan(
     let state_for_task = state.clone();
 
     tokio::spawn(async move {
-        let result = service::scan_library(
-            &state_for_task.db,
-            &library,
-            task_id.clone(),
-            |progress| {
+        let result =
+            service::scan_library(&state_for_task.db, &library, task_id.clone(), |progress| {
                 let db = state_for_task.db.clone();
                 let task_id = task_id.clone();
                 let progress = progress.clone();
 
                 Box::pin(async move { update_scan_task_progress(&db, &task_id, &progress).await })
-            },
-        )
-        .await;
+            })
+            .await;
 
         let _ = complete_scan_task(&state_for_task.db, &task_id, result).await;
     });
@@ -139,7 +141,10 @@ async fn update_scan_task_progress(
     task_id: &str,
     progress: &ScanProgress,
 ) -> Result<(), ApiError> {
-    let Some(task) = scan_task::Entity::find_by_id(task_id.to_owned()).one(db).await? else {
+    let Some(task) = scan_task::Entity::find_by_id(task_id.to_owned())
+        .one(db)
+        .await?
+    else {
         return Ok(());
     };
 
@@ -151,10 +156,22 @@ async fn update_scan_task_progress(
     active_task.removed_files = Set(progress.removed_files);
     active_task.updated_at = Set(Utc::now());
     active_task.update(db).await?;
-    let progress_percent = calculate_progress_percent(progress.processed_files, progress.discovered_files);
+    // The scan continues with media-specific browse-cache generation.
+    // Reserve the final percent for task completion so progress never claims
+    // success while that work is still running.
+    let total_items = if progress.has_preview_phase {
+        progress.discovered_files.saturating_mul(2)
+    } else {
+        progress.discovered_files
+    };
+    let progress_percent =
+        calculate_progress_percent(progress.processed_files, total_items).min(99);
     let detail = format!(
-        "discovered {}, inserted {}, updated {}, removed {}",
-        progress.discovered_files, progress.inserted_items, progress.updated_files, progress.removed_files
+        "已发现 {}，已新增 {}，已更新 {}，已移除 {}",
+        progress.discovered_files,
+        progress.inserted_items,
+        progress.updated_files,
+        progress.removed_files
     );
     let _ = update_app_task(
         db,
@@ -162,7 +179,7 @@ async fn update_scan_task_progress(
         UpdateAppTaskParams {
             progress_percent: Some(progress_percent),
             processed_items: Some(progress.processed_files),
-            total_items: Some(progress.discovered_files),
+            total_items: Some(total_items),
             detail: Some(Some(detail)),
             ..UpdateAppTaskParams::default()
         },
@@ -177,7 +194,10 @@ async fn complete_scan_task(
     task_id: &str,
     result: Result<service::ScanSummary, ApiError>,
 ) -> Result<(), ApiError> {
-    let Some(task) = scan_task::Entity::find_by_id(task_id.to_owned()).one(db).await? else {
+    let Some(task) = scan_task::Entity::find_by_id(task_id.to_owned())
+        .one(db)
+        .await?
+    else {
         return Ok(());
     };
 
@@ -193,10 +213,16 @@ async fn complete_scan_task(
             active_task.updated_files = Set(summary.updated_files);
             active_task.removed_files = Set(summary.removed_files);
             active_task.error_message = Set(None);
-            let progress_percent = calculate_progress_percent(summary.processed_files, summary.discovered_files);
+            let progress_percent =
+                calculate_progress_percent(summary.processed_files, summary.discovered_files);
             let detail = format!(
-                "discovered {}, inserted {}, updated {}, removed {}",
-                summary.discovered_files, summary.inserted_items, summary.updated_files, summary.removed_files
+                "已发现 {}，已新增 {}，已更新 {}，已移除 {}，已生成浏览缓存 {}，失败 {}",
+                summary.discovered_files,
+                summary.inserted_items,
+                summary.updated_files,
+                summary.removed_files,
+                summary.previews_generated,
+                summary.preview_failed
             );
             let _ = update_app_task(
                 db,
@@ -204,8 +230,20 @@ async fn complete_scan_task(
                 UpdateAppTaskParams {
                     status: Some(ScanTaskStatus::Completed.to_string()),
                     progress_percent: Some(progress_percent),
-                    processed_items: Some(summary.processed_files),
-                    total_items: Some(summary.discovered_files),
+                    processed_items: Some(if summary.has_preview_phase {
+                        summary
+                            .processed_files
+                            .saturating_add(summary.preview_processed)
+                    } else {
+                        summary.processed_files
+                    }),
+                    total_items: Some(if summary.has_preview_phase {
+                        summary
+                            .discovered_files
+                            .saturating_add(summary.preview_total)
+                    } else {
+                        summary.discovered_files
+                    }),
                     detail: Some(Some(detail)),
                     error_message: Some(None),
                     finished_at: Some(Some(finished_at)),
