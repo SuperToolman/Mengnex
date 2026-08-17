@@ -280,7 +280,7 @@ async fn complete_scan_task(
         && processor_for(&library.media_type)
             .is_some_and(|processor| processor.creates_derived_assets())
     {
-        start_cache_generation(db, library.clone(), false).await?;
+        start_cache_generation(db, library.clone()).await?;
     }
 
     Ok(())

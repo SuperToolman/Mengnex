@@ -1,12 +1,13 @@
 "use client";
 
 import { ChevronDown } from "@gravity-ui/icons";
-import { Alert, ListBox, Pagination, SearchField, Select, Skeleton } from "@heroui/react";
+import { Alert, Card, ListBox, Pagination, SearchField, Select, Skeleton } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import { getMediaLibraries, getVideoCatalog, type LibraryResponse, type VideoAssetResponse } from "@/src/api/client";
 import VideoCard from "./components/VideoCard";
+import styles from "./video-grid-skeleton.module.css";
 
 const PAGE_SIZE = 48;
 
@@ -57,15 +58,15 @@ function FilterSelect<T extends string>({
 
 function VideoGridSkeleton() {
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className={styles.grid} aria-label="正在加载视频">
             {Array.from({ length: 10 }).map((_, index) => (
-                <div key={index} className="overflow-hidden border border-border">
-                    <Skeleton className="aspect-video w-full rounded-none" />
-                    <div className="space-y-3 p-3">
-                        <Skeleton className="h-4 w-4/5" />
-                        <Skeleton className="h-3 w-2/5" />
-                    </div>
-                </div>
+                <Card.Root key={index}>
+                    <Skeleton className={styles.thumbnail} />
+                    <Card.Content className={styles.content}>
+                        <Skeleton className={styles.title} />
+                        <Skeleton className={styles.metadata} />
+                    </Card.Content>
+                </Card.Root>
             ))}
         </div>
     );
@@ -161,7 +162,7 @@ export default function VideoPage() {
             ) : null}
             {!error && !isLoading && videos.length > 0 ? (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    <div className={styles.grid}>
                         {videos.map((video) => <VideoCard key={video.id} video={video} onOpen={() => router.push(`/video/${video.id}`)} />)}
                     </div>
                     <div className="mx-auto w-fit bg-surface-secondary p-2">

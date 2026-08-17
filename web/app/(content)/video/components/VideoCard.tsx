@@ -21,7 +21,7 @@ export default function VideoCard({ video, onOpen }: { video: VideoAssetResponse
         <div className="group overflow-hidden transition-transform duration-200 hover:-translate-y-0.5">
             <Card className="relative aspect-video overflow-hidden bg-black">
                 {video.poster_src ? (
-                    <Image fill unoptimized alt={`${video.title} 封面`} src={video.poster_src} sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover" />
+                    <Image fill unoptimized alt={`${video.title} 封面`} src={video.poster_src} sizes="(min-width: 2560px) 14vw, (min-width: 1920px) 17vw, (min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover" />
                 ) : null}
                 {!video.poster_src ? (
                     <div className="absolute inset-0 grid place-items-center bg-surface-secondary text-muted"><Video className="h-8 w-8" /></div>

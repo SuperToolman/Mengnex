@@ -17,20 +17,11 @@ use serde::Deserialize;
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{
-        media_file, media_item, media_library, video_asset, video_collection,
+        author_resource, media_file, media_item, media_library, video_asset, video_collection,
         video_collection_member, video_playback_state,
     },
     modules::{
         auth::service::CurrentUser,
-        libraries::cache::start_cache_generation,
-        tasks::{
-            dto::{TaskKind, TaskResponse, TaskStatus},
-            service::{
-                CreateAppTaskParams, UpdateAppTaskParams, create_app_task,
-                find_running_library_background_task, find_running_library_task,
-                task_response_from_model, update_app_task,
-            },
-        },
         videos::{
             dto::{
                 UpdateVideoPlaybackRequest, VideoAssetResponse, VideoCatalogResponse,
@@ -61,35 +52,9 @@ pub struct VideoCatalogQuery {
     pub offset: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct GenerateCoversQuery {
-    pub force: Option<bool>,
-}
-
 #[derive(Debug, FromQueryResult)]
 struct CatalogCount {
     total: i64,
-}
-
-#[utoipa::path(post, path = "/api/videos/covers/{library_id}", params(("library_id" = String, Path), ("force" = Option<bool>, Query)), responses((status = 200, body = TaskResponse)), tag = "videos")]
-pub async fn start_cover_generation(
-    State(state): State<AppState>,
-    Path(library_id): Path<String>,
-    Query(query): Query<GenerateCoversQuery>,
-) -> Result<Json<TaskResponse>, ApiError> {
-    let library = media_library::Entity::find_by_id(library_id)
-        .one(&state.db)
-        .await?
-        .ok_or(ApiError::NotFound("media library"))?;
-    if !matches!(library.media_type.as_str(), "video" | "mixed_video") {
-        return Err(ApiError::BadRequest(
-            "media library does not support video covers".to_owned(),
-        ));
-    }
-    let library_name = library.name.clone();
-    let task = start_cache_generation(&state.db, library, query.force.unwrap_or(false)).await?;
-    let response = task_response_from_model(task, Some(library_name), None);
-    Ok(Json(response))
 }
 
 #[utoipa::path(delete, path = "/api/videos/covers/{library_id}", params(("library_id" = String, Path)), responses((status = 200, body = VideoCoverJobResponse)), tag = "videos")]
@@ -97,7 +62,7 @@ pub async fn delete_covers(
     State(state): State<AppState>,
     Path(library_id): Path<String>,
 ) -> Result<Json<VideoCoverJobResponse>, ApiError> {
-    if find_running_library_task(&state.db, &library_id, TaskKind::VideoCoverGenerate)
+    if crate::modules::tasks::service::find_running_library_background_task(&state.db, &library_id)
         .await?
         .is_some()
     {
@@ -147,129 +112,6 @@ pub async fn get_poster(
         Body::from_stream(ReaderStream::new(file)),
     )
         .into_response())
-}
-
-#[utoipa::path(post, path = "/api/videos/analyze/{library_id}", params(("library_id" = String, Path)), responses((status = 200, body = TaskResponse)), tag = "videos")]
-pub async fn start_analysis(
-    State(state): State<AppState>,
-    Path(library_id): Path<String>,
-) -> Result<Json<TaskResponse>, ApiError> {
-    let library = media_library::Entity::find_by_id(library_id)
-        .one(&state.db)
-        .await?
-        .ok_or(ApiError::NotFound("media library"))?;
-    if !matches!(library.media_type.as_str(), "video" | "mixed_video") {
-        return Err(ApiError::BadRequest(
-            "media library does not support video analysis".to_owned(),
-        ));
-    }
-    if find_running_library_background_task(&state.db, &library.id)
-        .await?
-        .is_some()
-    {
-        return Err(ApiError::BadRequest(
-            "library already has a running background task".to_owned(),
-        ));
-    }
-    let task_id = uuid::Uuid::new_v4().to_string();
-    let task = create_app_task(
-        &state.db,
-        CreateAppTaskParams {
-            id: task_id.clone(),
-            kind: TaskKind::VideoAnalyze.to_string(),
-            title: "分析视频技术信息".to_owned(),
-            library_id: Some(library.id.clone()),
-            status: TaskStatus::Queued.to_string(),
-            progress_percent: 0,
-            processed_items: 0,
-            total_items: 0,
-            detail: Some("等待读取视频时长、分辨率与编码信息".to_owned()),
-            error_message: None,
-            metadata_json: None,
-            created_at: Utc::now(),
-            finished_at: None,
-        },
-    )
-    .await?;
-    let task_db = state.db.clone();
-    tokio::spawn(async move {
-        let _ = update_app_task(
-            &task_db,
-            &task_id,
-            UpdateAppTaskParams {
-                status: Some(TaskStatus::Running.to_string()),
-                ..Default::default()
-            },
-        )
-        .await;
-        let result =
-            service::analyze_pending_assets(&task_db, &task_id, &library.id, &library.source_type)
-                .await;
-        let (status, progress, done, total, detail, error) = match result {
-            Ok(summary) if summary.failed_assets > 0 => (
-                TaskStatus::Failed.to_string(),
-                Some(100),
-                Some(summary.processed_assets),
-                Some(summary.total_assets),
-                Some(Some(format!(
-                    "已分析 {}，已跳过 {}，失败 {}",
-                    summary.analyzed_assets, summary.skipped_assets, summary.failed_assets
-                ))),
-                Some(
-                    summary
-                        .last_error
-                        .unwrap_or_else(|| format!("{} 个视频分析失败", summary.failed_assets)),
-                ),
-            ),
-            Ok(summary) => (
-                TaskStatus::Completed.to_string(),
-                Some(100),
-                Some(summary.processed_assets),
-                Some(summary.total_assets),
-                Some(Some(format!(
-                    "已分析 {}，已跳过 {}，失败 0",
-                    summary.analyzed_assets, summary.skipped_assets
-                ))),
-                None,
-            ),
-            Err(ApiError::TaskCanceled) => (
-                TaskStatus::Canceled.to_string(),
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
-            Err(error) => (
-                TaskStatus::Failed.to_string(),
-                None,
-                None,
-                None,
-                None,
-                Some(format!("{error:?}")),
-            ),
-        };
-        let _ = update_app_task(
-            &task_db,
-            &task_id,
-            UpdateAppTaskParams {
-                status: Some(status),
-                progress_percent: progress,
-                processed_items: done,
-                total_items: total,
-                detail,
-                error_message: Some(error),
-                finished_at: Some(Some(Utc::now())),
-                ..Default::default()
-            },
-        )
-        .await;
-    });
-    Ok(Json(task_response_from_model(
-        task,
-        Some(library.name),
-        None,
-    )))
 }
 
 fn apply_playback(video: &mut VideoAssetResponse, state: Option<&video_playback_state::Model>) {
@@ -493,6 +335,12 @@ pub async fn get_video(
         .one(&state.db)
         .await?
         .ok_or(ApiError::NotFound("media file"))?;
+    let author_id = author_resource::Entity::find()
+        .filter(author_resource::Column::ResourceType.eq("video_asset"))
+        .filter(author_resource::Column::ResourceId.eq(&asset.id))
+        .one(&state.db)
+        .await?
+        .map(|resource| resource.author_id);
     let item = media_item::Entity::find_by_id(&asset.item_id)
         .one(&state.db)
         .await?
@@ -605,6 +453,7 @@ pub async fn get_video(
         file_name: file.file_name,
         file_size: file.file_size,
         source_path: file.source_locator.unwrap_or(file.full_path),
+        author_id,
         source_missing: item.source_missing_at.is_some(),
         analysis_error,
         poster_error,

@@ -46,6 +46,8 @@ pub struct UpdateAppTaskParams {
 pub struct PreviewTaskMetadata {
     pub generated_previews: i64,
     pub skipped_assets: i64,
+    #[serde(default)]
+    pub errors: Vec<String>,
 }
 
 pub async fn create_app_task(
@@ -121,20 +123,6 @@ pub async fn update_app_task(
     active_task.updated_at = Set(Utc::now());
 
     Ok(Some(active_task.update(db).await?))
-}
-
-pub async fn find_running_library_task(
-    db: &DatabaseConnection,
-    library_id: &str,
-    kind: TaskKind,
-) -> Result<Option<app_task::Model>, ApiError> {
-    Ok(app_task::Entity::find()
-        .filter(app_task::Column::LibraryId.eq(library_id.to_owned()))
-        .filter(app_task::Column::Kind.eq(kind.to_string()))
-        .filter(app_task::Column::FinishedAt.is_null())
-        .filter(app_task::Column::Status.is_in(["queued", "running", "paused"]))
-        .one(db)
-        .await?)
 }
 
 pub async fn find_running_library_background_task(
@@ -257,9 +245,7 @@ pub fn task_response_from_model(
                 .max(0)
                 .min(scan_total);
             (Some(scan_processed), Some(scan_total), None, None)
-        } else if value.kind == TaskKind::GenerateCache.to_string()
-            || value.kind == TaskKind::VideoCoverGenerate.to_string()
-        {
+        } else if value.kind == TaskKind::GenerateCache.to_string() {
             (
                 None,
                 None,
@@ -270,6 +256,7 @@ pub fn task_response_from_model(
             (None, None, None, None)
         };
 
+    let error_details = parse_preview_metadata(value.metadata_json.as_deref()).errors;
     TaskResponse {
         id: value.id,
         kind: value.kind,
@@ -284,6 +271,7 @@ pub fn task_response_from_model(
         preview_total_items,
         detail: value.detail,
         error_message: value.error_message,
+        error_details,
         created_at: value.created_at,
         updated_at: value.updated_at,
         finished_at: value.finished_at,

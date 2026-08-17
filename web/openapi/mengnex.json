@@ -1615,6 +1615,37 @@
         }
       }
     },
+    "/api/tasks/{id}/retry": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "operationId": "retry_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Failed task id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retried task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos": {
       "get": {
         "tags": [
@@ -1664,36 +1695,6 @@
                   "items": {
                     "$ref": "#/components/schemas/VideoAssetResponse"
                   }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/videos/analyze/{library_id}": {
-      "post": {
-        "tags": [
-          "videos"
-        ],
-        "operationId": "start_analysis",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
                 }
               }
             }
@@ -1784,42 +1785,6 @@
       }
     },
     "/api/videos/covers/{library_id}": {
-      "post": {
-        "tags": [
-          "videos"
-        ],
-        "operationId": "start_cover_generation",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "force",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          }
-        }
-      },
       "delete": {
         "tags": [
           "videos"
@@ -2081,7 +2046,8 @@
           "resource_count",
           "resource_types",
           "manga",
-          "photos"
+          "photos",
+          "videos"
         ],
         "properties": {
           "avatar_history": {
@@ -2122,6 +2088,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VideoAssetResponse"
             }
           }
         }
@@ -3425,6 +3397,7 @@
           "title",
           "status",
           "progress_percent",
+          "error_details",
           "created_at",
           "updated_at"
         ],
@@ -3438,6 +3411,12 @@
               "string",
               "null"
             ]
+          },
+          "error_details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "error_message": {
             "type": [
@@ -4033,6 +4012,12 @@
             ],
             "properties": {
               "analysis_error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author_id": {
                 "type": [
                   "string",
                   "null"

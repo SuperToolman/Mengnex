@@ -29,6 +29,7 @@ export type AuthorDetailResponse = {
     photos: Array<PhotoAssetResponse>;
     resource_count: number;
     resource_types: Array<string>;
+    videos: Array<VideoAssetResponse>;
 };
 
 export type AuthorResponse = {
@@ -353,6 +354,7 @@ export type TagResponse = {
 export type TaskResponse = {
     created_at: string;
     detail?: string | null;
+    error_details: Array<string>;
     error_message?: string | null;
     finished_at?: string | null;
     id: string;
@@ -480,6 +482,7 @@ export type VideoCoverJobResponse = {
 };
 
 export type VideoDetailResponse = VideoAssetResponse & {
+    author_id?: string | null;
     analysis_error?: string | null;
     collection?: null | VideoCollectionResponse;
     file_name: string;
@@ -1511,6 +1514,27 @@ export type ResumeTaskResponses = {
 
 export type ResumeTaskResponse = ResumeTaskResponses[keyof ResumeTaskResponses];
 
+export type RetryTaskData = {
+    body?: never;
+    path: {
+        /**
+         * Failed task id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{id}/retry';
+};
+
+export type RetryTaskResponses = {
+    /**
+     * Retried task
+     */
+    200: TaskResponse;
+};
+
+export type RetryTaskResponse = RetryTaskResponses[keyof RetryTaskResponses];
+
 export type ListVideosData = {
     body?: never;
     path?: never;
@@ -1539,21 +1563,6 @@ export type ListVideosResponses = {
 };
 
 export type ListVideosResponse = ListVideosResponses[keyof ListVideosResponses];
-
-export type StartAnalysisData = {
-    body?: never;
-    path: {
-        library_id: string;
-    };
-    query?: never;
-    url: '/api/videos/analyze/{library_id}';
-};
-
-export type StartAnalysisResponses = {
-    200: TaskResponse;
-};
-
-export type StartAnalysisResponse = StartAnalysisResponses[keyof StartAnalysisResponses];
 
 export type ListVideoCatalogData = {
     body?: never;
@@ -1590,23 +1599,6 @@ export type DeleteCoversResponses = {
 };
 
 export type DeleteCoversResponse = DeleteCoversResponses[keyof DeleteCoversResponses];
-
-export type StartCoverGenerationData = {
-    body?: never;
-    path: {
-        library_id: string;
-    };
-    query?: {
-        force?: boolean;
-    };
-    url: '/api/videos/covers/{library_id}';
-};
-
-export type StartCoverGenerationResponses = {
-    200: TaskResponse;
-};
-
-export type StartCoverGenerationResponse = StartCoverGenerationResponses[keyof StartCoverGenerationResponses];
 
 export type GetVideoData = {
     body?: never;

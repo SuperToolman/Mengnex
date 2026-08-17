@@ -1,4 +1,7 @@
-use crate::modules::{manga::dto::MangaSeriesResponse, photos::dto::PhotoAssetResponse};
+use crate::modules::{
+    manga::dto::MangaSeriesResponse, photos::dto::PhotoAssetResponse,
+    videos::dto::VideoAssetResponse,
+};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -28,4 +31,5 @@ pub struct AuthorDetailResponse {
     pub resource_types: Vec<String>,
     pub manga: Vec<MangaSeriesResponse>,
     pub photos: Vec<PhotoAssetResponse>,
+    pub videos: Vec<VideoAssetResponse>,
 }

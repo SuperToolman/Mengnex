@@ -45,6 +45,8 @@ pub struct PreviewOperationSummary {
     pub last_error: Option<String>,
     pub deleted_previews: i64,
     pub reclaimed_bytes: i64,
+    pub errors: Vec<String>,
+    pub total_operations: i64,
 }
 
 #[derive(Debug, Clone, Default)]

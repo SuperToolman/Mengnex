@@ -1,6 +1,6 @@
 "use client";
 
-import { CirclePause, CirclePlay, CircleStop, Filmstrip, Stopwatch, TrashBin } from "@gravity-ui/icons";
+import { ArrowsRotateRight, CircleInfo, CirclePause, CirclePlay, CircleStop, Stopwatch, TrashBin } from "@gravity-ui/icons";
 import { Alert, Button, Chip, Modal, ProgressBar, Skeleton, Tabs, Tooltip } from "@heroui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -11,6 +11,7 @@ import {
     getTaskSummary,
     pauseTask,
     resumeTask,
+    retryTask,
     type TaskResponse,
     type TaskSummaryResponse,
 } from "@/src/api/client";
@@ -34,11 +35,8 @@ function getStatus(status: string): [string, TaskColor] {
 }
 
 function getKind(task: TaskResponse) {
-    if (task.kind === "generate_cache" || task.kind === "video_cover_generate") {
-        return { label: "缓存生成", icon: <CirclePlay className="h-4 w-4" /> };
-    }
-    if (task.kind === "video_analyze") {
-        return { label: "视频技术信息分析", icon: <Filmstrip className="h-4 w-4" /> };
+    if (task.kind === "generate_cache") {
+        return { label: "生成媒体信息", icon: <CirclePlay className="h-4 w-4" /> };
     }
     if (task.kind === "scan_library") {
         return { label: "媒体库扫描", icon: <Stopwatch className="h-4 w-4" /> };
@@ -67,6 +65,7 @@ export default function TasksPage() {
     const [loading, setLoading] = useState(true);
     const [acting, setActing] = useState<string | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [detailTask, setDetailTask] = useState<TaskResponse | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [now, setNow] = useState(Date.now);
     const lock = useRef(false);
@@ -109,6 +108,12 @@ export default function TasksPage() {
         () => tasks.filter((task) => view === "active" ? activeTask(task) : !activeTask(task)),
         [tasks, view],
     );
+    const detailErrors = detailTask
+        ? Array.from(new Set([
+            detailTask.error_message,
+            ...detailTask.error_details,
+        ].filter((value): value is string => Boolean(value && value.trim()))))
+        : [];
 
     async function run(id: string, action: "pause" | "resume" | "cancel") {
         setActing(id);
@@ -122,6 +127,13 @@ export default function TasksPage() {
         } finally {
             setActing(null);
         }
+    }
+
+    async function retry(id: string) {
+        setActing(id);
+        try { await retryTask(id); await load(); }
+        catch (cause) { setError(cause instanceof Error ? cause.message : "请求失败"); }
+        finally { setActing(null); }
     }
 
     async function clearHistory() {
@@ -157,6 +169,8 @@ export default function TasksPage() {
                                 <Chip color={color} variant="soft" size="sm">{label}</Chip>
                                 <time className="text-xs text-muted">{formatTime(task.updated_at)}</time>
                                 <div className="flex justify-end gap-1">
+                                    <Tooltip><Tooltip.Trigger><Button size="sm" variant="ghost" isIconOnly onPress={() => setDetailTask(task)}><CircleInfo /></Button></Tooltip.Trigger><Tooltip.Content>查看详情</Tooltip.Content></Tooltip>
+                                    {task.status === "failed" && task.kind === "generate_cache" ? <Tooltip><Tooltip.Trigger><Button size="sm" variant="ghost" isIconOnly isDisabled={acting === task.id} onPress={() => void retry(task.id)}><ArrowsRotateRight /></Button></Tooltip.Trigger><Tooltip.Content>重试失败项</Tooltip.Content></Tooltip> : null}
                                     {(task.status === "queued" || task.status === "running") ? <Tooltip><Tooltip.Trigger><Button size="sm" variant="ghost" isIconOnly isDisabled={acting === task.id} onPress={() => void run(task.id, "pause")}><CirclePause /></Button></Tooltip.Trigger><Tooltip.Content>暂停</Tooltip.Content></Tooltip> : null}
                                     {task.status === "paused" ? <Tooltip><Tooltip.Trigger><Button size="sm" variant="ghost" isIconOnly onPress={() => void run(task.id, "resume")}><CirclePlay /></Button></Tooltip.Trigger><Tooltip.Content>继续</Tooltip.Content></Tooltip> : null}
                                     {activeTask(task) ? <Tooltip><Tooltip.Trigger><Button size="sm" variant="ghost" isIconOnly onPress={() => void run(task.id, "cancel")}><CircleStop /></Button></Tooltip.Trigger><Tooltip.Content>取消</Tooltip.Content></Tooltip> : null}
@@ -169,6 +183,12 @@ export default function TasksPage() {
             <Modal isOpen={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
                 <Modal.Trigger aria-label="打开删除任务记录确认对话框" className="sr-only"><span /></Modal.Trigger>
                 <Modal.Backdrop variant="blur"><Modal.Container placement="center"><Modal.Dialog><Modal.Header><Modal.Heading>删除任务记录</Modal.Heading></Modal.Header><Modal.Body>删除后无法恢复。</Modal.Body><Modal.Footer><Button variant="secondary" onPress={() => setDeleteId(null)}>取消</Button><Button variant="danger" isDisabled={deleting} onPress={async () => { if (deleteId) { setDeleting(true); try { await deleteTask(deleteId); setDeleteId(null); await load(); } finally { setDeleting(false); } } }}>删除</Button></Modal.Footer></Modal.Dialog></Modal.Container></Modal.Backdrop>
+            </Modal>
+            <Modal isOpen={detailTask !== null} onOpenChange={(open) => !open && setDetailTask(null)}>
+                <Modal.Trigger aria-label="任务详情" className="sr-only"><span /></Modal.Trigger>
+                <Modal.Backdrop variant="blur"><Modal.Container placement="center"><Modal.Dialog><Modal.Header><Modal.Heading>任务详情</Modal.Heading></Modal.Header><Modal.Body>
+                    {detailTask ? <div className="space-y-3 text-sm"><p>{detailTask.title}</p><p className="text-muted">{detailTask.detail || "无处理详情"}</p>{detailErrors.length ? <div><p className="mb-2 font-medium text-danger">错误记录（{detailErrors.length}）</p><ol className="max-h-72 list-decimal space-y-2 overflow-auto pl-5 text-danger">{detailErrors.map((error, index) => <li key={`${index}-${error}`}>{error}</li>)}</ol></div> : <p className="text-muted">未记录错误。</p>}</div> : null}
+                </Modal.Body><Modal.Footer><Button variant="secondary" onPress={() => setDetailTask(null)}>关闭</Button></Modal.Footer></Modal.Dialog></Modal.Container></Modal.Backdrop>
             </Modal>
         </div>
         </ContentPageLayout>

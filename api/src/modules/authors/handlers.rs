@@ -19,11 +19,13 @@ use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{
         author, author_avatar, author_resource, manga_series, photo_asset, tag, tag_resource,
+        video_asset,
     },
     modules::{
         authors::dto::{AuthorAvatarResponse, AuthorDetailResponse, AuthorResponse},
         manga::dto::MangaSeriesResponse,
         photos::dto::PhotoAssetResponse,
+        videos::dto::VideoAssetResponse,
     },
 };
 
@@ -117,6 +119,11 @@ pub async fn get_author(
         .filter(|item| item.resource_type == "photo_asset")
         .map(|item| item.resource_id.clone())
         .collect::<Vec<_>>();
+    let video_ids = resources
+        .iter()
+        .filter(|item| item.resource_type == "video_asset")
+        .map(|item| item.resource_id.clone())
+        .collect::<Vec<_>>();
     let mut tags_by_series: HashMap<String, Vec<String>> = HashMap::new();
     for resource in tag_resource::Entity::find()
         .filter(tag_resource::Column::ResourceType.eq("manga_series"))
@@ -162,6 +169,14 @@ pub async fn get_author(
         .into_iter()
         .map(PhotoAssetResponse::from)
         .collect();
+    let videos = video_asset::Entity::find()
+        .filter(video_asset::Column::Id.is_in(video_ids))
+        .order_by_desc(video_asset::Column::CreatedAt)
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .map(VideoAssetResponse::from)
+        .collect();
     let avatar_history = author_avatar::Entity::find()
         .filter(author_avatar::Column::AuthorId.eq(value.id.clone()))
         .order_by_desc(author_avatar::Column::CreatedAt)
@@ -183,6 +198,7 @@ pub async fn get_author(
         resource_types: summary.resource_types,
         manga,
         photos,
+        videos,
     }))
 }
 

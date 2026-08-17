@@ -87,6 +87,7 @@ pub struct VideoDetailResponse {
     pub file_name: String,
     pub file_size: i64,
     pub source_path: String,
+    pub author_id: Option<String>,
     pub source_missing: bool,
     pub analysis_error: Option<String>,
     pub poster_error: Option<String>,

@@ -40,8 +40,6 @@ type LibrarieCardProps = {
     onRescan?: () => void;
     onGeneratePreviews?: () => void;
     onDeletePreviews?: () => void;
-    onAnalyzeVideos?: () => void;
-    onRegenerateVideoCovers?: () => void;
     onOpenSettings?: () => void;
     onOpenInfo?: () => void;
     onToggleEnabled?: () => void;
@@ -509,8 +507,6 @@ export default function LibrarieCard({
     onRescan,
     onGeneratePreviews,
     onDeletePreviews,
-    onAnalyzeVideos,
-    onRegenerateVideoCovers,
     onOpenSettings,
     onOpenInfo,
     onToggleEnabled,
@@ -532,11 +528,11 @@ export default function LibrarieCard({
         },
         {
             key: "generate",
-            title: hasActiveCacheTask ? "缓存任务进行中" : "生成浏览缓存",
+            title: hasActiveCacheTask ? "生成任务进行中" : "生成媒体信息",
             description: hasActiveCacheTask
                 ? "当前媒体库已有生成任务，请到任务页查看进度。"
                 : isVideoLibrary
-                  ? "为缺少封面的视频抽取并缓存画面。"
+                  ? "读取视频技术信息，并为缺少封面的影片生成浏览封面。"
                   : "补齐缺失或过期的预览图缓存。",
             icon: Camera,
             disabled: isBusy || hasActiveCacheTask,
@@ -584,29 +580,8 @@ export default function LibrarieCard({
             onPress: onDeleteLibrary,
         },
     ];
-    const mediaSpecificMenuActions: MenuAction[] = isVideoLibrary ? [
-        {
-            key: "analyze-video",
-            title: "读取视频技术信息",
-            description: "使用 FFprobe 读取时长、分辨率与音视频编码，不生成浏览缓存。",
-            icon: Filmstrip,
-            disabled: isBusy || !library.enabled,
-            onPress: onAnalyzeVideos,
-        },
-        {
-            key: "regenerate-video-covers",
-            title: "重新生成视频封面",
-            description: "覆盖当前媒体库已有的封面缓存。",
-            icon: ArrowsRotateRight,
-            disabled: isBusy || hasActiveCacheTask || !library.enabled,
-            onPress: onRegenerateVideoCovers,
-        },
-    ] : [];
     const menuActionGroups: MenuActionGroup[] = [
         { key: "common", label: "通用功能", actions: commonMenuActions },
-        ...(mediaSpecificMenuActions.length > 0
-            ? [{ key: "media-specific", label: "视频专属功能", actions: mediaSpecificMenuActions }]
-            : []),
     ];
 
     return (

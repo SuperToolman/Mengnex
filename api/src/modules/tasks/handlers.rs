@@ -12,6 +12,7 @@ use crate::{
     infra::entities::{app_task, media_library, scan_task},
     modules::{
         auth::service::CurrentUser,
+        libraries::cache::retry_cache_generation,
         scanner::dto::ScanTaskStatus,
         tasks::{
             dto::{DeleteTasksResponse, TaskKind, TaskResponse, TaskStatus, TaskSummaryResponse},
@@ -330,6 +331,36 @@ pub async fn cancel_task(
     .await?;
 
     Ok(Json(to_task_response(&state, updated).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/tasks/{id}/retry",
+    params(("id" = String, Path, description = "Failed task id")),
+    responses((status = 200, description = "Retried task", body = TaskResponse)),
+    tag = "tasks"
+)]
+pub async fn retry_task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<TaskResponse>, ApiError> {
+    let task = get_task_or_not_found(&state, &id).await?;
+    if task.kind != TaskKind::GenerateCache.to_string()
+        || task.status != TaskStatus::Failed.to_string()
+    {
+        return Err(ApiError::BadRequest(
+            "only failed media information tasks can be retried".to_owned(),
+        ));
+    }
+    let library_id = task
+        .library_id
+        .ok_or(ApiError::BadRequest("task has no media library".to_owned()))?;
+    let library = media_library::Entity::find_by_id(library_id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("media library"))?;
+    let retried = retry_cache_generation(&state.db, library, task.id).await?;
+    Ok(Json(to_task_response(&state, retried).await?))
 }
 
 fn status_for_pause(task: &app_task::Model) -> String {

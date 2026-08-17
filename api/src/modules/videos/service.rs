@@ -16,8 +16,9 @@ use uuid::Uuid;
 
 use crate::{
     core::error::ApiError,
-    infra::entities::{app_setting, media_file, video_asset},
+    infra::entities::{app_setting, author_resource, media_file, video_asset},
     modules::{
+        authors::service::link_author_for_resource,
         sources,
         tasks::service::{UpdateAppTaskParams, update_app_task, wait_for_task_permit},
     },
@@ -42,12 +43,33 @@ pub async fn upsert_video_asset(
         active.library_id = Set(file.library_id.clone());
         active.title = Set(title.to_owned());
         active.container = Set(file.extension.clone());
+        // The scanner calls this branch only after the source file metadata
+        // changed or a missing item returned. Existing derivatives no longer
+        // describe the current bytes and must be regenerated.
+        active.duration_seconds = Set(None);
+        active.width = Set(None);
+        active.height = Set(None);
+        active.video_codec = Set(None);
+        active.audio_codec = Set(None);
+        active.analysis_status = Set("pending".to_owned());
+        active.analysis_error = Set(None);
+        active.analyzed_at = Set(None);
+        active.poster_rel_path = Set(None);
+        active.poster_file_size = Set(None);
+        active.poster_generated_at = Set(None);
+        active.poster_error = Set(None);
         active.updated_at = Set(now);
-        active.update(db).await?;
+        let updated = active.update(db).await?;
+        author_resource::Entity::delete_many()
+            .filter(author_resource::Column::ResourceType.eq("video_asset"))
+            .filter(author_resource::Column::ResourceId.eq(updated.id.clone()))
+            .exec(db)
+            .await?;
+        link_author_for_resource(db, title, "video_asset", &updated.id).await?;
         return Ok(());
     }
 
-    video_asset::ActiveModel {
+    let asset = video_asset::ActiveModel {
         id: Set(Uuid::new_v4().to_string()),
         item_id: Set(file.item_id.clone()),
         file_id: Set(file.id.clone()),
@@ -71,6 +93,7 @@ pub async fn upsert_video_asset(
     }
     .insert(db)
     .await?;
+    link_author_for_resource(db, title, "video_asset", &asset.id).await?;
     Ok(())
 }
 
@@ -81,6 +104,7 @@ pub struct VideoCoverSummary {
     pub skipped_assets: i64,
     pub failed_assets: i64,
     pub last_error: Option<String>,
+    pub errors: Vec<String>,
     pub deleted_covers: i64,
     pub reclaimed_bytes: i64,
 }
@@ -93,6 +117,31 @@ pub struct VideoAnalysisSummary {
     pub skipped_assets: i64,
     pub failed_assets: i64,
     pub last_error: Option<String>,
+    pub errors: Vec<String>,
+}
+
+pub async fn video_progress_baseline(
+    db: &DatabaseConnection,
+    library_id: &str,
+) -> Result<(i64, i64), ApiError> {
+    let assets = video_asset::Entity::find()
+        .filter(video_asset::Column::LibraryId.eq(library_id.to_owned()))
+        .all(db)
+        .await?;
+    let total = assets.len() as i64;
+    let mut completed = 0;
+    for asset in &assets {
+        completed += i64::from(asset.analysis_status == "ready");
+        if asset
+            .poster_rel_path
+            .as_ref()
+            .and_then(|_| resolve_cover_path(asset))
+            .is_some_and(|path| path.is_file())
+        {
+            completed += 1;
+        }
+    }
+    Ok((total, completed))
 }
 
 pub fn preview_root(library_id: &str) -> PathBuf {
@@ -134,7 +183,7 @@ pub async fn generate_library_covers(
         db,
         task_id,
         UpdateAppTaskParams {
-            total_items: Some(base_total.saturating_add(total)),
+            total_items: Some(if base_total > 0 { base_total } else { total }),
             ..Default::default()
         },
     )
@@ -145,7 +194,6 @@ pub async fn generate_library_covers(
         let target = root.join(format!("{}.jpg", asset.id));
         if !force && asset.poster_rel_path.is_some() && target.is_file() {
             summary.skipped_assets += 1;
-            summary.processed_assets += 1;
             update_cover_progress(db, task_id, &summary, total, base_processed, base_total).await?;
             continue;
         }
@@ -160,7 +208,7 @@ pub async fn generate_library_covers(
             active.update(db).await?;
             summary.failed_assets += 1;
             summary.last_error = Some(error);
-            summary.processed_assets += 1;
+            summary.errors.push(summary.last_error.clone().unwrap());
             update_cover_progress(db, task_id, &summary, total, base_processed, base_total).await?;
             continue;
         };
@@ -179,6 +227,7 @@ pub async fn generate_library_covers(
         };
         let asset_id = asset.id.clone();
         let mut active: video_asset::ActiveModel = asset.into();
+        let succeeded = result.is_ok();
         match result {
             Ok(size) => {
                 active.poster_rel_path =
@@ -194,11 +243,14 @@ pub async fn generate_library_covers(
                 active.poster_error = Set(Some(error.clone()));
                 summary.failed_assets += 1;
                 summary.last_error = Some(error);
+                summary.errors.push(summary.last_error.clone().unwrap());
             }
         }
         active.updated_at = Set(Utc::now());
         active.update(db).await?;
-        summary.processed_assets += 1;
+        if succeeded {
+            summary.processed_assets += 1;
+        }
         update_cover_progress(db, task_id, &summary, total, base_processed, base_total).await?;
     }
     Ok(summary)
@@ -274,7 +326,7 @@ async fn update_cover_progress(
     base_processed: i64,
     base_total: i64,
 ) -> Result<(), ApiError> {
-    let combined_total = base_total.saturating_add(total);
+    let combined_total = if base_total > 0 { base_total } else { total };
     let combined_processed = base_processed.saturating_add(summary.processed_assets);
     let percent = if combined_total == 0 {
         99
@@ -305,6 +357,7 @@ pub async fn delete_library_covers(
 ) -> Result<VideoCoverSummary, ApiError> {
     let assets = video_asset::Entity::find()
         .filter(video_asset::Column::LibraryId.eq(library_id.to_owned()))
+        .filter(video_asset::Column::AnalysisStatus.ne("ready"))
         .all(db)
         .await?;
     let mut summary = VideoCoverSummary::default();
@@ -329,11 +382,13 @@ pub async fn delete_library_covers(
     Ok(summary)
 }
 
-pub async fn analyze_pending_assets(
+pub async fn analyze_library_assets(
     db: &DatabaseConnection,
     task_id: &str,
     library_id: &str,
     source_type: &str,
+    total_assets: i64,
+    base_completed: i64,
 ) -> Result<VideoAnalysisSummary, ApiError> {
     let settings = app_setting::Entity::find_by_id("global")
         .one(db)
@@ -341,23 +396,24 @@ pub async fn analyze_pending_assets(
         .ok_or(ApiError::NotFound("Preferences not found"))?;
     let assets = video_asset::Entity::find()
         .filter(video_asset::Column::LibraryId.eq(library_id.to_owned()))
+        .filter(video_asset::Column::AnalysisStatus.ne("ready"))
         .all(db)
         .await?;
     let mut summary = VideoAnalysisSummary {
-        total_assets: assets.len() as i64,
+        total_assets: total_assets,
         ..Default::default()
     };
-    update_analysis_progress(db, task_id, &summary).await?;
+    update_analysis_progress(db, task_id, &summary, base_completed).await?;
     for asset in assets {
         wait_for_task_permit(db, task_id).await?;
         let Some(file) = media_file::Entity::find_by_id(asset.file_id.clone())
             .one(db)
             .await?
         else {
-            summary.processed_assets += 1;
             summary.failed_assets += 1;
             summary.last_error = Some("未找到源媒体文件记录".to_owned());
-            update_analysis_progress(db, task_id, &summary).await?;
+            summary.errors.push(summary.last_error.clone().unwrap());
+            update_analysis_progress(db, task_id, &summary, base_completed).await?;
             continue;
         };
         let probe = if source_type == crate::modules::sources::WEBDAV {
@@ -373,10 +429,14 @@ pub async fn analyze_pending_assets(
             "failed" => {
                 summary.failed_assets += 1;
                 summary.last_error = probe.error.clone();
+                if let Some(error) = probe.error.as_ref() {
+                    summary.errors.push(error.clone());
+                }
             }
             _ => summary.skipped_assets += 1,
         }
         let mut active: video_asset::ActiveModel = asset.into();
+        let succeeded = probe.status == "ready";
         active.duration_seconds = Set(probe.duration_seconds);
         active.width = Set(probe.width);
         active.height = Set(probe.height);
@@ -387,8 +447,10 @@ pub async fn analyze_pending_assets(
         active.analyzed_at = Set(probe.analyzed_at);
         active.updated_at = Set(Utc::now());
         active.update(db).await?;
-        summary.processed_assets += 1;
-        update_analysis_progress(db, task_id, &summary).await?;
+        if succeeded {
+            summary.processed_assets += 1;
+        }
+        update_analysis_progress(db, task_id, &summary, base_completed).await?;
     }
     Ok(summary)
 }
@@ -397,19 +459,22 @@ async fn update_analysis_progress(
     db: &DatabaseConnection,
     task_id: &str,
     summary: &VideoAnalysisSummary,
+    base_completed: i64,
 ) -> Result<(), ApiError> {
-    let progress_percent = if summary.total_assets <= 0 {
-        0
+    let combined_total = summary.total_assets.saturating_mul(2);
+    let combined_processed = base_completed.saturating_add(summary.processed_assets);
+    let progress_percent = if combined_total <= 0 {
+        99
     } else {
-        ((summary.processed_assets * 100) / summary.total_assets).min(99) as i32
+        ((combined_processed * 100) / combined_total).min(99) as i32
     };
     update_app_task(
         db,
         task_id,
         UpdateAppTaskParams {
             progress_percent: Some(progress_percent),
-            processed_items: Some(summary.processed_assets),
-            total_items: Some(summary.total_assets),
+            processed_items: Some(combined_processed),
+            total_items: Some(combined_total),
             detail: Some(Some(format!(
                 "已分析 {}，已跳过 {}，失败 {}",
                 summary.analyzed_assets, summary.skipped_assets, summary.failed_assets

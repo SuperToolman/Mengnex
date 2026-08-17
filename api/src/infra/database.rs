@@ -537,8 +537,19 @@ async fn backfill_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr> {
 async fn normalize_legacy_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr> {
     db.execute(Statement::from_string(
         DbBackend::Sqlite,
-        "UPDATE app_tasks SET kind = 'generate_cache', title = '生成浏览缓存' WHERE kind = 'video_cover_generate'"
+        "UPDATE app_tasks SET progress_percent = MIN(progress_percent, 99) WHERE status = 'failed'"
             .to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET kind = 'generate_cache', title = '生成媒体信息' WHERE kind IN ('video_cover_generate', 'video_analyze')"
+            .to_owned(),
+    ))
+    .await?;
+    db.execute(Statement::from_string(
+        DbBackend::Sqlite,
+        "UPDATE app_tasks SET title = '生成媒体信息' WHERE kind = 'generate_cache'".to_owned(),
     ))
     .await?;
     db.execute(Statement::from_string(
@@ -549,18 +560,7 @@ async fn normalize_legacy_app_tasks(db: &DatabaseConnection) -> Result<(), DbErr
     .await?;
     db.execute(Statement::from_string(
         DbBackend::Sqlite,
-        "UPDATE app_tasks SET error_message = '浏览缓存生成失败：' || (SELECT poster_error FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL ORDER BY updated_at DESC LIMIT 1) WHERE kind IN ('generate_cache', 'scan_library') AND status = 'failed' AND (error_message IS NULL OR error_message = detail OR error_message LIKE 'generated %') AND EXISTS (SELECT 1 FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL)"
-            .to_owned(),
-    ))
-    .await?;
-    db.execute(Statement::from_string(
-        DbBackend::Sqlite,
-        "UPDATE app_tasks SET title = '分析视频技术信息' WHERE kind = 'video_analyze'".to_owned(),
-    ))
-    .await?;
-    db.execute(Statement::from_string(
-        DbBackend::Sqlite,
-        "UPDATE app_tasks SET status = 'failed', error_message = '视频技术信息读取失败，请重新执行任务查看具体原因' WHERE kind = 'video_analyze' AND status = 'completed' AND EXISTS (SELECT 1 FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND video_assets.analysis_status = 'failed')"
+        "UPDATE app_tasks SET error_message = '生成媒体信息失败：' || (SELECT poster_error FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL ORDER BY updated_at DESC LIMIT 1) WHERE kind IN ('generate_cache', 'scan_library') AND status = 'failed' AND (error_message IS NULL OR error_message = detail OR error_message LIKE 'generated %') AND EXISTS (SELECT 1 FROM video_assets WHERE video_assets.library_id = app_tasks.library_id AND poster_error IS NOT NULL)"
             .to_owned(),
     ))
     .await?;

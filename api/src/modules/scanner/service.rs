@@ -343,29 +343,74 @@ where
     Ok(summary)
 }
 
-fn difference_member_order(file_name: &str) -> Option<i32> {
-    let stem = Path::new(file_name)
-        .file_stem()
-        .and_then(|value| value.to_str())?
-        .to_ascii_lowercase();
-    if stem == "video" {
-        return Some(0);
+fn difference_group_name(file_name: &str) -> Option<(Option<String>, String)> {
+    let stem = Path::new(file_name).file_stem()?.to_str()?.trim();
+    let mut title = stem;
+    let author = crate::modules::authors::service::leading_author(stem).map(str::trim);
+    if author.is_some()
+        && let Some(end) = title.find(']')
+    {
+        title = title[end + 1..].trim();
     }
-    let suffix = stem.strip_prefix("video")?;
-    if suffix.is_empty() || !suffix.chars().all(|character| character.is_ascii_digit()) {
-        return None;
+    loop {
+        let trimmed = title.trim_end();
+        let stripped = ['}', ')', ']'].iter().find_map(|close| {
+            let open = match close {
+                ')' => '(',
+                ']' => '[',
+                '}' => '{',
+                _ => return None,
+            };
+            trimmed
+                .rfind(open)
+                .filter(|index| trimmed[*index..].ends_with(*close))
+                .map(|index| trimmed[..index].trim())
+        });
+        match stripped {
+            Some(value) => title = value,
+            None => break,
+        }
     }
-    suffix.parse::<i32>().ok()
+    let lower = title.to_ascii_lowercase();
+    if lower.strip_prefix("video").is_some_and(|suffix| {
+        !suffix.is_empty() && suffix.chars().all(|character| character.is_ascii_digit())
+    }) {
+        title = &title[.."video".len()];
+    }
+    let lower = title.to_ascii_lowercase();
+    let title = [" custom outfit", " original outfit"]
+        .iter()
+        .find_map(|suffix| {
+            lower
+                .ends_with(suffix)
+                .then(|| title[..title.len() - suffix.len()].trim())
+        })
+        .unwrap_or(title);
+    (!title.is_empty()).then(|| (author.map(str::to_owned), title.to_owned()))
 }
 
-fn source_parent_and_title(source: &str) -> Option<(String, String)> {
+fn difference_group_key(file_name: &str) -> Option<(Option<String>, String)> {
+    difference_group_name(file_name).map(|(author, title)| {
+        (
+            author.map(|value| value.to_ascii_lowercase()),
+            title.to_ascii_lowercase(),
+        )
+    })
+}
+
+fn source_parent_path(source: &str) -> Option<String> {
     let normalized = source.replace('\\', "/");
     let (parent, _) = normalized.rsplit_once('/')?;
-    let title = parent.rsplit('/').next()?.trim();
-    if title.is_empty() {
-        return None;
-    }
-    Some((parent.to_owned(), title.to_owned()))
+    (!parent.is_empty()).then(|| parent.to_owned())
+}
+
+fn difference_group_identity(
+    source: &str,
+    file_name: &str,
+) -> Option<(String, Option<String>, String)> {
+    let parent = source_parent_path(source)?;
+    let (author, title) = difference_group_key(file_name)?;
+    Some((parent, author, title))
 }
 
 async fn rebuild_difference_video_collections(
@@ -416,46 +461,59 @@ async fn rebuild_difference_video_collections(
         .filter(media_file::Column::LibraryId.eq(&library.id))
         .all(&txn)
         .await?;
-    let mut groups: HashMap<String, (String, BTreeMap<i32, String>)> = HashMap::new();
+    let mut groups: HashMap<
+        (String, Option<String>, String),
+        (Option<String>, String, BTreeMap<String, String>),
+    > = HashMap::new();
 
     for file in files {
         if !active_item_ids.contains(&file.item_id) {
             continue;
         }
-        let Some(order) = difference_member_order(&file.file_name) else {
-            continue;
-        };
         let Some(asset) = assets_by_file.get(&file.id) else {
             continue;
         };
         let source = file.source_locator.as_deref().unwrap_or(&file.full_path);
-        let Some((parent, title)) = source_parent_and_title(source) else {
+        let Some(group_key) = difference_group_identity(source, &file.file_name) else {
+            continue;
+        };
+        let Some((display_author, display_title)) = difference_group_name(&file.file_name) else {
             continue;
         };
         groups
-            .entry(parent)
-            .or_insert_with(|| (title, BTreeMap::new()))
-            .1
-            .entry(order)
+            .entry(group_key)
+            .or_insert_with(|| (display_author, display_title, BTreeMap::new()))
+            .2
+            .entry(file.file_name.clone())
             .or_insert_with(|| asset.id.clone());
     }
 
     let now = Utc::now();
-    for (source_path, (title, members)) in groups {
+    for ((parent, author, title), (display_author, display_title, members)) in groups {
         if members.len() < 2 {
             continue;
         }
         let collection_id = Uuid::new_v4().to_string();
         let default_video_asset_id = members
-            .get(&0)
-            .or_else(|| members.values().next())
+            .values()
+            .next()
             .expect("collection has members")
             .clone();
+        let collection_title = display_author
+            .as_deref()
+            .map(|author| format!("[{author}] {display_title}"))
+            .unwrap_or(display_title);
+        let collection_source_path = format!(
+            "difference://{}/{}/{}",
+            parent,
+            author.as_deref().unwrap_or("unattributed"),
+            title
+        );
         video_collection::ActiveModel {
             id: Set(collection_id.clone()),
             library_id: Set(library.id.clone()),
-            title: Set(title),
-            source_path: Set(source_path),
+            title: Set(collection_title),
+            source_path: Set(collection_source_path),
             collection_type: Set("difference".to_owned()),
             default_video_asset_id: Set(default_video_asset_id),
             created_at: Set(now),
@@ -463,12 +521,12 @@ async fn rebuild_difference_video_collections(
         }
         .insert(&txn)
         .await?;
-        for (sort_order, video_asset_id) in members {
+        for (sort_order, video_asset_id) in members.values().enumerate() {
             video_collection_member::ActiveModel {
                 id: Set(Uuid::new_v4().to_string()),
                 collection_id: Set(collection_id.clone()),
-                video_asset_id: Set(video_asset_id),
-                sort_order: Set(sort_order),
+                video_asset_id: Set(video_asset_id.clone()),
+                sort_order: Set(sort_order as i32),
                 created_at: Set(now),
             }
             .insert(&txn)
@@ -627,26 +685,47 @@ async fn mark_missing_library_files(
 
 #[cfg(test)]
 mod video_collection_tests {
-    use super::{difference_member_order, source_parent_and_title};
+    use super::{difference_group_identity, difference_group_key, difference_group_name};
 
     #[test]
-    fn recognizes_only_difference_collection_member_names() {
-        assert_eq!(difference_member_order("video.mp4"), Some(0));
-        assert_eq!(difference_member_order("VIDEO2.mkv"), Some(2));
-        assert_eq!(difference_member_order("video15.webm"), Some(15));
-        assert_eq!(difference_member_order("其他视频.mp4"), None);
-        assert_eq!(difference_member_order("video-edit.mp4"), None);
-        assert_eq!(difference_member_order("video1-copy.mp4"), None);
+    fn keeps_same_normalized_title_in_separate_parent_directories() {
+        let dir1_video = difference_group_identity("D:/SAVE/dir1/video.mp4", "video.mp4");
+        let dir1_video1 = difference_group_identity("D:/SAVE/dir1/video1.mp4", "video1.mp4");
+        let dir2_video = difference_group_identity("D:/SAVE/dir2/video.mp4", "video.mp4");
+        let dir2_video2 = difference_group_identity("D:/SAVE/dir2/video2.mp4", "video2.mp4");
+
+        assert_eq!(dir1_video, dir1_video1);
+        assert_eq!(dir2_video, dir2_video2);
+        assert_ne!(dir1_video, dir2_video);
+        assert_eq!(
+            difference_group_key("video.mp4"),
+            Some((None, "video".to_owned()))
+        );
     }
 
     #[test]
-    fn derives_collection_title_from_parent_directory() {
+    fn normalizes_optional_author_and_known_video_variants() {
         assert_eq!(
-            source_parent_and_title("D:/SAVE/Test/AuditPool/去海的那一天/video.mp4"),
+            difference_group_name("[Aries] 2B & 9S - YoRHa Bunker (4K).mp4"),
             Some((
-                "D:/SAVE/Test/AuditPool/去海的那一天".to_owned(),
-                "去海的那一天".to_owned(),
+                Some("Aries".to_owned()),
+                "2B & 9S - YoRHa Bunker".to_owned(),
             ))
+        );
+        assert_eq!(
+            difference_group_key("[Aries] 2B & 9S - YoRHa Bunker (4K).mp4"),
+            Some((
+                Some("aries".to_owned()),
+                "2b & 9s - yorha bunker".to_owned(),
+            ))
+        );
+        assert_eq!(
+            difference_group_key("[Aries] 2B & 9S - YoRHa Bunker [WM].mp4"),
+            difference_group_key("[Aries] 2B & 9S - YoRHa Bunker (4K).mp4")
+        );
+        assert_eq!(
+            difference_group_key("[Erovirus] 2025 ToSaveMankind Complete Custom Outfit.mp4"),
+            difference_group_key("[Erovirus] 2025 ToSaveMankind Complete Original Outfit.mp4")
         );
     }
 }

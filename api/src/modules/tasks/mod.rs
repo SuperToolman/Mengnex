@@ -21,4 +21,5 @@ pub fn routes() -> Router<AppState> {
         .route("/api/tasks/{id}/pause", post(handlers::pause_task))
         .route("/api/tasks/{id}/resume", post(handlers::resume_task))
         .route("/api/tasks/{id}/cancel", post(handlers::cancel_task))
+        .route("/api/tasks/{id}/retry", post(handlers::retry_task))
 }

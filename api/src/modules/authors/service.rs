@@ -30,15 +30,24 @@ fn strip_leading_group(value: &str) -> Option<&str> {
         .strip_prefix(open)
         .map(|_| &value[end + close.len_utf8()..])
 }
-pub async fn link_author(
+pub async fn link_author_for_resource(
     txn: &DatabaseTransaction,
     title: &str,
+    resource_type: &str,
     resource_id: &str,
 ) -> Result<(), ApiError> {
     let Some(name) = leading_author(title) else {
         return Ok(());
     };
-    link_author_name(txn, name, "manga_series", resource_id).await
+    link_author_name(txn, name, resource_type, resource_id).await
+}
+
+pub async fn link_author(
+    txn: &DatabaseTransaction,
+    title: &str,
+    resource_id: &str,
+) -> Result<(), ApiError> {
+    link_author_for_resource(txn, title, "manga_series", resource_id).await
 }
 
 pub async fn link_author_name(

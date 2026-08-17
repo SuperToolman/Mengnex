@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{get, post, put},
+    routing::{delete, get, put},
 };
 
 use crate::core::app::AppState;
@@ -18,10 +18,6 @@ pub fn routes() -> Router<AppState> {
         .route("/api/videos/{id}/poster", get(handlers::get_poster))
         .route(
             "/api/videos/covers/{library_id}",
-            post(handlers::start_cover_generation).delete(handlers::delete_covers),
-        )
-        .route(
-            "/api/videos/analyze/{library_id}",
-            post(handlers::start_analysis),
+            delete(handlers::delete_covers),
         )
 }

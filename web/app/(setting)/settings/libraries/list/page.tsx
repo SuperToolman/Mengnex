@@ -30,15 +30,13 @@ import {
 } from "@heroui/react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { Key } from "@heroui/react";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
     createMediaLibrary,
     deleteLibraryPreviews,
     deleteVideoCovers,
     deleteMediaLibrary,
-    generateVideoCovers,
     generateLibraryPreviews,
-    startVideoAnalysis,
     getMediaLibraries,
     getLibraryCovers,
     getMangaSeries,
@@ -74,13 +72,7 @@ type CreateFormState = {
     previewsEnabled: boolean;
 };
 
-type LibrarySettingsFormState = {
-    name: string;
-    sourceType: LibrarySource;
-    rootPath: string;
-    webdavConnectionId: string;
-    previewsEnabled: boolean;
-};
+type LibrarySettingsFormState = CreateFormState;
 
 type SelectOption<T extends string> = {
     value: T;
@@ -134,9 +126,13 @@ const initialCreateForm: CreateFormState = {
     previewsEnabled: true,
 };
 
+const initialSettingsForm: LibrarySettingsFormState = {
+    ...initialCreateForm,
+};
+
 const videoCollectionTypeOptions: SelectOption<"normal" | "difference">[] = [
     { value: "normal", label: "普通集合", description: "预留模式，本阶段不执行归组", icon: Filmstrip },
-    { value: "difference", label: "差异视频集合", description: "同一时间轴下切换不同视频版本", icon: Filmstrip },
+    { value: "difference", label: "差异视频集合", description: "同一标题下切换不同视频成员", icon: Filmstrip },
 ];
 
 const videoFormatOptions = [
@@ -223,14 +219,6 @@ function VideoFormatAutocomplete({
     );
 }
 
-const initialSettingsForm: LibrarySettingsFormState = {
-    name: "",
-    sourceType: "local",
-    rootPath: "",
-    webdavConnectionId: "",
-    previewsEnabled: true,
-};
-
 function getErrorMessage(error: unknown) {
     if (error instanceof Error) {
         return error.message;
@@ -304,25 +292,28 @@ function SelectField<T extends string>({
     options,
     onSelectionChange,
     optionLayout = "list",
+    isDisabled = false,
 }: {
     label: string;
     selectedKey: T;
     options: SelectOption<T>[];
     onSelectionChange: (value: T) => void;
     optionLayout?: "list" | "grid";
+    isDisabled?: boolean;
 }) {
     return (
         <label className="block">
             <span className={fieldLabelClass}>{label}</span>
             <Select.Root
                 selectedKey={selectedKey}
+                isDisabled={isDisabled}
                 onSelectionChange={(key) => {
                     if (key !== null && key !== undefined) {
                         onSelectionChange(String(key) as T);
                     }
                 }}
             >
-                <Select.Trigger aria-label={label} className={selectTriggerClass}>
+                <Select.Trigger aria-label={label} className={`${selectTriggerClass} ${isDisabled ? "cursor-not-allowed opacity-70" : ""}`}>
                     <Select.Value className="min-w-0 truncate text-left text-foreground" />
                     <Select.Indicator>
                         <ChevronDown className="h-4 w-4 text-muted" />
@@ -421,7 +412,7 @@ function SettingSwitch({
     );
 }
 
-function CacheSetting({
+function MediaInfoSetting({
     value,
     onChange,
     description,
@@ -432,12 +423,78 @@ function CacheSetting({
 }) {
     return (
         <SettingSwitch
-            title="生成浏览缓存"
+            title="自动生成媒体信息"
             value={value}
             onChange={onChange}
             description={description}
         />
     );
+}
+
+function LibraryModal({
+    state,
+    triggerLabel,
+    children,
+    dialogClassName,
+}: {
+    state: ReturnType<typeof useOverlayState>;
+    triggerLabel: string;
+    children: ReactNode;
+    dialogClassName: string;
+}) {
+    return (
+        <Modal state={state}>
+            <Modal.Trigger aria-label={triggerLabel} className="sr-only">
+                <button type="button" aria-label={triggerLabel} />
+            </Modal.Trigger>
+            <Modal.Backdrop isDismissable variant="blur" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <Modal.Container placement="center" className="max-h-[calc(100dvh-32px)]">
+                    <Modal.Dialog className={dialogClassName}>{children}</Modal.Dialog>
+                </Modal.Container>
+            </Modal.Backdrop>
+        </Modal>
+    );
+}
+
+function LibraryFormFields({
+    form,
+    webdavConnections,
+    onChange,
+    onMediaTypeChange,
+    isMediaTypeEditable,
+}: {
+    form: CreateFormState;
+    webdavConnections: WebdavConnectionResponse[];
+    onChange: (key: keyof CreateFormState, value: CreateFormState[keyof CreateFormState]) => void;
+    onMediaTypeChange: (mediaType: MediaType) => void;
+    isMediaTypeEditable: boolean;
+}) {
+    return <>
+        <section className={createSectionClass}>
+            <div><h3 className="text-sm font-semibold text-foreground">基本设置</h3><p className="mt-1 text-xs leading-5 text-muted">设置媒体库的名称、内容类型与媒体来源。</p></div>
+            <div className="grid gap-4 md:grid-cols-2">
+                <TextInputField label="媒体库名称" value={form.name} placeholder="例如：家庭照片" onChange={(value) => onChange("name", value)} />
+                <SelectField label="媒体类型" selectedKey={form.mediaType} options={mediaTypeOptions} optionLayout="grid" isDisabled={!isMediaTypeEditable} onSelectionChange={onMediaTypeChange} />
+            </div>
+            {form.sourceType === "local" ? <div className="grid gap-4 md:grid-cols-2">
+                <SelectField label="媒体源" selectedKey={form.sourceType} options={sourceTypeOptions} onSelectionChange={(value) => onChange("sourceType", value)} />
+                <TextInputField label="本地绝对路径" value={form.rootPath} placeholder="例如：D:\\Media\\Photos" onChange={(value) => onChange("rootPath", value)} />
+            </div> : <div className="space-y-4"><div className="grid gap-4 md:grid-cols-3">
+                <SelectField label="媒体源" selectedKey={form.sourceType} options={sourceTypeOptions} onSelectionChange={(value) => onChange("sourceType", value)} />
+                <SelectField label="WebDAV 连接" selectedKey={form.webdavServerId} options={webdavConnections.map((connection) => ({ value: connection.id, label: connection.name, description: connection.url, icon: CloudGear }))} onSelectionChange={(value) => onChange("webdavServerId", value)} />
+                <TextInputField label="WebDAV 路径" value={form.webdavPath} placeholder="例如：/media/photos" onChange={(value) => onChange("webdavPath", value)} />
+            </div><p className="text-xs leading-5 text-muted">路径相对于所选连接的地址拼接；填写 <code>/</code> 扫描连接根目录。</p></div>}
+        </section>
+        {form.mediaType === "video" ? <section className={createSectionClass}>
+            <div><h3 className="text-sm font-semibold text-foreground">视频专属设置</h3><p className="mt-1 text-xs leading-5 text-muted">配置视频文件识别范围与目录集合规则。</p></div>
+            <div className="space-y-2"><p className={fieldLabelClass}>扫描媒体格式</p><VideoFormatAutocomplete value={form.scanExtensions} onChange={(value) => onChange("scanExtensions", value)} /><p className="text-xs leading-5 text-muted">扫描时只索引选中的视频容器格式。</p></div>
+            <div className="space-y-3"><p className={fieldLabelClass}>视频集合</p><SettingSwitch title="启用视频集合" value={form.collectionsEnabled} onChange={(value) => onChange("collectionsEnabled", value)} description="开启后，扫描器会按选择的集合规则归组视频。" />{form.collectionsEnabled ? <SelectField label="媒体集合类型" selectedKey={form.collectionType} options={videoCollectionTypeOptions} onSelectionChange={(value) => onChange("collectionType", value)} /> : null}</div>
+        </section> : null}
+        <section className={createSectionClass}>
+            <div><h3 className="text-sm font-semibold text-foreground">扫描与媒体信息</h3><p className="mt-1 text-xs leading-5 text-muted">控制每次扫描完成后的媒体信息生成行为。</p></div>
+            <MediaInfoSetting value={form.previewsEnabled} onChange={(value) => onChange("previewsEnabled", value)} description={form.mediaType === "video" ? "开启后，每次扫描完成都会读取视频技术信息，并为缺少封面的影片生成浏览封面。" : "开启后，该媒体库每次扫描完成都会自动补齐预览图缓存。"} />
+        </section>
+    </>;
 }
 
 export default function MediaLibrariesPage() {
@@ -636,7 +693,12 @@ async function loadPageData() {
             name: library.name,
             sourceType: library.source_type === "webdav" ? "webdav" : "local",
             rootPath: library.root_path,
-            webdavConnectionId: library.webdav_connection_id ?? "",
+            webdavServerId: library.webdav_connection_id ?? "",
+            webdavPath: library.root_path,
+            mediaType: library.media_type as MediaType,
+            scanExtensions: library.scan_extensions,
+            collectionsEnabled: library.collections_enabled,
+            collectionType: library.collection_type === "difference" ? "difference" : "normal",
             previewsEnabled: library.previews_enabled,
         });
         settingsModalState.open();
@@ -701,8 +763,8 @@ async function loadPageData() {
 
                 toast.success(
                     createForm.previewsEnabled
-                        ? "媒体库已创建，首次扫描任务已启动，后续扫描会自动补齐浏览缓存。"
-                        : "媒体库已创建，首次扫描任务已启动；缓存自动生成未开启，可稍后手动生成。",
+                        ? "媒体库已创建，首次扫描任务已启动，后续扫描会自动补齐媒体信息。"
+                        : "媒体库已创建，首次扫描任务已启动；自动生成媒体信息未开启，可稍后手动生成。",
                 );
                 setCreateForm(initialCreateForm);
                 createModalState.close();
@@ -730,40 +792,10 @@ async function loadPageData() {
         try {
             setWorkingLibraryId(library.id);
             await generateLibraryPreviews(library.id);
-            toast.success(`已为“${library.name}”创建缓存生成任务，请到任务页查看进度。`);
+            toast.success(`已为“${library.name}”创建媒体信息生成任务，请到任务页查看进度。`);
             await loadPageData();
         } catch (generateError) {
             toast.danger(getErrorMessage(generateError));
-        } finally {
-            setWorkingLibraryId(null);
-        }
-    }
-
-    async function startVideoAnalysisTask(library: LibraryResponse) {
-        try {
-            setWorkingLibraryId(library.id);
-            await startVideoAnalysis(library.id);
-            toast.success(`已为“${library.name}”创建视频技术信息读取任务，请到任务页查看进度。`);
-            await loadPageData();
-        } catch (analysisError) {
-            toast.danger(getErrorMessage(analysisError));
-        } finally {
-            setWorkingLibraryId(null);
-        }
-    }
-
-    async function startVideoCoverTask(library: LibraryResponse, force: boolean) {
-        try {
-            setWorkingLibraryId(library.id);
-            await generateVideoCovers(library.id, force);
-            toast.success(
-                force
-                    ? `已为“${library.name}”创建封面重新生成任务，请到任务页查看进度。`
-                    : `已为“${library.name}”创建封面生成任务，请到任务页查看进度。`,
-            );
-            await loadPageData();
-        } catch (coverError) {
-            toast.danger(getErrorMessage(coverError));
         } finally {
             setWorkingLibraryId(null);
         }
@@ -775,14 +807,16 @@ async function loadPageData() {
         }
 
         const name = settingsForm.name.trim();
-        const rootPath = settingsForm.rootPath.trim();
+        const rootPath = settingsForm.sourceType === "webdav"
+            ? settingsForm.webdavPath.trim()
+            : settingsForm.rootPath.trim();
 
         if (!name || (settingsForm.sourceType === "local" && !rootPath)) {
             toast.warning("媒体库名称和路径不能为空。");
             return;
         }
 
-        if (settingsForm.sourceType === "webdav" && !settingsForm.webdavConnectionId) {
+        if (settingsForm.sourceType === "webdav" && !settingsForm.webdavServerId) {
             toast.warning("请选择 WebDAV 连接。");
             return;
         }
@@ -794,7 +828,12 @@ async function loadPageData() {
                     root_path: rootPath,
                     previews_enabled: settingsForm.previewsEnabled,
                     source_type: settingsForm.sourceType,
-                    webdav_connection_id: settingsForm.sourceType === "webdav" ? settingsForm.webdavConnectionId : undefined,
+                    webdav_connection_id: settingsForm.sourceType === "webdav" ? settingsForm.webdavServerId : undefined,
+                    scan_extensions: settingsForm.mediaType === "video" ? settingsForm.scanExtensions : undefined,
+                    collections_enabled: settingsForm.mediaType === "video" ? settingsForm.collectionsEnabled : undefined,
+                    collection_type: settingsForm.mediaType === "video" && settingsForm.collectionsEnabled
+                        ? settingsForm.collectionType
+                        : undefined,
                 });
                 settingsModalState.close();
                 toast.success("媒体库设置已更新。");
@@ -873,8 +912,6 @@ async function loadPageData() {
                                         })
                                     }
                                     onGeneratePreviews={() => void startGenerateTask(library)}
-                                    onAnalyzeVideos={() => void startVideoAnalysisTask(library)}
-                                    onRegenerateVideoCovers={() => void startVideoCoverTask(library, true)}
                                     onDeletePreviews={() =>
                                         runLibraryAction(library.id, async () => {
                                             if (["video", "mixed_video"].includes(library.media_type)) {
@@ -910,20 +947,11 @@ async function loadPageData() {
                 )}
             </div>
 
-            <Modal state={createModalState}>
-                <Modal.Trigger aria-label="打开新建媒体库对话框" className="sr-only">
-                    <button type="button" aria-label="打开新建媒体库对话框" />
-                </Modal.Trigger>
-                <Modal.Backdrop
-                    isDismissable
-                    variant="blur"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                >
-                    <Modal.Container
-                        placement="center"
-                        className="max-h-[calc(100dvh-32px)]"
-                    >
-                        <Modal.Dialog className="!w-[min(900px,calc(100vw-32px))] !max-w-[900px] flex max-h-[calc(100dvh-32px)] flex-col overflow-hidden border border-[var(--border)] p-0 outline-none">
+            <LibraryModal
+                state={createModalState}
+                triggerLabel="打开新建媒体库对话框"
+                dialogClassName="!w-[min(900px,calc(100vw-32px))] !max-w-[900px] flex max-h-[calc(100dvh-32px)] flex-col overflow-hidden border border-[var(--border)] p-0 outline-none"
+            >
                             <Modal.Header className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-5">
                                 <div className="min-w-0">
                                     <Modal.Heading className="text-lg font-semibold text-foreground">
@@ -941,151 +969,7 @@ async function loadPageData() {
                                 </Modal.CloseTrigger>
                             </Modal.Header>
                             <Modal.Body className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
-                                <section className={createSectionClass}>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-foreground">基本设置</h3>
-                                        <p className="mt-1 text-xs leading-5 text-muted">设置媒体库的名称、内容类型与媒体来源。</p>
-                                    </div>
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <TextInputField
-                                            label="媒体库名称"
-                                            value={createForm.name}
-                                            placeholder="例如：家庭照片"
-                                            onChange={(value) => updateCreateForm("name", value)}
-                                        />
-                                        <SelectField
-                                            label="媒体类型"
-                                            selectedKey={createForm.mediaType}
-                                            options={mediaTypeOptions}
-                                            optionLayout="grid"
-                                            onSelectionChange={updateCreateMediaType}
-                                        />
-                                    </div>
-                                    {createForm.mediaType === "manga" ? (
-                                        <div className="rounded-xl border border-sky-300/30 bg-sky-500/10 px-4 py-3 text-sm leading-6 text-muted">
-                                            图片父目录默认识别为单篇漫画。目录名包含“第…章 / 话 / 节”、Chapter 或 Ch. 时，该目录识别为章节，其上一级目录识别为漫画标题。仅扫描图片目录。
-                                        </div>
-                                    ) : null}
-                                    {createForm.sourceType === "local" ? (
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <SelectField
-                                                label="媒体源"
-                                                selectedKey={createForm.sourceType}
-                                                options={sourceTypeOptions}
-                                                onSelectionChange={(value) =>
-                                                    updateCreateForm("sourceType", value)
-                                                }
-                                            />
-                                            <TextInputField
-                                                label="本地绝对路径"
-                                                value={createForm.rootPath}
-                                                placeholder="例如：D:\\Media\\Photos"
-                                                onChange={(value) => updateCreateForm("rootPath", value)}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <div className="grid gap-4 md:grid-cols-3">
-                                                <SelectField
-                                                    label="媒体源"
-                                                    selectedKey={createForm.sourceType}
-                                                    options={sourceTypeOptions}
-                                                    onSelectionChange={(value) =>
-                                                        updateCreateForm("sourceType", value)
-                                                    }
-                                                />
-                                                <SelectField
-                                                    label="WebDAV 连接"
-                                                    selectedKey={createForm.webdavServerId}
-                                                    options={webdavConnections.map((connection) => ({ value: connection.id, label: connection.name, description: connection.url, icon: CloudGear }))}
-                                                    onSelectionChange={(value) =>
-                                                        updateCreateForm("webdavServerId", value)
-                                                    }
-                                                />
-                                                <TextInputField
-                                                    label="WebDAV 路径"
-                                                    value={createForm.webdavPath}
-                                                    placeholder="例如：/media/photos"
-                                                    onChange={(value) =>
-                                                        updateCreateForm("webdavPath", value)
-                                                    }
-                                                />
-                                            </div>
-                                            <p className="text-xs leading-5 text-muted">
-                                                路径相对于所选连接的地址拼接；填写 <code>/</code> 扫描连接根目录，填写 <code>/media/photos</code> 扫描该子目录。不能填写本机绝对路径或另一个 URL。
-                                            </p>
-                                            {webdavConnections.length === 0 ? <div className="rounded-xl border border-amber-400/25 bg-amber-500/12 px-4 py-3 text-sm text-amber-700 dark:text-amber-100">请先在“远程数据源”中添加 WebDAV 连接。</div> : null}
-                                        </div>
-                                    )}
-                                </section>
-
-                                {createForm.mediaType === "video" ? (
-                                    <section className={createSectionClass}>
-                                        <div>
-                                            <h3 className="text-sm font-semibold text-foreground">视频专属设置</h3>
-                                            <p className="mt-1 text-xs leading-5 text-muted">配置视频文件识别范围与目录集合规则。</p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <p className={fieldLabelClass}>扫描媒体格式</p>
-                                            <VideoFormatAutocomplete
-                                                value={createForm.scanExtensions}
-                                                onChange={(value) => updateCreateForm("scanExtensions", value)}
-                                            />
-                                            <p className="text-xs leading-5 text-muted">
-                                                扫描时只索引选中的视频容器格式；默认已选择常用格式。
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <p className={fieldLabelClass}>视频集合</p>
-                                            <SettingSwitch
-                                                title="启用视频集合"
-                                                value={createForm.collectionsEnabled}
-                                                onChange={(value) => updateCreateForm("collectionsEnabled", value)}
-                                                description="默认关闭。开启后，扫描器会按选择的集合规则归组视频。"
-                                            />
-                                            {createForm.collectionsEnabled ? (
-                                                <div className="space-y-4 border-l-2 border-border pl-4">
-                                                    <SelectField
-                                                        label="媒体集合类型"
-                                                        selectedKey={createForm.collectionType}
-                                                        options={videoCollectionTypeOptions}
-                                                        onSelectionChange={(value) => updateCreateForm("collectionType", value)}
-                                                    />
-                                                    {createForm.collectionType === "normal" ? (
-                                                        <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
-                                                            普通集合为预留模式，本阶段保存该设置但不会执行视频归组。
-                                                        </div>
-                                                    ) : (
-                                                        <div className="rounded-xl border border-sky-300/30 bg-sky-500/10 px-4 py-3 text-xs leading-6 text-muted">
-                                                            <p className="font-medium text-foreground">差异视频集合扫描规则</p>
-                                                            <p className="mt-1">递归扫描目录；同一目录至少存在两个名称为 <code>video.ext</code> 或 <code>video数字.ext</code> 的视频时，将这些匹配项识别为一个集合。</p>
-                                                            <p><code>video.ext</code> 优先作为默认播放视频，其他成员按文件名数字排序；集合标题使用目录名。</p>
-                                                            <p>同目录中不符合命名规则的视频不会加入集合，仍作为独立视频展示。</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </section>
-                                ) : null}
-
-                                <section className={createSectionClass}>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-foreground">扫描与缓存</h3>
-                                        <p className="mt-1 text-xs leading-5 text-muted">控制每次扫描完成后的缓存生成行为。</p>
-                                    </div>
-                                    <CacheSetting
-                                        value={createForm.previewsEnabled}
-                                        onChange={(value) =>
-                                            updateCreateForm("previewsEnabled", value)
-                                        }
-                                        description={createForm.mediaType === "video"
-                                            ? "开启后，每次扫描完成都会自动使用 FFmpeg 抽取视频封面，并保存到 api/data/preview/媒体库ID。"
-                                            : "开启后，该媒体库每次扫描完成都会自动补齐预览图缓存。"}
-                                    />
-                                </section>
+                                <LibraryFormFields form={createForm} webdavConnections={webdavConnections} onChange={updateCreateForm} onMediaTypeChange={updateCreateMediaType} isMediaTypeEditable />
                             </Modal.Body>
                             <Modal.Footer className="flex shrink-0 justify-end gap-3 border-t border-border px-6 py-5">
                                 <Button
@@ -1103,81 +987,23 @@ async function loadPageData() {
                                     {isSubmitting ? "创建中..." : "创建并扫描"}
                                 </Button>
                             </Modal.Footer>
-                        </Modal.Dialog>
-                    </Modal.Container>
-                </Modal.Backdrop>
-            </Modal>
+            </LibraryModal>
 
-            <Modal state={settingsModalState}>
-                <Modal.Trigger aria-label="打开媒体库设置对话框" className="sr-only">
-                    <button type="button" aria-label="打开媒体库设置对话框" />
-                </Modal.Trigger>
-                <Modal.Backdrop
-                    isDismissable
-                    variant="blur"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                >
-                    <Modal.Container placement="center" className={modalSurfaceClass}>
-                        <Modal.Dialog className="outline-none">
+            <LibraryModal
+                state={settingsModalState}
+                triggerLabel="打开媒体库设置对话框"
+                dialogClassName="!w-[min(900px,calc(100vw-32px))] !max-w-[900px] flex max-h-[calc(100dvh-32px)] flex-col overflow-hidden border border-[var(--border)] p-0 outline-none"
+            >
                             <Modal.Header className="border-b border-border px-6 py-5">
                                 <Modal.Heading className="text-lg font-semibold text-foreground">
                                     媒体库设置
                                 </Modal.Heading>
                                 <p className="mt-1 text-sm text-muted">
-                                    修改媒体库名称、路径和缓存生成策略。
+                                    修改媒体库名称、路径和媒体信息生成策略。
                                 </p>
                             </Modal.Header>
-                            <Modal.Body className="space-y-5 px-6 py-5">
-                                <TextInputField
-                                    label="媒体库名称"
-                                    value={settingsForm.name}
-                                    placeholder="请输入媒体库名称"
-                                    onChange={(value) => updateSettingsForm("name", value)}
-                                />
-                                <SelectField
-                                    label="媒体源"
-                                    selectedKey={settingsForm.sourceType}
-                                    options={sourceTypeOptions}
-                                    onSelectionChange={(value) => updateSettingsForm("sourceType", value)}
-                                />
-                                {settingsForm.sourceType === "local" ? (
-                                    <TextInputField
-                                        label="本地绝对路径"
-                                        value={settingsForm.rootPath}
-                                        placeholder="例如：D:\\Media\\Photos"
-                                        onChange={(value) => updateSettingsForm("rootPath", value)}
-                                    />
-                                ) : (
-                                    <div className="space-y-3">
-                                        <SelectField
-                                            label="WebDAV 连接"
-                                            selectedKey={settingsForm.webdavConnectionId}
-                                            options={webdavConnections.map((connection) => ({ value: connection.id, label: connection.name, description: connection.url, icon: CloudGear }))}
-                                            onSelectionChange={(value) => updateSettingsForm("webdavConnectionId", value)}
-                                        />
-                                        <TextInputField
-                                            label="WebDAV 路径"
-                                            value={settingsForm.rootPath}
-                                            placeholder="/ 或 /media/photos"
-                                            onChange={(value) => updateSettingsForm("rootPath", value)}
-                                        />
-                                        <p className="text-xs leading-5 text-muted">
-                                            路径相对于所选连接的地址拼接；<code>/</code> 为连接根目录。
-                                        </p>
-                                    </div>
-                                )}
-                                <div className="space-y-3">
-                                    <p className={fieldLabelClass}>媒体库设置</p>
-                                    <CacheSetting
-                                        value={settingsForm.previewsEnabled}
-                                        onChange={(value) =>
-                                            updateSettingsForm("previewsEnabled", value)
-                                        }
-                                        description={editingLibrary?.media_type === "video"
-                                            ? "每次扫描完成后，自动使用 FFmpeg 抽取视频封面并写入视频封面缓存。"
-                                            : "每次扫描完成后，自动为该媒体库补齐预览图缓存。"}
-                                    />
-                                </div>
+                            <Modal.Body className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
+                                <LibraryFormFields form={settingsForm} webdavConnections={webdavConnections} onChange={updateSettingsForm} onMediaTypeChange={() => undefined} isMediaTypeEditable={false} />
                             </Modal.Body>
                             <Modal.Footer className="flex justify-end gap-3 border-t border-border px-6 py-5">
                                 <Modal.CloseTrigger aria-label="关闭" className="rounded-xl p-2 text-muted transition hover:bg-white/10">
@@ -1191,10 +1017,7 @@ async function loadPageData() {
                                     {isSavingSettings ? "保存中..." : "保存设置"}
                                 </Button>
                             </Modal.Footer>
-                        </Modal.Dialog>
-                    </Modal.Container>
-                </Modal.Backdrop>
-            </Modal>
+            </LibraryModal>
 
             <Modal state={infoModalState}>
                 <Modal.Trigger aria-label="打开媒体库信息对话框" className="sr-only">

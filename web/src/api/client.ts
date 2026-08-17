@@ -42,6 +42,7 @@ import {
     purgeItem,
     restoreItem,
     resumeTask as resumeTaskSdk,
+    retryTask as retryTaskSdk,
     setup as setupSdk,
     replaceResourceTags,
     startScan,
@@ -233,7 +234,10 @@ export async function getResourceTags(resourceType: string, resourceId: string) 
 export async function replaceTagsForResource(resourceType: string, resourceId: string, tagIds: string[]) {
     return execute(replaceResourceTags({ ...sdkOptions, path: { resource_type: resourceType, resource_id: resourceId }, body: { tag_ids: tagIds } }));
 }
-export async function getAuthor(authorId: string) { return execute(getAuthorSdk({ ...sdkOptions, path: { id: authorId } })); }
+export async function getAuthor(authorId: string) {
+    const author = await execute(getAuthorSdk({ ...sdkOptions, path: { id: authorId } }));
+    return { ...author, avatar_src: toAbsoluteUrl(author.avatar_src) };
+}
 export async function uploadAuthorAvatar(authorId: string, file: File) {
     const response = await fetch(`${API_BASE_URL}/api/authors/${authorId}/avatar`, {
         method: "PUT",
@@ -329,6 +333,10 @@ export async function resumeTask(taskId: string) {
     return execute(resumeTaskSdk({ ...sdkOptions, path: { id: taskId } }));
 }
 
+export async function retryTask(taskId: string) {
+    return execute(retryTaskSdk({ ...sdkOptions, path: { id: taskId } }));
+}
+
 export async function cancelTask(taskId: string) {
     return execute(cancelTaskSdk({ ...sdkOptions, path: { id: taskId } }));
 }
@@ -401,29 +409,6 @@ export async function getVideo(id: string) {
 
 export async function updateVideoPlayback(id: string, body: UpdateVideoPlaybackRequest) {
     return execute(updateVideoPlaybackSdk({ ...sdkOptions, path: { id }, body }));
-}
-
-export async function startVideoAnalysis(libraryId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/videos/analyze/${libraryId}`, {
-        method: "POST",
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error((await response.json().catch(() => null))?.message ?? "无法创建视频分析任务");
-    }
-    return response.json() as Promise<TaskResponse>;
-}
-
-export async function generateVideoCovers(libraryId: string, force = false) {
-    const query = new URLSearchParams({ force: String(force) });
-    const response = await fetch(`${API_BASE_URL}/api/videos/covers/${libraryId}?${query}`, {
-        method: "POST",
-        credentials: "include",
-    });
-    if (!response.ok) {
-        throw new Error((await response.json().catch(() => null))?.message ?? "无法创建视频封面任务");
-    }
-    return response.json() as Promise<TaskResponse>;
 }
 
 export async function deleteVideoCovers(libraryId: string) {

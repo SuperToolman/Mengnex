@@ -11,9 +11,9 @@ use sea_orm::{
 use crate::{
     core::{app::AppState, error::ApiError},
     infra::entities::{
-        app_task, manga_series, media_file, media_item, media_library, photo_asset, scan_task,
-        video_asset, video_collection, video_collection_member, video_playback_state,
-        webdav_connection,
+        app_task, author_resource, manga_chapter, manga_page, manga_series, media_file, media_item,
+        media_library, photo_asset, scan_task, tag_resource, video_asset, video_collection,
+        video_collection_member, video_playback_state, webdav_connection,
     },
     modules::{
         auth::service::CurrentUser,
@@ -465,6 +465,20 @@ pub async fn delete_library(
         .into_iter()
         .map(|asset| asset.id)
         .collect::<Vec<_>>();
+    let library_photo_ids = photo_asset::Entity::find()
+        .filter(photo_asset::Column::LibraryId.eq(library.id.clone()))
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .map(|asset| asset.id)
+        .collect::<Vec<_>>();
+    let library_manga_ids = manga_series::Entity::find()
+        .filter(manga_series::Column::LibraryId.eq(library.id.clone()))
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .map(|series| series.id)
+        .collect::<Vec<_>>();
     let txn = state.db.begin().await?;
     let collection_ids = video_collection::Entity::find()
         .filter(video_collection::Column::LibraryId.eq(library.id.clone()))
@@ -487,6 +501,53 @@ pub async fn delete_library(
         .filter(photo_asset::Column::LibraryId.eq(library.id.clone()))
         .exec(&txn)
         .await?;
+    if !library_manga_ids.is_empty() {
+        author_resource::Entity::delete_many()
+            .filter(author_resource::Column::ResourceType.eq("manga_series"))
+            .filter(author_resource::Column::ResourceId.is_in(library_manga_ids.clone()))
+            .exec(&txn)
+            .await?;
+        tag_resource::Entity::delete_many()
+            .filter(tag_resource::Column::ResourceType.eq("manga_series"))
+            .filter(tag_resource::Column::ResourceId.is_in(library_manga_ids.clone()))
+            .exec(&txn)
+            .await?;
+        let chapter_ids = manga_chapter::Entity::find()
+            .filter(manga_chapter::Column::SeriesId.is_in(library_manga_ids.clone()))
+            .all(&txn)
+            .await?
+            .into_iter()
+            .map(|chapter| chapter.id)
+            .collect::<Vec<_>>();
+        if !chapter_ids.is_empty() {
+            manga_page::Entity::delete_many()
+                .filter(manga_page::Column::ChapterId.is_in(chapter_ids.clone()))
+                .exec(&txn)
+                .await?;
+            manga_chapter::Entity::delete_many()
+                .filter(manga_chapter::Column::Id.is_in(chapter_ids))
+                .exec(&txn)
+                .await?;
+        }
+        manga_series::Entity::delete_many()
+            .filter(manga_series::Column::Id.is_in(library_manga_ids))
+            .exec(&txn)
+            .await?;
+    }
+    if !library_photo_ids.is_empty() {
+        author_resource::Entity::delete_many()
+            .filter(author_resource::Column::ResourceType.eq("photo_asset"))
+            .filter(author_resource::Column::ResourceId.is_in(library_photo_ids))
+            .exec(&txn)
+            .await?;
+    }
+    if !library_video_ids.is_empty() {
+        author_resource::Entity::delete_many()
+            .filter(author_resource::Column::ResourceType.eq("video_asset"))
+            .filter(author_resource::Column::ResourceId.is_in(library_video_ids.clone()))
+            .exec(&txn)
+            .await?;
+    }
     if !library_video_ids.is_empty() {
         video_playback_state::Entity::delete_many()
             .filter(video_playback_state::Column::VideoAssetId.is_in(library_video_ids))
@@ -517,6 +578,15 @@ pub async fn delete_library(
         .exec(&txn)
         .await?;
     txn.commit().await?;
+    let preview_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("data")
+        .join("preview")
+        .join(&library.id);
+    match tokio::fs::remove_dir_all(&preview_dir).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(ApiError::Io(error)),
+    }
 
     Ok(Json(DeleteLibraryResponse { id: library.id }))
 }
@@ -540,7 +610,7 @@ pub async fn generate_library_preview_assets(
         .await?
         .ok_or(ApiError::NotFound("media library"))?;
 
-    let task_model = start_cache_generation(&state.db, library, false).await?;
+    let task_model = start_cache_generation(&state.db, library).await?;
     let task = preview_task_response_from_model(task_model);
 
     Ok(Json(task))
