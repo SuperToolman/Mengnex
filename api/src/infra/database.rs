@@ -8,10 +8,10 @@ use sea_orm::{
 
 use crate::infra::entities::{
     app_setting, app_task, app_user, auth_session, author, author_avatar, author_resource,
-    manga_chapter, manga_page, manga_series, media_file, media_item, media_library, photo_asset,
-    photo_folder, role_permission, scan_task, tag, tag_resource, user_library_permission,
-    video_asset, video_collection, video_collection_member, video_playback_state,
-    webdav_connection,
+    manga_chapter, manga_page, manga_series, media_file, media_item, media_library, novel_book,
+    novel_chapter, novel_reading_state, photo_asset, photo_folder, role_permission, scan_task, tag,
+    tag_resource, user_library_permission, video_asset, video_collection, video_collection_member,
+    video_playback_state, webdav_connection,
 };
 
 pub async fn connect() -> Result<DatabaseConnection, DbErr> {
@@ -25,6 +25,7 @@ pub async fn connect() -> Result<DatabaseConnection, DbErr> {
 
     reset_legacy_schema_if_needed(&db).await?;
     create_tables(&db).await?;
+    rebuild_music_schema(&db).await?;
     normalize_legacy_app_tasks(&db).await?;
     ensure_avatar_directories()?;
     backfill_app_tasks(&db).await?;
@@ -100,6 +101,9 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_table(db, manga_series::Entity).await?;
     create_table(db, manga_chapter::Entity).await?;
     create_table(db, manga_page::Entity).await?;
+    create_table(db, novel_book::Entity).await?;
+    create_table(db, novel_chapter::Entity).await?;
+    create_table(db, novel_reading_state::Entity).await?;
     create_table(db, photo_asset::Entity).await?;
     create_table(db, photo_folder::Entity).await?;
     ensure_schema_columns(db).await?;
@@ -108,6 +112,42 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     ensure_default_app_settings(db).await?;
     ensure_default_role_permissions(db).await?;
 
+    Ok(())
+}
+
+async fn rebuild_music_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
+    for table in [
+        "music_playlist_tracks",
+        "music_playlists",
+        "music_favorites",
+        "music_track_artists",
+        "music_artists",
+        "music_playback_states",
+        "music_tracks",
+        "music_albums",
+    ] {
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            format!("DROP TABLE IF EXISTS {table}"),
+        ))
+        .await?;
+    }
+    for statement in [
+        "CREATE TABLE music_albums (id TEXT PRIMARY KEY NOT NULL, library_id TEXT NOT NULL, title TEXT NOT NULL, normalized_title TEXT NOT NULL, artist TEXT, year INTEGER, cover_rel_path TEXT, track_count BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+        "CREATE TABLE music_tracks (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_id TEXT NOT NULL, library_id TEXT NOT NULL, album_id TEXT, title TEXT NOT NULL, artist TEXT, album_artist TEXT, album_title TEXT, track_number INTEGER, disc_number INTEGER, year INTEGER, duration_seconds DOUBLE, codec TEXT, bitrate_kbps INTEGER, sample_rate_hz INTEGER, bit_depth INTEGER, genre TEXT, composer TEXT, lyricist TEXT, producer TEXT, lyrics TEXT, lyrics_source TEXT, metadata_status TEXT NOT NULL DEFAULT 'pending', metadata_error TEXT, analyzed_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+        "CREATE TABLE music_playback_states (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, music_track_id TEXT NOT NULL, position_seconds DOUBLE NOT NULL DEFAULT 0, completed BOOLEAN NOT NULL DEFAULT 0, last_played_at TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+        "CREATE TABLE music_artists (id TEXT PRIMARY KEY NOT NULL, normalized_name TEXT NOT NULL, display_name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+        "CREATE TABLE music_track_artists (id TEXT PRIMARY KEY NOT NULL, track_id TEXT NOT NULL, artist_id TEXT NOT NULL, role TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0)",
+        "CREATE TABLE music_favorites (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, track_id TEXT NOT NULL, created_at TEXT NOT NULL)",
+        "CREATE TABLE music_playlists (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+        "CREATE TABLE music_playlist_tracks (id TEXT PRIMARY KEY NOT NULL, playlist_id TEXT NOT NULL, track_id TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL)",
+    ] {
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            statement.to_owned(),
+        ))
+        .await?;
+    }
     Ok(())
 }
 
@@ -334,9 +374,27 @@ async fn create_indexes(db: &DatabaseConnection) -> Result<(), DbErr> {
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_kind_status ON app_tasks(kind, status)",
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_status ON app_tasks(status)",
         "CREATE INDEX IF NOT EXISTS idx_app_tasks_updated_at ON app_tasks(updated_at DESC)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_novel_books_file_id ON novel_books(file_id)",
+        "CREATE INDEX IF NOT EXISTS idx_novel_books_library_id ON novel_books(library_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_novel_chapters_book_sequence ON novel_chapters(book_id, sequence)",
+        "CREATE INDEX IF NOT EXISTS idx_novel_reading_states_book_id ON novel_reading_states(book_id)",
         "CREATE INDEX IF NOT EXISTS idx_media_files_library_id ON media_files(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_media_files_full_path ON media_files(full_path)",
         "CREATE INDEX IF NOT EXISTS idx_media_files_library_source_locator ON media_files(library_id, source_locator)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_tracks_file_id ON music_tracks(file_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_artists_normalized_name ON music_artists(normalized_name)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_track_artists_unique ON music_track_artists(track_id, artist_id, role)",
+        "CREATE INDEX IF NOT EXISTS idx_music_track_artists_artist ON music_track_artists(artist_id, position)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_favorites_user_track ON music_favorites(user_id, track_id)",
+        "CREATE INDEX IF NOT EXISTS idx_music_favorites_user_created ON music_favorites(user_id, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_music_playlists_user_updated ON music_playlists(user_id, updated_at DESC)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_playlist_tracks_unique ON music_playlist_tracks(playlist_id, track_id)",
+        "CREATE INDEX IF NOT EXISTS idx_music_playlist_tracks_order ON music_playlist_tracks(playlist_id, position)",
+        "CREATE INDEX IF NOT EXISTS idx_music_tracks_library_album ON music_tracks(library_id, album_id)",
+        "CREATE INDEX IF NOT EXISTS idx_music_tracks_library_title ON music_tracks(library_id, title)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_albums_library_title_artist ON music_albums(library_id, normalized_title, artist)",
+        "CREATE INDEX IF NOT EXISTS idx_music_albums_library_updated ON music_albums(library_id, updated_at DESC)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_music_playback_user_track ON music_playback_states(user_id, music_track_id)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_video_assets_file_id ON video_assets(file_id)",
         "CREATE INDEX IF NOT EXISTS idx_video_assets_library_id ON video_assets(library_id)",
         "CREATE INDEX IF NOT EXISTS idx_video_assets_library_created_at ON video_assets(library_id, created_at DESC)",

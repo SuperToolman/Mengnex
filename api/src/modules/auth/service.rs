@@ -54,8 +54,14 @@ fn required_permission(method: &str, path: &str) -> &'static str {
     if path.starts_with("/api/auth/roles") {
         return "system.manage";
     }
+    if method == "GET" && path.starts_with("/api/auth/users/") && path.ends_with("/avatar") {
+        return "media.read";
+    }
     if path.starts_with("/api/auth/users") {
         return "system.manage";
+    }
+    if path.starts_with("/api/auth/me") {
+        return "media.read";
     }
     if method == "PUT" && path.starts_with("/api/videos/") && path.ends_with("/playback") {
         return "media.read";

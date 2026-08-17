@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 
 use crate::core::app::AppState;
@@ -20,6 +20,15 @@ pub fn public_routes() -> Router<AppState> {
 pub fn protected_routes() -> Router<AppState> {
     Router::new()
         .route("/api/auth/me", get(handlers::me))
+        .route("/api/auth/me/profile", put(handlers::update_current_user))
+        .route(
+            "/api/auth/me/avatar",
+            get(handlers::get_current_user_avatar).put(handlers::upload_current_user_avatar),
+        )
+        .route(
+            "/api/auth/users/{id}/avatar",
+            get(handlers::get_user_avatar),
+        )
         .route(
             "/api/auth/users",
             get(handlers::list_users).post(handlers::create_user),

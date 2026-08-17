@@ -125,6 +125,7 @@ pub async fn start_scan(
     let state_for_task = state.clone();
 
     tokio::spawn(async move {
+        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
         let result =
             service::scan_library(&state_for_task.db, &library, task_id.clone(), |progress| {
                 let db = state_for_task.db.clone();

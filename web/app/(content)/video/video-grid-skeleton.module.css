@@ -4,6 +4,14 @@
     gap: 1rem;
 }
 
+.zoom0,
+.zoom1,
+.zoom2,
+.zoom3,
+.zoom4 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
 .thumbnail {
     aspect-ratio: 16 / 9;
     width: 100%;
@@ -25,37 +33,120 @@
 }
 
 @media (min-width: 640px) {
-    .grid {
+    .zoom1,
+    .zoom2,
+    .zoom3 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-}
 
-@media (min-width: 1024px) {
-    .grid {
+    .zoom0 {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
-@media (min-width: 1280px) {
-    .grid {
+@media (min-width: 1024px) {
+    .zoom0 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .zoom1 {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .zoom2 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .zoom3,
+    .zoom4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .zoom0 {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .zoom1 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .zoom2 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .zoom3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .zoom4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (min-width: 1536px) {
-    .grid {
+    .zoom0 {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .zoom1 {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .zoom2 {
         grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .zoom3 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .zoom4 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 @media (min-width: 1920px) {
-    .grid {
+    .zoom0 {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+
+    .zoom1 {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .zoom2 {
         grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .zoom3 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .zoom4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
 
 @media (min-width: 2560px) {
-    .grid {
+    .zoom0 {
+        grid-template-columns: repeat(9, minmax(0, 1fr));
+    }
+
+    .zoom1 {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+
+    .zoom2 {
         grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .zoom3 {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .zoom4 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 }

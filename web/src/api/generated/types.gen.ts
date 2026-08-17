@@ -4,6 +4,10 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AddMusicPlaylistTrackRequest = {
+    track_id: string;
+};
+
 export type AuthRole = 'owner' | 'admin' | 'editor' | 'viewer';
 
 export type AuthStatusResponse = {
@@ -51,6 +55,11 @@ export type CreateLibraryRequest = {
     scan_extensions?: Array<string> | null;
     source_type?: string;
     webdav_connection_id?: string | null;
+};
+
+export type CreateMusicPlaylistRequest = {
+    description?: string | null;
+    name: string;
 };
 
 export type CreateScanTaskRequest = {
@@ -218,6 +227,124 @@ export type MediaItemResponse = {
 
 export type MediaType = 'photo' | 'video' | 'mixed_video' | 'game' | 'manga' | 'anime' | 'movie' | 'series' | 'novel' | 'music' | 'other';
 
+export type MusicAlbumDetailResponse = {
+    album: MusicAlbumResponse;
+    tracks: Array<MusicTrackResponse>;
+};
+
+export type MusicAlbumResponse = {
+    artist?: string | null;
+    cover_src?: string | null;
+    id: string;
+    library_id: string;
+    title: string;
+    track_count: number;
+    updated_at: string;
+    year?: number | null;
+};
+
+export type MusicArtistDetailResponse = {
+    artist: MusicArtistResponse;
+    tracks: Array<MusicTrackResponse>;
+};
+
+export type MusicArtistResponse = {
+    album_count: number;
+    id: string;
+    name: string;
+    track_count: number;
+};
+
+export type MusicFavoriteResponse = {
+    is_favorite: boolean;
+    track_id: string;
+};
+
+export type MusicPlaybackResponse = {
+    completed: boolean;
+    last_played_at: string;
+    position_seconds: number;
+    track_id: string;
+};
+
+export type MusicPlaylistDetailResponse = {
+    playlist: MusicPlaylistResponse;
+    tracks: Array<MusicTrackResponse>;
+};
+
+export type MusicPlaylistResponse = {
+    description?: string | null;
+    id: string;
+    name: string;
+    track_count: number;
+    updated_at: string;
+};
+
+export type MusicTrackResponse = {
+    album_id?: string | null;
+    album_title?: string | null;
+    artist?: string | null;
+    album_artist?: string | null;
+    bitrate_kbps?: number | null;
+    bit_depth?: number | null;
+    codec?: string | null;
+    disc_number?: number | null;
+    duration_seconds?: number | null;
+    file_id: string;
+    genre?: string | null;
+    id: string;
+    is_favorite: boolean;
+    library_id: string;
+    playback_completed: boolean;
+    playback_position_seconds: number;
+    sample_rate_hz?: number | null;
+    stream_src: string;
+    title: string;
+    track_number?: number | null;
+};
+
+export type NovelBookResponse = {
+    author?: string | null;
+    chapter_count: number;
+    cover_src?: string | null;
+    description?: string | null;
+    format: string;
+    id: string;
+    language?: string | null;
+    library_id: string;
+    parse_error?: string | null;
+    parse_status: string;
+    parsed_at?: string | null;
+    title: string;
+};
+
+export type NovelChapterContentResponse = {
+    book_id: string;
+    content: string;
+    id: string;
+    sequence: number;
+    title: string;
+    word_count: number;
+};
+
+export type NovelChapterResponse = {
+    id: string;
+    sequence: number;
+    title: string;
+    word_count: number;
+};
+
+export type NovelDetailResponse = NovelBookResponse & {
+    chapters: Array<NovelChapterResponse>;
+};
+
+export type NovelReadingStateResponse = {
+    chapter_id?: string | null;
+    locator?: string | null;
+    progress_percent: number;
+    updated_at: string;
+};
+
 export type PhotoAssetResponse = {
     batch_time: string;
     file_id: string;
@@ -380,6 +507,11 @@ export type TaskSummaryResponse = {
     total: number;
 };
 
+export type UpdateCurrentUserRequest = {
+    display_name: string;
+    password?: string | null;
+};
+
 export type UpdateLibraryPreviewConfigRequest = {
     previews_enabled: boolean;
 };
@@ -394,6 +526,21 @@ export type UpdateLibraryRequest = {
     scan_extensions?: Array<string> | null;
     source_type?: string | null;
     webdav_connection_id?: string | null;
+};
+
+export type UpdateMusicFavoriteRequest = {
+    favorite: boolean;
+};
+
+export type UpdateMusicPlaybackRequest = {
+    completed?: boolean | null;
+    position_seconds: number;
+};
+
+export type UpdateNovelReadingStateRequest = {
+    chapter_id?: string | null;
+    locator?: string | null;
+    progress_percent: number;
 };
 
 export type UpdatePreferencesRequest = {
@@ -482,8 +629,8 @@ export type VideoCoverJobResponse = {
 };
 
 export type VideoDetailResponse = VideoAssetResponse & {
-    author_id?: string | null;
     analysis_error?: string | null;
+    author_id?: string | null;
     collection?: null | VideoCollectionResponse;
     file_name: string;
     file_size: number;
@@ -551,6 +698,46 @@ export type MeResponses = {
 
 export type MeResponse = MeResponses[keyof MeResponses];
 
+export type GetCurrentUserAvatarData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/me/avatar';
+};
+
+export type GetCurrentUserAvatarResponses = {
+    /**
+     * Current user avatar
+     */
+    200: unknown;
+};
+
+export type UploadCurrentUserAvatarData = {
+    body: Array<number>;
+    path?: never;
+    query?: never;
+    url: '/api/auth/me/avatar';
+};
+
+export type UploadCurrentUserAvatarResponses = {
+    200: UserResponse;
+};
+
+export type UploadCurrentUserAvatarResponse = UploadCurrentUserAvatarResponses[keyof UploadCurrentUserAvatarResponses];
+
+export type UpdateCurrentUserData = {
+    body: UpdateCurrentUserRequest;
+    path?: never;
+    query?: never;
+    url: '/api/auth/me/profile';
+};
+
+export type UpdateCurrentUserResponses = {
+    200: UserResponse;
+};
+
+export type UpdateCurrentUserResponse = UpdateCurrentUserResponses[keyof UpdateCurrentUserResponses];
+
 export type ListRolePermissionsData = {
     body?: never;
     path?: never;
@@ -615,6 +802,22 @@ export type CreateUserResponses = {
 };
 
 export type CreateUserResponse = CreateUserResponses[keyof CreateUserResponses];
+
+export type GetUserAvatarData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auth/users/{id}/avatar';
+};
+
+export type GetUserAvatarResponses = {
+    /**
+     * User avatar
+     */
+    200: unknown;
+};
 
 export type ListAuthorsData = {
     body?: never;
@@ -1007,6 +1210,357 @@ export type ListMediaItemsResponses = {
 };
 
 export type ListMediaItemsResponse = ListMediaItemsResponses[keyof ListMediaItemsResponses];
+
+export type ListAlbumsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string;
+        search?: string;
+        limit?: number;
+        offset?: number;
+    };
+    url: '/api/music/albums';
+};
+
+export type ListAlbumsResponses = {
+    200: Array<MusicAlbumResponse>;
+};
+
+export type ListAlbumsResponse = ListAlbumsResponses[keyof ListAlbumsResponses];
+
+export type GetAlbumData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/albums/{id}';
+};
+
+export type GetAlbumResponses = {
+    200: MusicAlbumDetailResponse;
+};
+
+export type GetAlbumResponse = GetAlbumResponses[keyof GetAlbumResponses];
+
+export type GetAlbumCoverData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/albums/{id}/cover';
+};
+
+export type GetAlbumCoverResponses = {
+    /**
+     * Album cover
+     */
+    200: unknown;
+};
+
+export type ListArtistsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string;
+    };
+    url: '/api/music/artists';
+};
+
+export type ListArtistsResponses = {
+    200: Array<MusicArtistResponse>;
+};
+
+export type ListArtistsResponse = ListArtistsResponses[keyof ListArtistsResponses];
+
+export type GetArtistData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/artists/{id}';
+};
+
+export type GetArtistResponses = {
+    200: MusicArtistDetailResponse;
+};
+
+export type GetArtistResponse = GetArtistResponses[keyof GetArtistResponses];
+
+export type ListFavoritesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/music/favorites';
+};
+
+export type ListFavoritesResponses = {
+    200: Array<MusicTrackResponse>;
+};
+
+export type ListFavoritesResponse = ListFavoritesResponses[keyof ListFavoritesResponses];
+
+export type ListPlaylistsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/music/playlists';
+};
+
+export type ListPlaylistsResponses = {
+    200: Array<MusicPlaylistResponse>;
+};
+
+export type ListPlaylistsResponse = ListPlaylistsResponses[keyof ListPlaylistsResponses];
+
+export type CreatePlaylistData = {
+    body: CreateMusicPlaylistRequest;
+    path?: never;
+    query?: never;
+    url: '/api/music/playlists';
+};
+
+export type CreatePlaylistResponses = {
+    200: MusicPlaylistResponse;
+};
+
+export type CreatePlaylistResponse = CreatePlaylistResponses[keyof CreatePlaylistResponses];
+
+export type DeletePlaylistData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/playlists/{id}';
+};
+
+export type DeletePlaylistResponses = {
+    204: void;
+};
+
+export type DeletePlaylistResponse = DeletePlaylistResponses[keyof DeletePlaylistResponses];
+
+export type GetPlaylistData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/playlists/{id}';
+};
+
+export type GetPlaylistResponses = {
+    200: MusicPlaylistDetailResponse;
+};
+
+export type GetPlaylistResponse = GetPlaylistResponses[keyof GetPlaylistResponses];
+
+export type AddPlaylistTrackData = {
+    body: AddMusicPlaylistTrackRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/playlists/{id}/tracks';
+};
+
+export type AddPlaylistTrackResponses = {
+    204: void;
+};
+
+export type AddPlaylistTrackResponse = AddPlaylistTrackResponses[keyof AddPlaylistTrackResponses];
+
+export type RemovePlaylistTrackData = {
+    body?: never;
+    path: {
+        id: string;
+        track_id: string;
+    };
+    query?: never;
+    url: '/api/music/playlists/{id}/tracks/{track_id}';
+};
+
+export type RemovePlaylistTrackResponses = {
+    204: void;
+};
+
+export type RemovePlaylistTrackResponse = RemovePlaylistTrackResponses[keyof RemovePlaylistTrackResponses];
+
+export type ListRecentData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/music/recent';
+};
+
+export type ListRecentResponses = {
+    200: Array<MusicTrackResponse>;
+};
+
+export type ListRecentResponse = ListRecentResponses[keyof ListRecentResponses];
+
+export type ListTracksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string;
+        search?: string;
+        limit?: number;
+        offset?: number;
+    };
+    url: '/api/music/tracks';
+};
+
+export type ListTracksResponses = {
+    200: Array<MusicTrackResponse>;
+};
+
+export type ListTracksResponse = ListTracksResponses[keyof ListTracksResponses];
+
+export type UpdateFavoriteData = {
+    body: UpdateMusicFavoriteRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/tracks/{id}/favorite';
+};
+
+export type UpdateFavoriteResponses = {
+    200: MusicFavoriteResponse;
+};
+
+export type UpdateFavoriteResponse = UpdateFavoriteResponses[keyof UpdateFavoriteResponses];
+
+export type UpdatePlaybackData = {
+    body: UpdateMusicPlaybackRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/tracks/{id}/playback';
+};
+
+export type UpdatePlaybackResponses = {
+    200: MusicPlaybackResponse;
+};
+
+export type UpdatePlaybackResponse = UpdatePlaybackResponses[keyof UpdatePlaybackResponses];
+
+export type ListBooksData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string | null;
+        search?: string | null;
+        limit?: number | null;
+        offset?: number | null;
+    };
+    url: '/api/novels';
+};
+
+export type ListBooksResponses = {
+    200: Array<NovelBookResponse>;
+};
+
+export type ListBooksResponse = ListBooksResponses[keyof ListBooksResponses];
+
+export type GetBookData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/novels/{id}';
+};
+
+export type GetBookErrors = {
+    404: unknown;
+};
+
+export type GetBookResponses = {
+    200: NovelDetailResponse;
+};
+
+export type GetBookResponse = GetBookResponses[keyof GetBookResponses];
+
+export type GetChapterData = {
+    body?: never;
+    path: {
+        id: string;
+        chapter_id: string;
+    };
+    query?: never;
+    url: '/api/novels/{id}/chapters/{chapter_id}';
+};
+
+export type GetChapterErrors = {
+    404: unknown;
+};
+
+export type GetChapterResponses = {
+    200: NovelChapterContentResponse;
+};
+
+export type GetChapterResponse = GetChapterResponses[keyof GetChapterResponses];
+
+export type GetCoverData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/novels/{id}/cover';
+};
+
+export type GetCoverErrors = {
+    404: unknown;
+};
+
+export type GetCoverResponses = {
+    /**
+     * Novel cover
+     */
+    200: unknown;
+};
+
+export type GetReadingStateData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/novels/{id}/reading-state';
+};
+
+export type GetReadingStateResponses = {
+    200: null | NovelReadingStateResponse;
+};
+
+export type GetReadingStateResponse = GetReadingStateResponses[keyof GetReadingStateResponses];
+
+export type UpdateReadingStateData = {
+    body: UpdateNovelReadingStateRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/novels/{id}/reading-state';
+};
+
+export type UpdateReadingStateErrors = {
+    404: unknown;
+};
+
+export type UpdateReadingStateResponses = {
+    200: NovelReadingStateResponse;
+};
+
+export type UpdateReadingStateResponse = UpdateReadingStateResponses[keyof UpdateReadingStateResponses];
 
 export type ListPhotosData = {
     body?: never;
@@ -1619,7 +2173,7 @@ export type GetVideoResponses = {
 
 export type GetVideoResponse = GetVideoResponses[keyof GetVideoResponses];
 
-export type UpdatePlaybackData = {
+export type UpdatePlayback2Data = {
     body: UpdateVideoPlaybackRequest;
     path: {
         id: string;
@@ -1628,11 +2182,11 @@ export type UpdatePlaybackData = {
     url: '/api/videos/{id}/playback';
 };
 
-export type UpdatePlaybackResponses = {
+export type UpdatePlayback2Responses = {
     200: VideoPlaybackResponse;
 };
 
-export type UpdatePlaybackResponse = UpdatePlaybackResponses[keyof UpdatePlaybackResponses];
+export type UpdatePlayback2Response = UpdatePlayback2Responses[keyof UpdatePlayback2Responses];
 
 export type GetPosterData = {
     body?: never;

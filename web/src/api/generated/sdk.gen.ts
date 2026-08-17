@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAuthorData, GetAuthorResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetSeriesData, GetSeriesResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ListAuthorsData, ListAuthorsResponses, ListData, ListFolderContentsData, ListFolderContentsResponses, ListLibrariesData, ListLibrariesResponses, ListLibraryCoversData, ListLibraryCoversResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, RetryTaskData, RetryTaskResponses, SetupData, SetupResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, TaskSummaryData, TaskSummaryResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses } from './types.gen';
+import type { AddPlaylistTrackData, AddPlaylistTrackResponses, CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreatePlaylistData, CreatePlaylistResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeletePlaylistData, DeletePlaylistResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAlbumCoverData, GetAlbumCoverResponses, GetAlbumData, GetAlbumResponses, GetArtistData, GetArtistResponses, GetAuthorData, GetAuthorResponses, GetBookData, GetBookErrors, GetBookResponses, GetChapterData, GetChapterErrors, GetChapterResponses, GetCoverData, GetCoverErrors, GetCoverResponses, GetCurrentUserAvatarData, GetCurrentUserAvatarResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPlaylistData, GetPlaylistResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetReadingStateData, GetReadingStateResponses, GetSeriesData, GetSeriesResponses, GetUserAvatarData, GetUserAvatarResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ListAlbumsData, ListAlbumsResponses, ListArtistsData, ListArtistsResponses, ListAuthorsData, ListAuthorsResponses, ListBooksData, ListBooksResponses, ListData, ListFavoritesData, ListFavoritesResponses, ListFolderContentsData, ListFolderContentsResponses, ListLibrariesData, ListLibrariesResponses, ListLibraryCoversData, ListLibraryCoversResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListPlaylistsData, ListPlaylistsResponses, ListRecentData, ListRecentResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListTracksData, ListTracksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, RemovePlaylistTrackData, RemovePlaylistTrackResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, RetryTaskData, RetryTaskResponses, SetupData, SetupResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, TaskSummaryData, TaskSummaryResponses, UpdateCurrentUserData, UpdateCurrentUserResponses, UpdateFavoriteData, UpdateFavoriteResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlayback2Data, UpdatePlayback2Responses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateReadingStateData, UpdateReadingStateErrors, UpdateReadingStateResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses, UploadCurrentUserAvatarData, UploadCurrentUserAvatarResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -38,6 +38,33 @@ export const me = <ThrowOnError extends boolean = false>(options?: Options<MeDat
     responseStyle: 'data',
     url: '/api/auth/me',
     ...options
+});
+
+export const getCurrentUserAvatar = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserAvatarData, ThrowOnError>): RequestResult<GetCurrentUserAvatarResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<GetCurrentUserAvatarResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/auth/me/avatar',
+    ...options
+});
+
+export const uploadCurrentUserAvatar = <ThrowOnError extends boolean = false>(options: Options<UploadCurrentUserAvatarData, ThrowOnError>): RequestResult<UploadCurrentUserAvatarResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UploadCurrentUserAvatarResponses, unknown, ThrowOnError, 'data'>({
+    bodySerializer: null,
+    responseStyle: 'data',
+    url: '/api/auth/me/avatar',
+    ...options,
+    headers: {
+        'Content-Type': 'application/octet-stream',
+        ...options.headers
+    }
+});
+
+export const updateCurrentUser = <ThrowOnError extends boolean = false>(options: Options<UpdateCurrentUserData, ThrowOnError>): RequestResult<UpdateCurrentUserResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdateCurrentUserResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/auth/me/profile',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const listRolePermissions = <ThrowOnError extends boolean = false>(options?: Options<ListRolePermissionsData, ThrowOnError>): RequestResult<ListRolePermissionsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListRolePermissionsResponses, unknown, ThrowOnError, 'data'>({
@@ -76,6 +103,12 @@ export const createUser = <ThrowOnError extends boolean = false>(options: Option
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const getUserAvatar = <ThrowOnError extends boolean = false>(options: Options<GetUserAvatarData, ThrowOnError>): RequestResult<GetUserAvatarResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetUserAvatarResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/auth/users/{id}/avatar',
+    ...options
 });
 
 export const listAuthors = <ThrowOnError extends boolean = false>(options?: Options<ListAuthorsData, ThrowOnError>): RequestResult<ListAuthorsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListAuthorsResponses, unknown, ThrowOnError, 'data'>({
@@ -196,6 +229,158 @@ export const listMediaItems = <ThrowOnError extends boolean = false>(options?: O
     responseStyle: 'data',
     url: '/api/media/items',
     ...options
+});
+
+export const listAlbums = <ThrowOnError extends boolean = false>(options?: Options<ListAlbumsData, ThrowOnError>): RequestResult<ListAlbumsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListAlbumsResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/albums',
+    ...options
+});
+
+export const getAlbum = <ThrowOnError extends boolean = false>(options: Options<GetAlbumData, ThrowOnError>): RequestResult<GetAlbumResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetAlbumResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/albums/{id}',
+    ...options
+});
+
+export const getAlbumCover = <ThrowOnError extends boolean = false>(options: Options<GetAlbumCoverData, ThrowOnError>): RequestResult<GetAlbumCoverResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetAlbumCoverResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/albums/{id}/cover',
+    ...options
+});
+
+export const listArtists = <ThrowOnError extends boolean = false>(options?: Options<ListArtistsData, ThrowOnError>): RequestResult<ListArtistsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListArtistsResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/artists',
+    ...options
+});
+
+export const getArtist = <ThrowOnError extends boolean = false>(options: Options<GetArtistData, ThrowOnError>): RequestResult<GetArtistResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetArtistResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/artists/{id}',
+    ...options
+});
+
+export const listFavorites = <ThrowOnError extends boolean = false>(options?: Options<ListFavoritesData, ThrowOnError>): RequestResult<ListFavoritesResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListFavoritesResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/favorites',
+    ...options
+});
+
+export const listPlaylists = <ThrowOnError extends boolean = false>(options?: Options<ListPlaylistsData, ThrowOnError>): RequestResult<ListPlaylistsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListPlaylistsResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists',
+    ...options
+});
+
+export const createPlaylist = <ThrowOnError extends boolean = false>(options: Options<CreatePlaylistData, ThrowOnError>): RequestResult<CreatePlaylistResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).post<CreatePlaylistResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deletePlaylist = <ThrowOnError extends boolean = false>(options: Options<DeletePlaylistData, ThrowOnError>): RequestResult<DeletePlaylistResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).delete<DeletePlaylistResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists/{id}',
+    ...options
+});
+
+export const getPlaylist = <ThrowOnError extends boolean = false>(options: Options<GetPlaylistData, ThrowOnError>): RequestResult<GetPlaylistResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetPlaylistResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists/{id}',
+    ...options
+});
+
+export const addPlaylistTrack = <ThrowOnError extends boolean = false>(options: Options<AddPlaylistTrackData, ThrowOnError>): RequestResult<AddPlaylistTrackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).post<AddPlaylistTrackResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists/{id}/tracks',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const removePlaylistTrack = <ThrowOnError extends boolean = false>(options: Options<RemovePlaylistTrackData, ThrowOnError>): RequestResult<RemovePlaylistTrackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).delete<RemovePlaylistTrackResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/playlists/{id}/tracks/{track_id}',
+    ...options
+});
+
+export const listRecent = <ThrowOnError extends boolean = false>(options?: Options<ListRecentData, ThrowOnError>): RequestResult<ListRecentResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListRecentResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/recent',
+    ...options
+});
+
+export const listTracks = <ThrowOnError extends boolean = false>(options?: Options<ListTracksData, ThrowOnError>): RequestResult<ListTracksResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListTracksResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks',
+    ...options
+});
+
+export const updateFavorite = <ThrowOnError extends boolean = false>(options: Options<UpdateFavoriteData, ThrowOnError>): RequestResult<UpdateFavoriteResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdateFavoriteResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks/{id}/favorite',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const updatePlayback = <ThrowOnError extends boolean = false>(options: Options<UpdatePlaybackData, ThrowOnError>): RequestResult<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks/{id}/playback',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listBooks = <ThrowOnError extends boolean = false>(options?: Options<ListBooksData, ThrowOnError>): RequestResult<ListBooksResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListBooksResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels',
+    ...options
+});
+
+export const getBook = <ThrowOnError extends boolean = false>(options: Options<GetBookData, ThrowOnError>): RequestResult<GetBookResponses, GetBookErrors, ThrowOnError, 'data'> => (options.client ?? client).get<GetBookResponses, GetBookErrors, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels/{id}',
+    ...options
+});
+
+export const getChapter = <ThrowOnError extends boolean = false>(options: Options<GetChapterData, ThrowOnError>): RequestResult<GetChapterResponses, GetChapterErrors, ThrowOnError, 'data'> => (options.client ?? client).get<GetChapterResponses, GetChapterErrors, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels/{id}/chapters/{chapter_id}',
+    ...options
+});
+
+export const getCover = <ThrowOnError extends boolean = false>(options: Options<GetCoverData, ThrowOnError>): RequestResult<GetCoverResponses, GetCoverErrors, ThrowOnError, 'data'> => (options.client ?? client).get<GetCoverResponses, GetCoverErrors, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels/{id}/cover',
+    ...options
+});
+
+export const getReadingState = <ThrowOnError extends boolean = false>(options: Options<GetReadingStateData, ThrowOnError>): RequestResult<GetReadingStateResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetReadingStateResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels/{id}/reading-state',
+    ...options
+});
+
+export const updateReadingState = <ThrowOnError extends boolean = false>(options: Options<UpdateReadingStateData, ThrowOnError>): RequestResult<UpdateReadingStateResponses, UpdateReadingStateErrors, ThrowOnError, 'data'> => (options.client ?? client).put<UpdateReadingStateResponses, UpdateReadingStateErrors, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/novels/{id}/reading-state',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const listPhotos = <ThrowOnError extends boolean = false>(options?: Options<ListPhotosData, ThrowOnError>): RequestResult<ListPhotosResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListPhotosResponses, unknown, ThrowOnError, 'data'>({
@@ -398,7 +583,7 @@ export const getVideo = <ThrowOnError extends boolean = false>(options: Options<
     ...options
 });
 
-export const updatePlayback = <ThrowOnError extends boolean = false>(options: Options<UpdatePlaybackData, ThrowOnError>): RequestResult<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'>({
+export const updatePlayback2 = <ThrowOnError extends boolean = false>(options: Options<UpdatePlayback2Data, ThrowOnError>): RequestResult<UpdatePlayback2Responses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdatePlayback2Responses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/videos/{id}/playback',
     ...options,

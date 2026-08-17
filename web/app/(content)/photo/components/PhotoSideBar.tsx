@@ -38,68 +38,54 @@ function getSelectedNavigationKey(pathname: string) {
 export default function PhotoSideBar() {
     const pathname = usePathname();
     const router = useRouter();
-    const {
-        scaleLevel,
-        scaleMode,
-        searchQuery,
-        setScaleLevel,
-        setSearchQuery,
-    } = usePhotoShell();
-    const shouldShowControls = scaleMode !== "none";
     const selectedNavigationKey = getSelectedNavigationKey(pathname);
 
     return (
-        <div className="flex min-w-max items-center gap-3">
-                <Tabs.Root
-                    aria-label="照片导航"
-                    selectedKey={selectedNavigationKey}
-                    onSelectionChange={(key) => router.push(String(key))}
-                    className="w-[440px] shrink-0"
-                >
-                    <Tabs.ListContainer className="w-full">
-                        <Tabs.List className="grid w-full grid-cols-4">
-                    {PHOTO_NAV_ITEMS.map((item) => {
-                        return (
-                            <Tabs.Tab
-                                key={item.href}
-                                id={item.href}
-                                className="h-9 justify-center gap-2 px-2 whitespace-nowrap"
-                            >
-                                <item.icon className="h-4 w-4 shrink-0" />
-                                {item.label}
-                                <Tabs.Indicator />
-                            </Tabs.Tab>
-                        );
-                    })}
-                        </Tabs.List>
-                    </Tabs.ListContainer>
-                </Tabs.Root>
-
-                {shouldShowControls ? (
-                    <div className="flex min-w-[320px] items-center justify-end gap-2">
-                        <SearchField
-                            value={searchQuery}
-                            onChange={setSearchQuery}
-                            aria-label="搜索文件夹或照片"
-                            className="min-w-[220px] flex-1"
+        <Tabs.Root
+            aria-label="照片导航"
+            selectedKey={selectedNavigationKey}
+            onSelectionChange={(key) => router.push(String(key))}
+            className="w-[440px] shrink-0"
+        >
+            <Tabs.ListContainer className="w-full">
+                <Tabs.List className="grid w-full grid-cols-4">
+                    {PHOTO_NAV_ITEMS.map((item) => (
+                        <Tabs.Tab
+                            key={item.href}
+                            id={item.href}
+                            className="h-9 justify-center gap-2 px-2 whitespace-nowrap"
                         >
-                            <SearchField.Group className="h-9">
-                                <SearchField.SearchIcon />
-                                <SearchField.Input placeholder="搜索文件夹或照片" />
-                                <SearchField.ClearButton />
-                            </SearchField.Group>
-                        </SearchField>
-
-                        <ContentZoomSlider
-                            value={scaleLevel}
-                            labels={PHOTO_ZOOM_LABELS}
-                            onChange={setScaleLevel}
-                            ariaLabel="照片内容缩放"
-                            label="缩放"
-                            className="w-28"
-                        />
-                    </div>
-                ) : null}
-        </div>
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {item.label}
+                            <Tabs.Indicator />
+                        </Tabs.Tab>
+                    ))}
+                </Tabs.List>
+            </Tabs.ListContainer>
+        </Tabs.Root>
     );
+}
+
+export function PhotoSearchControl() {
+    const { scaleMode, searchQuery, setSearchQuery } = usePhotoShell();
+
+    if (scaleMode === "none") return null;
+
+    return (
+        <SearchField value={searchQuery} onChange={setSearchQuery} aria-label="搜索文件夹或照片" className="w-full">
+            <SearchField.Group className="h-9">
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder="搜索文件夹或照片" />
+                <SearchField.ClearButton />
+            </SearchField.Group>
+        </SearchField>
+    );
+}
+
+export function PhotoZoomControl() {
+    const { scaleLevel, scaleMode, setScaleLevel } = usePhotoShell();
+
+    if (scaleMode === "none") return null;
+
+    return <ContentZoomSlider value={scaleLevel} labels={PHOTO_ZOOM_LABELS} onChange={setScaleLevel} ariaLabel="照片内容缩放" label="缩放" className="w-28" />;
 }

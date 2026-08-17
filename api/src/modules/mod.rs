@@ -4,6 +4,8 @@ pub mod libraries;
 pub mod manga;
 pub mod media;
 pub mod media_types;
+pub mod music;
+pub mod novels;
 pub mod photos;
 pub mod preferences;
 pub mod recycle_bin;

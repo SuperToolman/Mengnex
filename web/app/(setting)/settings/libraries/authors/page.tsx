@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, Drawer, ListBox, Select, Slider, Spinner, useOverlayState, type UseOverlayStateReturn } from "@heroui/react";
+import { Avatar, Drawer, ListBox, Select, Spinner, useOverlayState, type UseOverlayStateReturn } from "@heroui/react";
 import { ChevronDown } from "@gravity-ui/icons";
 import { useEffect, useMemo, useState } from "react";
 import { deleteAuthorAvatar, getAuthor, getAuthors, selectAuthorAvatar, uploadAuthorAvatar, type AuthorDetailResponse, type AuthorResponse } from "@/src/api/client";
@@ -8,6 +8,7 @@ import MangaCard from "@/app/(content)/manga/components/MangaCard";
 import GalleryItem, { type GalleryItemData } from "@/app/(content)/photo/components/GalleryItem";
 import PhotoViewer from "@/app/(content)/photo/components/PhotoViewer";
 import AvatarSetting from "@/app/components/AvatarSetting";
+import ContentZoomSlider from "@/app/components/ContentZoomSlider";
 import AuthorCard from "./AuthorCard";
 import SettingsPage from "../../components/SettingsPage";
 import LibraryManagementTabs from "../components/LibraryManagementTabs";
@@ -79,5 +80,5 @@ export default function AuthorsPage() {
         if (sortBy === "media") return left.resource_types.join(",").localeCompare(right.resource_types.join(","), "zh-CN") || left.name.localeCompare(right.name, "zh-CN");
         return left.name.localeCompare(right.name, "zh-CN");
     }), [authors, sortBy]);
-    return <SettingsPage group="媒体库" title="作者库" description="查看从漫画标题和照片 EXIF 中识别出的作者。" actions={<><div className="flex items-center gap-2"><span className="text-sm text-muted">排序</span><Select.Root aria-label="作者排序方式" selectedKey={sortBy} onSelectionChange={(key) => key && setSortBy(String(key) as typeof sortBy)}><Select.Trigger className="h-9 w-32"><Select.Value /><Select.Indicator><ChevronDown className="h-4 w-4" /></Select.Indicator></Select.Trigger><Select.Popover><ListBox>{options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label}>{option.label}</ListBox.Item>)}</ListBox></Select.Popover></Select.Root></div><div className="flex items-center gap-2"><span className="whitespace-nowrap text-sm text-muted">内容：{zoomLabels[zoomLevel]}</span><Slider aria-label="作者内容缩放" className="w-32" minValue={0} maxValue={4} step={1} value={zoomLevel} onChange={(value) => setZoomLevel(Array.isArray(value) ? value[0] ?? 2 : value)}><Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track></Slider></div></>} contentClassName="space-y-6"><><LibraryManagementTabs />{error ? <p className="text-sm text-danger">{error}</p> : null}<div className={`grid gap-3 ${zoomClasses[zoomLevel] ?? zoomClasses[2]}`}>{sortedAuthors.map((author) => <AuthorCard key={author.id} author={author} onPress={() => { setActiveAuthorId(author.id); drawer.open(); }} />)}</div>{!error && authors.length === 0 ? <p className="text-sm text-muted">尚未识别到作者。</p> : null}<AuthorDrawer authorId={activeAuthorId} drawer={drawer} onAvatarUploaded={(updated) => setAuthors((current) => current.map((author) => author.id === updated.id ? updated : author))} /></></SettingsPage>;
+    return <SettingsPage group="媒体库" title="作者库" description="查看从漫画标题和照片 EXIF 中识别出的作者。" actions={<><div className="flex items-center gap-2"><span className="text-sm text-muted">排序</span><Select.Root aria-label="作者排序方式" selectedKey={sortBy} onSelectionChange={(key) => key && setSortBy(String(key) as typeof sortBy)}><Select.Trigger className="h-9 w-32"><Select.Value /><Select.Indicator><ChevronDown className="h-4 w-4" /></Select.Indicator></Select.Trigger><Select.Popover><ListBox>{options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label}>{option.label}</ListBox.Item>)}</ListBox></Select.Popover></Select.Root></div><ContentZoomSlider value={zoomLevel} labels={zoomLabels} onChange={setZoomLevel} ariaLabel="作者内容缩放" label="内容" className="w-32" /></>} contentClassName="space-y-6"><><LibraryManagementTabs />{error ? <p className="text-sm text-danger">{error}</p> : null}<div className={`grid gap-3 ${zoomClasses[zoomLevel] ?? zoomClasses[2]}`}>{sortedAuthors.map((author) => <AuthorCard key={author.id} author={author} onPress={() => { setActiveAuthorId(author.id); drawer.open(); }} />)}</div>{!error && authors.length === 0 ? <p className="text-sm text-muted">尚未识别到作者。</p> : null}<AuthorDrawer authorId={activeAuthorId} drawer={drawer} onAvatarUploaded={(updated) => setAuthors((current) => current.map((author) => author.id === updated.id ? updated : author))} /></></SettingsPage>;
 }

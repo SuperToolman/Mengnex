@@ -20,6 +20,8 @@ use crate::{
     modules::{
         manga::service::rebuild_image_manga_index,
         media_types::processor_for,
+        music::service::upsert_music_track,
+        novels::service::upsert_novel_book,
         photos::folders::{folder_path_for_source, refresh_photo_folder_index},
         tasks::service::wait_for_task_permit,
         videos::service::{resolve_cover_path, upsert_video_asset},
@@ -239,6 +241,12 @@ where
                 {
                     upsert_video_asset(&txn, &file, &item_title).await?;
                 }
+                if library.media_type == "novel" {
+                    upsert_novel_book(&txn, library, &file, &item_title).await?;
+                }
+                if library.media_type == "music" {
+                    upsert_music_track(&txn, library, &file, &item_title).await?;
+                }
 
                 txn.commit().await?;
             }
@@ -317,6 +325,12 @@ where
                 .is_some_and(|processor| processor.media_type() == "video")
             {
                 upsert_video_asset(&txn, &file, &title).await?;
+            }
+            if library.media_type == "novel" {
+                upsert_novel_book(&txn, library, &file, &title).await?;
+            }
+            if library.media_type == "music" {
+                upsert_music_track(&txn, library, &file, &title).await?;
             }
 
             txn.commit().await?;
@@ -461,6 +475,7 @@ async fn rebuild_difference_video_collections(
         .filter(media_file::Column::LibraryId.eq(&library.id))
         .all(&txn)
         .await?;
+    #[allow(clippy::type_complexity)]
     let mut groups: HashMap<
         (String, Option<String>, String),
         (Option<String>, String, BTreeMap<String, String>),

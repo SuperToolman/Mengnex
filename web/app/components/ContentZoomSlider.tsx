@@ -22,7 +22,7 @@ export default function ContentZoomSlider({
     const safeValue = Math.min(Math.max(value, 0), Math.max(labels.length - 1, 0));
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1">
             <span className="whitespace-nowrap text-sm text-muted">
                 {label}: {labels[safeValue] ?? ""}
             </span>

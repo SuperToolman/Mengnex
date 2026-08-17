@@ -13,8 +13,8 @@ use utoipa::OpenApi;
 use crate::{
     core::{health, openapi::ApiDoc},
     modules::{
-        auth, authors, libraries, manga, media, photos, preferences, recycle_bin, scanner, tags,
-        tasks, videos, webdav,
+        auth, authors, libraries, manga, media, music, novels, photos, preferences, recycle_bin,
+        scanner, tags, tasks, videos, webdav,
     },
 };
 
@@ -40,7 +40,9 @@ pub fn router(db: DatabaseConnection) -> Router {
         .merge(auth::protected_routes())
         .merge(libraries::routes())
         .merge(media::routes())
+        .merge(music::routes())
         .merge(manga::routes())
+        .merge(novels::routes())
         .merge(authors::routes())
         .merge(photos::routes())
         .merge(preferences::routes())

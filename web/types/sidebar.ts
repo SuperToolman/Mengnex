@@ -1,4 +1,5 @@
 import {
+    BookOpen,
     Books,
     CirclePlay,
     Display,
@@ -32,6 +33,12 @@ export const SIDEBAR_CONFIG: SidebarItem[] = [
         icon: Books,
         label: "漫画",
         href: "/manga",
+    },
+    {
+        id: "novel",
+        icon: BookOpen,
+        label: "小说",
+        href: "/novel",
     },
     {
         id: "game",

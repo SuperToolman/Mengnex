@@ -1,7 +1,9 @@
 use axum::{
     Json,
+    body::Bytes,
     extract::{Extension, State},
-    http::header,
+    http::{HeaderValue, header},
+    response::{IntoResponse, Response},
 };
 use chrono::Utc;
 use sea_orm::{
@@ -10,6 +12,7 @@ use sea_orm::{
 };
 use std::{
     collections::HashSet,
+    path::PathBuf,
     time::{Duration, Instant},
 };
 use uuid::Uuid;
@@ -20,7 +23,7 @@ use crate::{
     modules::auth::{
         dto::{
             AuthStatusResponse, AuthenticatedUserResponse, CreateUserRequest, CredentialsRequest,
-            RolePermissionsResponse, SetupRequest, UserResponse,
+            RolePermissionsResponse, SetupRequest, UpdateCurrentUserRequest, UserResponse,
         },
         service::{self, ADMIN, CurrentUser, OWNER, role_permissions},
     },
@@ -55,6 +58,34 @@ fn validate_username(value: &str) -> Result<(), ApiError> {
     } else {
         Ok(())
     }
+}
+
+fn user_avatar_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("data")
+        .join("avatars")
+        .join("users")
+}
+
+fn avatar_extension(body: &[u8]) -> Result<&'static str, ApiError> {
+    if body.starts_with(&[0x89, b'P', b'N', b'G']) {
+        Ok("png")
+    } else if body.starts_with(&[0xff, 0xd8, 0xff]) {
+        Ok("jpg")
+    } else if body.starts_with(b"RIFF") && body.get(8..12) == Some(b"WEBP") {
+        Ok("webp")
+    } else {
+        Err(ApiError::BadRequest(
+            "仅支持 PNG、JPEG 或 WebP 图片".to_owned(),
+        ))
+    }
+}
+
+fn user_avatar_file(user_id: &str) -> Option<(PathBuf, &'static str)> {
+    ["png", "jpg", "webp"].into_iter().find_map(|extension| {
+        let path = user_avatar_dir().join(format!("{user_id}.{extension}"));
+        path.exists().then_some((path, extension))
+    })
 }
 
 async fn setup_required(db: &impl sea_orm::ConnectionTrait) -> Result<bool, ApiError> {
@@ -236,6 +267,111 @@ pub async fn me(
     Ok(Json(AuthenticatedUserResponse {
         user: user_response(&state.db, user).await?,
     }))
+}
+
+#[utoipa::path(put, path = "/api/auth/me/profile", request_body = UpdateCurrentUserRequest, responses((status = 200, body = UserResponse)), tag = "auth")]
+pub async fn update_current_user(
+    Extension(current): Extension<CurrentUser>,
+    State(state): State<AppState>,
+    Json(payload): Json<UpdateCurrentUserRequest>,
+) -> Result<Json<UserResponse>, ApiError> {
+    let display_name = payload.display_name.trim();
+    if display_name.is_empty() {
+        return Err(ApiError::BadRequest("display name is required".to_owned()));
+    }
+    let mut active_user = app_user::ActiveModel {
+        id: Set(current.id.clone()),
+        display_name: Set(Some(display_name.to_owned())),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    };
+    if let Some(password) = payload.password.filter(|value| !value.is_empty()) {
+        active_user.password_hash = Set(service::hash_password(&password)?);
+    }
+    active_user.update(&state.db).await?;
+    let user = app_user::Entity::find_by_id(current.id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("user"))?;
+    Ok(Json(user_response(&state.db, user).await?))
+}
+
+async fn user_avatar_response(user_id: &str) -> Result<Response, ApiError> {
+    let (path, extension) = user_avatar_file(user_id).ok_or(ApiError::NotFound("user avatar"))?;
+    let content_type = match extension {
+        "png" => "image/png",
+        "jpg" => "image/jpeg",
+        _ => "image/webp",
+    };
+    let bytes = tokio::fs::read(path).await?;
+    Ok((
+        [(header::CONTENT_TYPE, HeaderValue::from_static(content_type))],
+        bytes,
+    )
+        .into_response())
+}
+
+#[utoipa::path(get, path = "/api/auth/me/avatar", responses((status = 200, description = "Current user avatar")), tag = "auth")]
+pub async fn get_current_user_avatar(
+    Extension(current): Extension<CurrentUser>,
+) -> Result<Response, ApiError> {
+    user_avatar_response(&current.id).await
+}
+
+#[utoipa::path(get, path = "/api/auth/users/{id}/avatar", responses((status = 200, description = "User avatar")), tag = "auth")]
+pub async fn get_user_avatar(
+    Extension(current): Extension<CurrentUser>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Response, ApiError> {
+    if current.id != id && !matches!(current.role.as_str(), "owner" | "admin") {
+        return Err(ApiError::Unauthorized(
+            "user avatar access denied".to_owned(),
+        ));
+    }
+    user_avatar_response(&id).await
+}
+
+#[utoipa::path(put, path = "/api/auth/me/avatar", request_body(content = Vec<u8>, content_type = "application/octet-stream"), responses((status = 200, body = UserResponse)), tag = "auth")]
+pub async fn upload_current_user_avatar(
+    Extension(current): Extension<CurrentUser>,
+    State(state): State<AppState>,
+    body: Bytes,
+) -> Result<Json<UserResponse>, ApiError> {
+    if body.is_empty() || body.len() > 5 * 1024 * 1024 {
+        return Err(ApiError::BadRequest("头像文件需小于 5MB".to_owned()));
+    }
+    let extension = avatar_extension(&body)?;
+    let directory = user_avatar_dir();
+    tokio::fs::create_dir_all(&directory).await?;
+    let file_name = format!("{}.{}", current.id, extension);
+    tokio::fs::write(directory.join(&file_name), body).await?;
+    for stale_extension in ["png", "jpg", "webp"] {
+        if stale_extension != extension {
+            let _ = tokio::fs::remove_file(
+                directory.join(format!("{}.{}", current.id, stale_extension)),
+            )
+            .await;
+        }
+    }
+    let updated_at = Utc::now();
+    let avatar_url = format!(
+        "/api/auth/users/{}/avatar?v={}",
+        current.id,
+        updated_at.timestamp_millis()
+    );
+    app_user::ActiveModel {
+        id: Set(current.id.clone()),
+        avatar_url: Set(Some(avatar_url)),
+        updated_at: Set(updated_at),
+        ..Default::default()
+    }
+    .update(&state.db)
+    .await?;
+    let user = app_user::Entity::find_by_id(current.id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("user"))?;
+    Ok(Json(user_response(&state.db, user).await?))
 }
 #[utoipa::path(get, path = "/api/auth/users", responses((status = 200, body = [UserResponse])), tag = "auth")]
 pub async fn list_users(

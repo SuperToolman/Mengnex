@@ -7,6 +7,8 @@ use crate::{
     infra::entities::{app_task, media_library},
     modules::{
         media_types::processor_for,
+        music::service::generate_library_music_metadata,
+        novels::service::generate_library_novel_metadata,
         photos::service::{
             PreviewGenerationProgress, PreviewOperationSummary,
             generate_library_previews_with_progress,
@@ -62,6 +64,7 @@ pub async fn start_cache_generation(
 
     let task_db = db.clone();
     tokio::spawn(async move {
+        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
         if let Err(error) = run_cache_generation(&task_db, &library, &task_id).await {
             tracing::error!(task_id, ?error, "browse cache task failed to finalize");
         }
@@ -98,6 +101,7 @@ pub async fn retry_cache_generation(
     .ok_or(ApiError::NotFound("task"))?;
     let task_db = db.clone();
     tokio::spawn(async move {
+        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
         if let Err(error) = run_cache_generation(&task_db, &library, &task_id).await {
             tracing::error!(
                 task_id,
@@ -128,6 +132,8 @@ async fn run_cache_generation(
     let result = match processor_for(&library.media_type).map(|processor| processor.media_type()) {
         Some("photo") => generate_photo_cache(db, library, task_id).await,
         Some("video") => generate_video_cache(db, library, task_id).await,
+        Some("novel") => generate_novel_cache(db, library, task_id).await,
+        Some("music") => generate_music_cache(db, library, task_id).await,
         _ => Err(ApiError::BadRequest(format!(
             "media type {} does not support browse cache generation",
             library.media_type
@@ -139,6 +145,22 @@ async fn run_cache_generation(
         Err(ApiError::TaskCanceled) => cancel_cache_task(db, task_id).await,
         Err(error) => fail_cache_task(db, task_id, format!("{error:?}")).await,
     }
+}
+
+async fn generate_novel_cache(
+    db: &DatabaseConnection,
+    library: &media_library::Model,
+    task_id: &str,
+) -> Result<PreviewOperationSummary, ApiError> {
+    generate_library_novel_metadata(db, library, task_id).await
+}
+
+async fn generate_music_cache(
+    db: &DatabaseConnection,
+    library: &media_library::Model,
+    task_id: &str,
+) -> Result<PreviewOperationSummary, ApiError> {
+    generate_library_music_metadata(db, library, task_id).await
 }
 
 async fn generate_photo_cache(

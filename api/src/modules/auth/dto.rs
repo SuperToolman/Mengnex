@@ -36,6 +36,12 @@ pub struct CreateUserRequest {
     pub library_ids: Vec<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateCurrentUserRequest {
+    pub display_name: String,
+    pub password: Option<String>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AuthStatusResponse {
     pub setup_required: bool,

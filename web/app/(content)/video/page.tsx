@@ -5,11 +5,14 @@ import { Alert, Card, ListBox, Pagination, SearchField, Select, Skeleton } from 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
+import ContentZoomSlider from "@/app/components/ContentZoomSlider";
 import { getMediaLibraries, getVideoCatalog, type LibraryResponse, type VideoAssetResponse } from "@/src/api/client";
 import VideoCard from "./components/VideoCard";
 import styles from "./video-grid-skeleton.module.css";
 
 const PAGE_SIZE = 48;
+const VIDEO_ZOOM_LABELS = ["小", "较小", "正常", "较大", "大"] as const;
+const videoZoomGridClasses = [styles.zoom0, styles.zoom1, styles.zoom2, styles.zoom3, styles.zoom4] as const;
 
 type SortValue = "created" | "title" | "duration" | "updated";
 type WatchedValue = "all" | "unwatched" | "in_progress" | "completed";
@@ -56,9 +59,9 @@ function FilterSelect<T extends string>({
     );
 }
 
-function VideoGridSkeleton() {
+function VideoGridSkeleton({ gridClassName }: { gridClassName: string }) {
     return (
-        <div className={styles.grid} aria-label="正在加载视频">
+        <div className={`${styles.grid} ${gridClassName}`} aria-label="正在加载视频">
             {Array.from({ length: 10 }).map((_, index) => (
                 <Card.Root key={index}>
                     <Skeleton className={styles.thumbnail} />
@@ -85,6 +88,7 @@ export default function VideoPage() {
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [zoomLevel, setZoomLevel] = useState(2);
 
     useEffect(() => {
         void getMediaLibraries()
@@ -125,20 +129,24 @@ export default function VideoPage() {
     }, [debouncedQuery, libraryId, page, sort, watched]);
 
     const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const videoGridClassName = videoZoomGridClasses[zoomLevel] ?? videoZoomGridClasses[2];
     const libraryOptions = [
         { id: "all", label: "全部媒体库" },
         ...libraries.map((library) => ({ id: library.id, label: library.name })),
     ];
 
-    const controls = (
+    const search = (
+        <SearchField value={query} onChange={setQuery} aria-label="搜索视频" className="w-full">
+            <SearchField.Group className="h-9">
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder="搜索视频" />
+                <SearchField.ClearButton />
+            </SearchField.Group>
+        </SearchField>
+    );
+
+    const filters = (
         <div className="flex items-center gap-2">
-            <SearchField value={query} onChange={setQuery} aria-label="搜索视频" className="w-48">
-                <SearchField.Group className="h-9">
-                    <SearchField.SearchIcon />
-                    <SearchField.Input placeholder="搜索视频" />
-                    <SearchField.ClearButton />
-                </SearchField.Group>
-            </SearchField>
             <FilterSelect label="选择媒体库" value={libraryId} options={libraryOptions} className="w-40" onChange={(value) => { setLibraryId(value); setPage(0); }} />
             <FilterSelect label="观看状态" value={watched} options={watchedOptions} className="w-32" onChange={(value) => { setWatched(value); setPage(0); }} />
             <FilterSelect label="排序方式" value={sort} options={sortOptions} className="w-32" onChange={(value) => { setSort(value); setPage(0); }} />
@@ -146,7 +154,28 @@ export default function VideoPage() {
     );
 
     return (
-        <ContentPageLayout title="视频" description={`${total} 个视频`} header={controls}>
+        <ContentPageLayout
+            title="视频"
+            description={`${total} 个视频`}
+            center={search}
+            actions={<>{filters}<ContentZoomSlider value={zoomLevel} labels={VIDEO_ZOOM_LABELS} onChange={setZoomLevel} ariaLabel="视频卡片缩放" label="缩放" className="w-28" /></>}
+            footer={!error && !isLoading && videos.length > 0 ? (
+                <div className="mx-auto w-fit bg-surface-secondary p-2">
+                    <Pagination size="sm">
+                        <Pagination.Summary>第 {page + 1} / {pageCount} 页</Pagination.Summary>
+                        <Pagination.Content>
+                            <Pagination.Item>
+                                <Pagination.Previous aria-label="上一页" isDisabled={page === 0} onPress={() => setPage((value) => Math.max(0, value - 1))}><Pagination.PreviousIcon /></Pagination.Previous>
+                            </Pagination.Item>
+                            <Pagination.Item><Pagination.Link isActive>{page + 1}</Pagination.Link></Pagination.Item>
+                            <Pagination.Item>
+                                <Pagination.Next aria-label="下一页" isDisabled={page + 1 >= pageCount} onPress={() => setPage((value) => value + 1)}><Pagination.NextIcon /></Pagination.Next>
+                            </Pagination.Item>
+                        </Pagination.Content>
+                    </Pagination>
+                </div>
+            ) : null}
+        >
             {error ? (
                 <Alert status="danger">
                     <Alert.Indicator />
@@ -156,29 +185,13 @@ export default function VideoPage() {
                     </Alert.Content>
                 </Alert>
             ) : null}
-            {!error && isLoading ? <VideoGridSkeleton /> : null}
+            {!error && isLoading ? <VideoGridSkeleton gridClassName={videoGridClassName} /> : null}
             {!error && !isLoading && total === 0 ? (
                 <ContentPageEmptyState message={debouncedQuery || watched !== "all" ? "没有匹配的视频。" : "创建视频媒体库并扫描后，视频会显示在这里。"} />
             ) : null}
             {!error && !isLoading && videos.length > 0 ? (
-                <div className="space-y-6">
-                    <div className={styles.grid}>
-                        {videos.map((video) => <VideoCard key={video.id} video={video} onOpen={() => router.push(`/video/${video.id}`)} />)}
-                    </div>
-                    <div className="mx-auto w-fit bg-surface-secondary p-2">
-                            <Pagination size="sm">
-                                <Pagination.Summary>第 {page + 1} / {pageCount} 页</Pagination.Summary>
-                                <Pagination.Content>
-                                    <Pagination.Item>
-                                        <Pagination.Previous aria-label="上一页" isDisabled={page === 0} onPress={() => setPage((value) => Math.max(0, value - 1))}><Pagination.PreviousIcon /></Pagination.Previous>
-                                    </Pagination.Item>
-                                    <Pagination.Item><Pagination.Link isActive>{page + 1}</Pagination.Link></Pagination.Item>
-                                    <Pagination.Item>
-                                        <Pagination.Next aria-label="下一页" isDisabled={page + 1 >= pageCount} onPress={() => setPage((value) => value + 1)}><Pagination.NextIcon /></Pagination.Next>
-                                    </Pagination.Item>
-                                </Pagination.Content>
-                            </Pagination>
-                    </div>
+                <div className={`${styles.grid} ${videoGridClassName}`}>
+                    {videos.map((video) => <VideoCard key={video.id} video={video} onOpen={() => router.push(`/video/${video.id}`)} />)}
                 </div>
             ) : null}
         </ContentPageLayout>

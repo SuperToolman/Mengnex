@@ -79,6 +79,82 @@
         }
       }
     },
+    "/api/auth/me/avatar": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "get_current_user_avatar",
+        "responses": {
+          "200": {
+            "description": "Current user avatar"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "upload_current_user_avatar",
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me/profile": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "update_current_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCurrentUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/roles": {
       "get": {
         "tags": [
@@ -199,6 +275,29 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/auth/users/{id}/avatar": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "get_user_avatar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User avatar"
           }
         }
       }
@@ -790,6 +889,880 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/music/albums": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_albums",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicAlbumResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_album",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicAlbumDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/albums/{id}/cover": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_album_cover",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Album cover"
+          }
+        }
+      }
+    },
+    "/api/music/artists": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_artists",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicArtistResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/artists/{id}": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_artist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicArtistDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/favorites": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_favorites",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicTrackResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/folders": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_folders",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicFolderResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_playlists",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicPlaylistResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "create_playlist",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMusicPlaylistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicPlaylistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/playlists/{id}": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_playlist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicPlaylistDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "delete_playlist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/music/playlists/{id}/tracks": {
+      "post": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "add_playlist_track",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMusicPlaylistTrackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/music/playlists/{id}/tracks/{track_id}": {
+      "delete": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "remove_playlist_track",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "track_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/music/recent": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_recent",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicTrackResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/stats": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_stats",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicLibraryStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "list_tracks",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicTrackResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks/{id}/favorite": {
+      "put": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "update_favorite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMusicFavoriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicFavoriteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks/{id}/lyrics": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "get_lyrics",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicLyricsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/tracks/{id}/playback": {
+      "put": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "update_playback",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMusicPlaybackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicPlaybackResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/novels": {
+      "get": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "list_books",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NovelBookResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/novels/{id}": {
+      "get": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "get_book",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/novels/{id}/chapters/{chapter_id}": {
+      "get": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "get_chapter",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelChapterContentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/novels/{id}/cover": {
+      "get": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "get_cover",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Novel cover"
+          },
+          "404": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/novels/{id}/reading-state": {
+      "get": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "get_reading_state",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NovelReadingStateResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "novels"
+        ],
+        "operationId": "update_reading_state",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNovelReadingStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelReadingStateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
           }
         }
       }
@@ -1987,6 +2960,17 @@
   },
   "components": {
     "schemas": {
+      "AddMusicPlaylistTrackRequest": {
+        "type": "object",
+        "required": [
+          "track_id"
+        ],
+        "properties": {
+          "track_id": {
+            "type": "string"
+          }
+        }
+      },
       "AuthRole": {
         "type": "string",
         "enum": [
@@ -2183,6 +3167,23 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "CreateMusicPlaylistRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -2837,6 +3838,594 @@
           "music",
           "other"
         ]
+      },
+      "MusicAlbumDetailResponse": {
+        "type": "object",
+        "required": [
+          "album",
+          "tracks"
+        ],
+        "properties": {
+          "album": {
+            "$ref": "#/components/schemas/MusicAlbumResponse"
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MusicTrackResponse"
+            }
+          }
+        }
+      },
+      "MusicAlbumResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "title",
+          "track_count",
+          "updated_at"
+        ],
+        "properties": {
+          "artist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cover_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "track_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MusicArtistDetailResponse": {
+        "type": "object",
+        "required": [
+          "artist",
+          "tracks"
+        ],
+        "properties": {
+          "artist": {
+            "$ref": "#/components/schemas/MusicArtistResponse"
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MusicTrackResponse"
+            }
+          }
+        }
+      },
+      "MusicArtistResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "track_count",
+          "album_count"
+        ],
+        "properties": {
+          "album_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "track_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "MusicFavoriteResponse": {
+        "type": "object",
+        "required": [
+          "track_id",
+          "is_favorite"
+        ],
+        "properties": {
+          "is_favorite": {
+            "type": "boolean"
+          },
+          "track_id": {
+            "type": "string"
+          }
+        }
+      },
+      "MusicFolderResponse": {
+        "type": "object",
+        "required": [
+          "path",
+          "track_count"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "track_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "MusicLibraryStatsResponse": {
+        "type": "object",
+        "required": [
+          "track_count",
+          "album_count",
+          "artist_count",
+          "total_duration_seconds",
+          "genres",
+          "years"
+        ],
+        "properties": {
+          "album_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "artist_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "total_duration_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "track_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "years": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "MusicLyricsResponse": {
+        "type": "object",
+        "required": [
+          "track_id"
+        ],
+        "properties": {
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "track_id": {
+            "type": "string"
+          }
+        }
+      },
+      "MusicPlaybackResponse": {
+        "type": "object",
+        "required": [
+          "track_id",
+          "position_seconds",
+          "completed",
+          "last_played_at"
+        ],
+        "properties": {
+          "completed": {
+            "type": "boolean"
+          },
+          "last_played_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "position_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "track_id": {
+            "type": "string"
+          }
+        }
+      },
+      "MusicPlaylistDetailResponse": {
+        "type": "object",
+        "required": [
+          "playlist",
+          "tracks"
+        ],
+        "properties": {
+          "playlist": {
+            "$ref": "#/components/schemas/MusicPlaylistResponse"
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MusicTrackResponse"
+            }
+          }
+        }
+      },
+      "MusicPlaylistResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "track_count",
+          "updated_at"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "track_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MusicTrackResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "file_id",
+          "library_id",
+          "title",
+          "stream_src",
+          "playback_position_seconds",
+          "playback_completed",
+          "is_favorite"
+        ],
+        "properties": {
+          "album_artist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "album_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "album_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bit_depth": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "bitrate_kbps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "codec": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disc_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "duration_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "genre": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_favorite": {
+            "type": "boolean"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "playback_completed": {
+            "type": "boolean"
+          },
+          "playback_position_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "sample_rate_hz": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "stream_src": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "track_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "NovelBookResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "title",
+          "format",
+          "chapter_count",
+          "parse_status"
+        ],
+        "properties": {
+          "author": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chapter_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cover_src": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "parse_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parse_status": {
+            "type": "string"
+          },
+          "parsed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "NovelChapterContentResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "book_id",
+          "title",
+          "sequence",
+          "content",
+          "word_count"
+        ],
+        "properties": {
+          "book_id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "word_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NovelChapterResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "sequence",
+          "title",
+          "word_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "word_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NovelDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NovelBookResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "chapters"
+            ],
+            "properties": {
+              "chapters": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NovelChapterResponse"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NovelReadingStateResponse": {
+        "type": "object",
+        "required": [
+          "progress_percent",
+          "updated_at"
+        ],
+        "properties": {
+          "chapter_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_percent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "PhotoAssetResponse": {
         "type": "object",
@@ -3535,6 +5124,23 @@
           }
         }
       },
+      "UpdateCurrentUserRequest": {
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "UpdateLibraryPreviewConfigRequest": {
         "type": "object",
         "required": [
@@ -3605,6 +5211,59 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "UpdateMusicFavoriteRequest": {
+        "type": "object",
+        "required": [
+          "favorite"
+        ],
+        "properties": {
+          "favorite": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateMusicPlaybackRequest": {
+        "type": "object",
+        "required": [
+          "position_seconds"
+        ],
+        "properties": {
+          "completed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "position_seconds": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "UpdateNovelReadingStateRequest": {
+        "type": "object",
+        "required": [
+          "progress_percent"
+        ],
+        "properties": {
+          "chapter_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_percent": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -4158,6 +5817,10 @@
     {
       "name": "manga",
       "description": "Image manga series, chapters and reader pages"
+    },
+    {
+      "name": "novels",
+      "description": "EPUB and text novel library and reader"
     },
     {
       "name": "authors",

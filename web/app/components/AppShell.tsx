@@ -11,7 +11,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const isPublicPath = PUBLIC_PATHS.has(pathname);
-    const isMangaReader = pathname.startsWith("/manga/read/");
+    const isImmersiveReader = pathname.startsWith("/manga/read/") || pathname.startsWith("/novel/read/");
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const hasCheckedSessionRef = useRef(false);
 
@@ -65,8 +65,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (isMangaReader) {
-        return <main className="h-dvh overflow-hidden bg-[#111111]">{children}</main>;
+    if (isImmersiveReader) {
+        return <main className="h-dvh overflow-hidden bg-background">{children}</main>;
     }
 
     return (

@@ -11,6 +11,8 @@ pub trait MediaProcessor: Send + Sync {
 pub struct PhotoProcessor;
 
 pub struct VideoProcessor;
+pub struct NovelProcessor;
+pub struct MusicProcessor;
 
 impl MediaProcessor for PhotoProcessor {
     fn media_type(&self) -> &'static str {
@@ -63,13 +65,53 @@ impl MediaProcessor for VideoProcessor {
     }
 }
 
+impl MediaProcessor for NovelProcessor {
+    fn media_type(&self) -> &'static str {
+        "novel"
+    }
+
+    fn accepts(&self, _mime_type: Option<&str>, file_name: &str) -> bool {
+        file_name.rsplit_once('.').is_some_and(|(_, extension)| {
+            matches!(extension.to_ascii_lowercase().as_str(), "epub" | "txt")
+        })
+    }
+
+    fn creates_derived_assets(&self) -> bool {
+        true
+    }
+}
+
+impl MediaProcessor for MusicProcessor {
+    fn media_type(&self) -> &'static str {
+        "music"
+    }
+    fn accepts(&self, _mime_type: Option<&str>, file_name: &str) -> bool {
+        file_name.rsplit_once('.').is_some_and(|(_, extension)| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "mp3" | "flac" | "m4a" | "aac" | "ogg" | "opus" | "wav"
+            )
+        })
+    }
+    fn creates_derived_assets(&self) -> bool {
+        true
+    }
+}
+
 static PHOTO_PROCESSOR: PhotoProcessor = PhotoProcessor;
 static VIDEO_PROCESSOR: VideoProcessor = VideoProcessor;
+static NOVEL_PROCESSOR: NovelProcessor = NovelProcessor;
+static MUSIC_PROCESSOR: MusicProcessor = MusicProcessor;
 
 pub fn processor_for(media_type: &str) -> Option<&'static dyn MediaProcessor> {
     // Add video, music, book, comic, and game processors here without
     // changing source enumeration or the common media index.
-    let processors: [&dyn MediaProcessor; 2] = [&PHOTO_PROCESSOR, &VIDEO_PROCESSOR];
+    let processors: [&dyn MediaProcessor; 4] = [
+        &PHOTO_PROCESSOR,
+        &VIDEO_PROCESSOR,
+        &NOVEL_PROCESSOR,
+        &MUSIC_PROCESSOR,
+    ];
 
     if matches!(media_type, "mixed_video" | "movie" | "anime" | "series") {
         return Some(&VIDEO_PROCESSOR);
@@ -100,5 +142,24 @@ mod tests {
         assert!(processor.accepts(None, "episode.mkv"));
         assert!(!processor.accepts(Some("image/jpeg"), "cover.jpg"));
         assert!(!processor.accepts(Some("video/webp"), "cover.webp"));
+    }
+
+    #[test]
+    fn novel_processor_accepts_epub_and_text() {
+        let processor = processor_for("novel").expect("novel processor");
+        assert!(processor.creates_derived_assets());
+        assert!(processor.accepts(None, "book.epub"));
+        assert!(processor.accepts(None, "book.txt"));
+        assert!(!processor.accepts(None, "book.pdf"));
+    }
+
+    #[test]
+    fn music_processor_accepts_common_audio_containers() {
+        let processor = processor_for("music").expect("music processor");
+        assert!(processor.creates_derived_assets());
+        assert!(processor.accepts(Some("audio/mpeg"), "track.mp3"));
+        assert!(processor.accepts(None, "album.flac"));
+        assert!(processor.accepts(None, "voice.opus"));
+        assert!(!processor.accepts(None, "cover.jpg"));
     }
 }

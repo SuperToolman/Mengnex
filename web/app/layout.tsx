@@ -4,6 +4,7 @@ import "./globals.css";
 import AppShell from "./components/AppShell";
 import { ThemeProvider } from "./components/ThemeProvider";
 import GlobalToastProvider from "./components/GlobalToastProvider";
+import { MusicPlayerProvider } from "./components/MusicPlayerProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,8 +34,10 @@ export default function RootLayout({
     >
       <body className="h-full overflow-hidden">
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
-          <GlobalToastProvider />
+          <MusicPlayerProvider>
+            <AppShell>{children}</AppShell>
+            <GlobalToastProvider />
+          </MusicPlayerProvider>
         </ThemeProvider>
       </body>
     </html>

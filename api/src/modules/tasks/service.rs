@@ -1,7 +1,11 @@
 use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::time::sleep;
 
 use crate::{
@@ -12,6 +16,17 @@ use crate::{
         tasks::dto::{TaskKind, TaskResponse},
     },
 };
+
+static BACKGROUND_PERMITS: OnceLock<Arc<Semaphore>> = OnceLock::new();
+
+pub async fn acquire_global_background_permit() -> OwnedSemaphorePermit {
+    BACKGROUND_PERMITS
+        .get_or_init(|| Arc::new(Semaphore::new(2)))
+        .clone()
+        .acquire_owned()
+        .await
+        .expect("background semaphore is never closed")
+}
 
 #[derive(Debug)]
 pub struct CreateAppTaskParams {

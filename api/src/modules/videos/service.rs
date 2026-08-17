@@ -400,7 +400,7 @@ pub async fn analyze_library_assets(
         .all(db)
         .await?;
     let mut summary = VideoAnalysisSummary {
-        total_assets: total_assets,
+        total_assets,
         ..Default::default()
     };
     update_analysis_progress(db, task_id, &summary, base_completed).await?;

@@ -8,6 +8,7 @@ import {
     SIDEBAR_CONFIG,
     type SidebarItem,
 } from "@/types/sidebar";
+import UserSidebarItem from "./UserSidebarItem";
 
 const SIDEBAR_STORAGE_KEY = "mengnex.sidebar.expanded";
 
@@ -294,7 +295,10 @@ export default function SideBar() {
                 </div>
                 <SidebarSection items={SIDEBAR_CONFIG} pathname={pathname} expanded={expanded} />
             </div>
-            <SidebarSection items={SIDEBAR_BOTTOM_CONFIG} pathname={pathname} expanded={expanded} />
+            <div>
+                <UserSidebarItem expanded={expanded} />
+                <SidebarSection items={SIDEBAR_BOTTOM_CONFIG} pathname={pathname} expanded={expanded} />
+            </div>
         </aside>
     );
 }

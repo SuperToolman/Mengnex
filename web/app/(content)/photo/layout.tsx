@@ -1,4 +1,4 @@
-import PhotoSideBar from "./components/PhotoSideBar";
+import PhotoSideBar, { PhotoSearchControl, PhotoZoomControl } from "./components/PhotoSideBar";
 import { PhotoShellProvider } from "./components/PhotoShellContext";
 import ContentPageLayout from "@/app/components/ContentPageLayout";
 
@@ -9,6 +9,8 @@ export default function PhotoLayout({ children }: Readonly<{ children: React.Rea
                 title="照片"
                 description="按拍摄日期浏览照片媒体库。"
                 header={<PhotoSideBar />}
+                center={<PhotoSearchControl />}
+                actions={<PhotoZoomControl />}
             >
                 {children}
             </ContentPageLayout>
