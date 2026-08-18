@@ -5,6 +5,7 @@ import {
     Display,
     Gear,
     Ghost,
+    FaceRobot,
     MusicNote,
     Picture,
     Snail,
@@ -22,6 +23,12 @@ export interface SidebarItem {
 }
 
 export const SIDEBAR_CONFIG: SidebarItem[] = [
+    {
+        id: "agent",
+        icon: FaceRobot,
+        label: "Agent",
+        href: "/agent",
+    },
     {
         id: "video",
         icon: CirclePlay,

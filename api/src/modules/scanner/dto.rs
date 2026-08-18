@@ -7,6 +7,7 @@ use crate::infra::entities::scan_task;
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScanTaskStatus {
+    Queued,
     Running,
     Paused,
     Completed,
@@ -17,6 +18,7 @@ pub enum ScanTaskStatus {
 impl std::fmt::Display for ScanTaskStatus {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
+            Self::Queued => "queued",
             Self::Running => "running",
             Self::Paused => "paused",
             Self::Completed => "completed",

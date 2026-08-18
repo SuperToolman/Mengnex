@@ -59,8 +59,6 @@ pub fn router(db: DatabaseConnection) -> Router {
 
     Router::new()
         .route("/health", get(health::health))
-        .route("/docs", get(swagger_ui))
-        .route("/openapi.json", get(openapi_json))
         .merge(auth::public_routes())
         .merge(protected)
         .layer(PropagateRequestIdLayer::x_request_id())
@@ -72,8 +70,8 @@ pub fn router(db: DatabaseConnection) -> Router {
         .layer(
             CorsLayer::new()
                 .allow_origin(AllowOrigin::list([
-                    HeaderValue::from_static("http://localhost:3000"),
-                    HeaderValue::from_static("http://127.0.0.1:3000"),
+                    HeaderValue::from_static("http://localhost:7589"),
+                    HeaderValue::from_static("http://127.0.0.1:7589"),
                 ]))
                 .allow_methods([
                     Method::GET,
@@ -86,6 +84,13 @@ pub fn router(db: DatabaseConnection) -> Router {
                 .allow_credentials(true),
         )
         .with_state(state)
+}
+
+/// API documentation is intentionally exposed on its own local listener.
+pub fn docs_router() -> Router {
+    Router::new()
+        .route("/docs", get(swagger_ui))
+        .route("/openapi.json", get(openapi_json))
 }
 
 async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {

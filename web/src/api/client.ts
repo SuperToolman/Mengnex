@@ -1,4 +1,4 @@
-import { client as generatedClient } from "./generated/client.gen";
+import { API_BASE_URL, execute, sdkOptions, toAbsoluteUrl } from "./transport";
 import {
     cancelTask as cancelTaskSdk,
     clearCompletedTasks as clearCompletedTasksSdk,
@@ -19,9 +19,6 @@ import {
     getReader,
     getSeries,
     getVideo as getVideoSdk,
-    getAlbum as getMusicAlbumSdk,
-    getArtist as getMusicArtistSdk,
-    getPlaylist as getMusicPlaylistSdk,
     listLibraries,
     listAuthors,
     listSeries,
@@ -35,15 +32,6 @@ import {
     listTasks,
     listVideos,
     listVideoCatalog,
-    listAlbums as listMusicAlbumsSdk,
-    listArtists as listMusicArtistsSdk,
-    listTracks as listMusicTracksSdk,
-    listFavorites as listMusicFavoritesSdk,
-    listRecent as listMusicRecentSdk,
-    listPlaylists as listMusicPlaylistsSdk,
-    createPlaylist as createMusicPlaylistSdk,
-    addPlaylistTrack as addMusicPlaylistTrackSdk,
-    removePlaylistTrack as removeMusicPlaylistTrackSdk,
     listBooks as listNovelBooksSdk,
     getBook as getNovelBookSdk,
     getChapter as getNovelChapterSdk,
@@ -70,8 +58,6 @@ import {
     updatePreferences as updatePreferencesSdk,
     updateTag as updateTagSdk,
     updatePlayback as updateVideoPlaybackSdk,
-    updatePlayback2 as updateMusicPlaybackSdk,
-    updateFavorite as updateMusicFavoriteSdk,
 } from "./generated/sdk.gen";
 import type {
     AuthRole,
@@ -88,9 +74,6 @@ import type {
     LibraryPreviewJobResponse,
     LibraryPreviewStatusResponse,
     MediaType,
-    UpdateMusicPlaybackRequest,
-    UpdateMusicFavoriteRequest,
-    CreateMusicPlaylistRequest,
     MangaDetailResponse,
     MangaReaderResponse,
     MangaSeriesResponse,
@@ -190,43 +173,7 @@ export type LibraryCoversResponse = {
     videos: VideoAssetResponse[];
 };
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-const sdkOptions = { throwOnError: true as const };
-
-generatedClient.setConfig({
-    baseUrl: API_BASE_URL,
-    credentials: "include",
-});
-
-generatedClient.interceptors.response.use((response) => {
-    if (response.status === 401 && typeof window !== "undefined") {
-        const path = new URL(response.url).pathname;
-        if (!path.startsWith("/api/auth/")) window.location.assign("/login");
-    }
-    return response;
-});
-
-async function execute<T>(request: Promise<T>): Promise<T> {
-    try {
-        return await request;
-    } catch (error) {
-        if (error instanceof Error) {
-            if (/failed to fetch|networkerror|load failed/i.test(error.message)) {
-                throw new Error("无法连接 API 服务，请先启动后端服务");
-            }
-            throw error;
-        }
-        if (error && typeof error === "object" && "message" in error) {
-            throw new Error(String(error.message));
-        }
-        throw new Error("API 请求失败，请检查后端服务日志");
-    }
-}
-
-function toAbsoluteUrl(url?: string | null) {
-    if (!url) return undefined;
-    return url.startsWith("http") || !API_BASE_URL ? url : `${API_BASE_URL}${url}`;
-}
+export { API_BASE_URL };
 
 function normalizePhoto(photo: PhotoAssetResponse): PhotoAssetResponse {
     return {
@@ -465,42 +412,6 @@ export async function getMangaSeries() {
 }
 export async function getMangaDetail(id: string) { return execute(getSeries({ ...sdkOptions, path: { id } })); }
 export async function getMangaReader(chapterId: string) { return execute(getReader({ ...sdkOptions, path: { id: chapterId } })); }
-
-export type ListMusicParams = { libraryId?: string; search?: string; limit?: number; offset?: number };
-export type MusicBrowseParams = ListMusicParams & { genre?: string; year?: number; albumArtist?: string; sort?: "title" | "artist" | "year" | "duration" };
-export type MusicLibraryStats = { track_count: number; album_count: number; artist_count: number; total_duration_seconds: number; genres: string[]; years: number[] };
-export type MusicFolder = { path: string; track_count: number };
-export type MusicLyrics = { track_id: string; source?: string | null; content?: string | null };
-async function getMusicJson<T>(path: string, params?: Record<string, string | number | undefined>) {
-    const query = new URLSearchParams(Object.entries(params ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined).map(([key, value]) => [key, String(value)])).toString();
-    const response = await fetch(`${API_BASE_URL}${path}${query ? `?${query}` : ""}`, { credentials: "include" });
-    if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? "音乐数据加载失败");
-    return response.json() as Promise<T>;
-}
-export async function getMusicAlbums(params?: ListMusicParams) {
-    const albums = await execute(listMusicAlbumsSdk({ ...sdkOptions, query: { library_id: params?.libraryId, search: params?.search, limit: params?.limit, offset: params?.offset } }));
-    return albums.map((album) => ({ ...album, cover_src: toAbsoluteUrl(album.cover_src) }));
-}
-export async function getMusicAlbum(id: string) {
-    const detail = await execute(getMusicAlbumSdk({ ...sdkOptions, path: { id } }));
-    return { ...detail, album: { ...detail.album, cover_src: toAbsoluteUrl(detail.album.cover_src) } };
-}
-export async function getMusicArtists(params?: Pick<ListMusicParams, "libraryId">) { return execute(listMusicArtistsSdk({ ...sdkOptions, query: { library_id: params?.libraryId } })); }
-export async function getMusicArtist(id: string) { return execute(getMusicArtistSdk({ ...sdkOptions, path: { id } })); }
-export async function getMusicTracks(params?: ListMusicParams) { return execute(listMusicTracksSdk({ ...sdkOptions, query: { library_id: params?.libraryId, search: params?.search, limit: params?.limit, offset: params?.offset } })); }
-export async function browseMusicTracks(params?: MusicBrowseParams) { return getMusicJson<import("./generated/types.gen").MusicTrackResponse[]>("/api/music/tracks", { library_id: params?.libraryId, search: params?.search, limit: params?.limit, offset: params?.offset, genre: params?.genre, year: params?.year, album_artist: params?.albumArtist, sort: params?.sort }); }
-export async function getMusicStats(libraryId?: string) { return getMusicJson<MusicLibraryStats>("/api/music/stats", { library_id: libraryId }); }
-export async function getMusicFolders(libraryId?: string) { return getMusicJson<MusicFolder[]>("/api/music/folders", { library_id: libraryId }); }
-export async function getMusicLyrics(trackId: string) { return getMusicJson<MusicLyrics>(`/api/music/tracks/${encodeURIComponent(trackId)}/lyrics`); }
-export async function updateMusicPlayback(trackId: string, payload: UpdateMusicPlaybackRequest) { return execute(updateMusicPlaybackSdk({ ...sdkOptions, path: { id: trackId }, body: payload })); }
-export async function getMusicFavorites() { return execute(listMusicFavoritesSdk(sdkOptions)); }
-export async function getMusicRecent() { return execute(listMusicRecentSdk(sdkOptions)); }
-export async function updateMusicFavorite(trackId: string, payload: UpdateMusicFavoriteRequest) { return execute(updateMusicFavoriteSdk({ ...sdkOptions, path: { id: trackId }, body: payload })); }
-export async function getMusicPlaylists() { return execute(listMusicPlaylistsSdk(sdkOptions)); }
-export async function createMusicPlaylist(payload: CreateMusicPlaylistRequest) { return execute(createMusicPlaylistSdk({ ...sdkOptions, body: payload })); }
-export async function getMusicPlaylist(id: string) { return execute(getMusicPlaylistSdk({ ...sdkOptions, path: { id } })); }
-export async function addMusicPlaylistTrack(playlistId: string, trackId: string) { return execute(addMusicPlaylistTrackSdk({ ...sdkOptions, path: { id: playlistId }, body: { track_id: trackId } })); }
-export async function removeMusicPlaylistTrack(playlistId: string, trackId: string) { return execute(removeMusicPlaylistTrackSdk({ ...sdkOptions, path: { id: playlistId, track_id: trackId } })); }
 
 export async function getNovels(params?: ListNovelsParams) {
     const books = await execute(listNovelBooksSdk({ ...sdkOptions, query: {

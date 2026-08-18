@@ -5,10 +5,13 @@ $root = $PSScriptRoot
 
 $script:backend = $null
 $script:frontend = $null
+$script:agent = $null
 $script:cleanupDone = $false
 
-$backendPort = if ([string]::IsNullOrWhiteSpace($env:PORT)) { 3001 } else { [int]$env:PORT }
-$frontendPort = 3000
+$backendPort = if ([string]::IsNullOrWhiteSpace($env:PORT)) { 7587 } else { [int]$env:PORT }
+$docsPort = if ([string]::IsNullOrWhiteSpace($env:API_DOCS_PORT)) { 7588 } else { [int]$env:API_DOCS_PORT }
+$frontendPort = if ([string]::IsNullOrWhiteSpace($env:WEB_PORT)) { 7589 } else { [int]$env:WEB_PORT }
+$agentPort = if ([string]::IsNullOrWhiteSpace($env:AGENT_PORT)) { 7590 } else { [int]$env:AGENT_PORT }
 
 function Stop-ListenerOnPort {
     param(
@@ -77,11 +80,11 @@ function Cleanup {
     Write-Host "  正在关闭所有服务..." -ForegroundColor Yellow
     Write-Host "===========================================" -ForegroundColor Yellow
 
-    foreach ($proc in @($script:backend, $script:frontend)) {
+    foreach ($proc in @($script:backend, $script:frontend, $script:agent)) {
         if ($null -eq $proc) { continue }
         $processId = $proc.Id
         $runningProc = Get-Process -Id $processId -ErrorAction SilentlyContinue
-        $name = if ($processId -eq $script:backend.Id) { 'Backend' } elseif ($processId -eq $script:frontend.Id) { 'Frontend' } else { "PID $processId" }
+        $name = if ($processId -eq $script:backend.Id) { 'Backend' } elseif ($processId -eq $script:frontend.Id) { 'Frontend' } elseif ($processId -eq $script:agent.Id) { 'Agent' } else { "PID $processId" }
         if ($null -ne $runningProc) {
             try {
                 Stop-Process -Id $processId -Force -ErrorAction Stop
@@ -99,6 +102,8 @@ function Cleanup {
         @{ Name = 'cargo'; Path = "$root\api" }
         @{ Name = 'pnpm';  Path = "$root\web" }
         @{ Name = 'node';  Path = "$root\web" }
+        @{ Name = 'pnpm';  Path = "$root\agent" }
+        @{ Name = 'node';  Path = "$root\agent" }
     )
     foreach ($t in $extraProcs) {
         Get-Process -Name $t.Name -ErrorAction SilentlyContinue | Where-Object {
@@ -146,7 +151,12 @@ try {
     # -- 启动前清理端口占用 ----------------------------------
     Write-Host "[+] 检查并清理残留进程..." -ForegroundColor Green
     Stop-ListenerOnPort -Port $backendPort -ServiceName 'Backend'
+    Stop-ListenerOnPort -Port $docsPort -ServiceName 'API Docs'
     Stop-ListenerOnPort -Port $frontendPort -ServiceName 'Frontend'
+    Stop-ListenerOnPort -Port $agentPort -ServiceName 'Agent'
+    if ($backendPort -ne 3001) { Stop-ListenerOnPort -Port 3001 -ServiceName 'Legacy Backend' }
+    if ($frontendPort -ne 3000) { Stop-ListenerOnPort -Port 3000 -ServiceName 'Legacy Frontend' }
+    if ($agentPort -ne 3010) { Stop-ListenerOnPort -Port 3010 -ServiceName 'Legacy Agent' }
     Write-Host ""
 
     # -- 后端 ------------------------------------------------
@@ -154,6 +164,8 @@ try {
     Write-Host "  端口: $backendPort  (可通过 PORT 环境变量修改)" -ForegroundColor Gray
     Write-Host "  工作目录: $root\api" -ForegroundColor Gray
 
+    $env:PORT = "$backendPort"
+    $env:API_DOCS_PORT = "$docsPort"
     $script:backend = Start-Process -NoNewWindow -PassThru `
         -FilePath "cargo" -ArgumentList "run" `
         -WorkingDirectory "$root\api"
@@ -162,10 +174,11 @@ try {
     # 后端可用后再启动前端，避免后端启动失败时留下孤立前端进程。
     Write-Host "  等待后端编译启动..." -ForegroundColor Gray
     Wait-ForListenerOnPort -Port $backendPort -ServiceName 'Backend' -ProcessId $script:backend.Id
+    Wait-ForListenerOnPort -Port $docsPort -ServiceName 'API Docs' -ProcessId $script:backend.Id
 
     # -- 前端 ------------------------------------------------
     Write-Host "[+] 启动前端 (Next.js)..." -ForegroundColor Green
-    Write-Host "  端口: 3000" -ForegroundColor Gray
+    Write-Host "  端口: $frontendPort" -ForegroundColor Gray
     Write-Host "  工作目录: $root\web" -ForegroundColor Gray
 
     # 查找 pnpm 的可执行文件（优先 .cmd，避免 .ps1 无法被 Start-Process 执行）
@@ -182,25 +195,44 @@ try {
     }
     if ($pnpmPath) {
         $script:frontend = Start-Process -NoNewWindow -PassThru `
-            -FilePath $pnpmPath -ArgumentList "dev" `
+            -FilePath $pnpmPath -ArgumentList "dev --port $frontendPort" `
             -WorkingDirectory "$root\web"
     } else {
         # 回退：通过 cmd 启动 pnpm
         $script:frontend = Start-Process -NoNewWindow -PassThru `
-            -FilePath "cmd" -ArgumentList "/c pnpm dev" `
+            -FilePath "cmd" -ArgumentList "/c pnpm dev --port $frontendPort" `
             -WorkingDirectory "$root\web"
     }
     Write-Host "  PID: $($script:frontend.Id)" -ForegroundColor Gray
     Write-Host "  等待前端启动..." -ForegroundColor Gray
     Wait-ForListenerOnPort -Port $frontendPort -ServiceName 'Frontend' -TimeoutSeconds 30
 
+    # -- Agent --------------------------------------------------
+    Write-Host "[+] 启动 Agent Gateway..." -ForegroundColor Green
+    Write-Host "  端口: $agentPort" -ForegroundColor Gray
+    Write-Host "  工作目录: $root\agent" -ForegroundColor Gray
+    $env:AGENT_PORT = "$agentPort"
+    $env:RUST_API_URL = "http://127.0.0.1:$backendPort"
+    if ($pnpmPath) {
+        $script:agent = Start-Process -NoNewWindow -PassThru `
+            -FilePath $pnpmPath -ArgumentList "dev" `
+            -WorkingDirectory "$root\agent"
+    } else {
+        $script:agent = Start-Process -NoNewWindow -PassThru `
+            -FilePath "cmd" -ArgumentList "/c pnpm dev" `
+            -WorkingDirectory "$root\agent"
+    }
+    Write-Host "  PID: $($script:agent.Id)" -ForegroundColor Gray
+    Wait-ForListenerOnPort -Port $agentPort -ServiceName 'Agent' -ProcessId $script:agent.Id -TimeoutSeconds 30
+
     # -- 完成提示 --------------------------------------------
     Write-Host ""
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host "  两个服务正在运行!" -ForegroundColor Cyan
+    Write-Host "  三个服务正在运行!" -ForegroundColor Cyan
     Write-Host "  后端 API: http://localhost:$backendPort" -ForegroundColor White
-    Write-Host "  API 文档: http://localhost:$backendPort/docs" -ForegroundColor White
+    Write-Host "  API 文档: http://localhost:$docsPort/docs" -ForegroundColor White
     Write-Host "  前端界面: http://localhost:$frontendPort" -ForegroundColor White
+    Write-Host "  Agent Gateway: http://localhost:$agentPort" -ForegroundColor White
     Write-Host "  按 Ctrl+C 关闭所有服务" -ForegroundColor Yellow
     Write-Host "===========================================" -ForegroundColor Cyan
 
@@ -210,8 +242,16 @@ try {
             Write-Host "`n[!] Backend 已退出，正在关闭所有进程..." -ForegroundColor Red
             break
         }
+        if (-not (Get-NetTCPConnection -LocalPort $docsPort -State Listen -ErrorAction SilentlyContinue)) {
+            Write-Host "`n[!] API Docs 已退出，正在关闭所有进程..." -ForegroundColor Red
+            break
+        }
         if (-not (Get-NetTCPConnection -LocalPort $frontendPort -State Listen -ErrorAction SilentlyContinue)) {
             Write-Host "`n[!] Frontend 已退出，正在关闭所有进程..." -ForegroundColor Red
+            break
+        }
+        if (-not (Get-NetTCPConnection -LocalPort $agentPort -State Listen -ErrorAction SilentlyContinue)) {
+            Write-Host "`n[!] Agent 已退出，正在关闭所有进程..." -ForegroundColor Red
             break
         }
         Start-Sleep -Seconds 1

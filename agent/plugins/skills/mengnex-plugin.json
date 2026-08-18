@@ -1,0 +1,42 @@
+{
+  "id": "skills",
+  "name": "Skills",
+  "version": "0.1.0",
+  "description": "将受信任技能说明注入 Agent 的系统上下文。",
+  "kind": "skill",
+  "dependencies": ["agent-loop"],
+  "provides": ["agent-context"],
+  "permissions": [],
+  "origin": "local",
+  "configurable": true,
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "skills": {
+        "type": "array",
+        "title": "技能",
+        "description": "每项技能会作为受信任指令注入 Agent 的系统上下文。",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "技能",
+          "required": ["id", "instruction"],
+          "properties": {
+            "id": { "type": "string", "title": "标识", "description": "小写字母、数字和连字符。" },
+            "instruction": { "type": "string", "title": "指令", "format": "textarea", "description": "提供给 Agent 的明确工作规则。" }
+          }
+        }
+      }
+    }
+  },
+  "ui": {
+    "settings": {
+      "label": "技能",
+      "description": "管理 Agent 在每次推理中可用的受信任技能指令。",
+      "icon": "sparkles"
+    }
+  },
+  "default_installed": false,
+  "entry": "./index.js"
+}

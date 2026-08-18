@@ -25,7 +25,6 @@ pub async fn connect() -> Result<DatabaseConnection, DbErr> {
 
     reset_legacy_schema_if_needed(&db).await?;
     create_tables(&db).await?;
-    rebuild_music_schema(&db).await?;
     normalize_legacy_app_tasks(&db).await?;
     ensure_avatar_directories()?;
     backfill_app_tasks(&db).await?;
@@ -107,6 +106,7 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     create_table(db, photo_asset::Entity).await?;
     create_table(db, photo_folder::Entity).await?;
     ensure_schema_columns(db).await?;
+    ensure_music_schema(db).await?;
     backfill_author_avatar_history(db).await?;
     create_indexes(db).await?;
     ensure_default_app_settings(db).await?;
@@ -115,7 +115,40 @@ async fn create_tables(db: &DatabaseConnection) -> Result<(), DbErr> {
     Ok(())
 }
 
-async fn rebuild_music_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
+async fn ensure_music_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
+    let tables = [
+        "music_albums",
+        "music_tracks",
+        "music_playback_states",
+        "music_artists",
+        "music_track_artists",
+        "music_favorites",
+        "music_playlists",
+        "music_playlist_tracks",
+    ];
+    let existing = db
+        .query_all(Statement::from_string(
+            DbBackend::Sqlite,
+            "SELECT name FROM sqlite_master WHERE type = 'table'".to_owned(),
+        ))
+        .await?
+        .into_iter()
+        .map(|row| row.try_get::<String>("", "name"))
+        .collect::<Result<HashSet<_>, _>>()?;
+    let reset_requested = env::var("MENGNEX_RESET_MUSIC_SCHEMA")
+        .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE"));
+
+    if !reset_requested && tables.iter().all(|table| existing.contains(*table)) {
+        return Ok(());
+    }
+
+    if reset_requested || tables.iter().any(|table| existing.contains(*table)) {
+        tracing::warn!(
+            reset_requested,
+            "rebuilding incomplete or explicitly reset music schema; music indexes and user music state will be removed"
+        );
+    }
+
     for table in [
         "music_playlist_tracks",
         "music_playlists",
@@ -691,5 +724,48 @@ mod tests {
         drop(connections);
         db.close().await.expect("close temporary SQLite database");
         fs::remove_file(&database_path).expect("remove temporary SQLite database");
+    }
+
+    #[tokio::test]
+    async fn existing_music_schema_is_not_rebuilt_on_connect() {
+        let database_path = env::temp_dir().join(format!("mengnex-music-{}.db", Uuid::new_v4()));
+        let database_url = format!(
+            "sqlite://{}?mode=rwc",
+            database_path.to_string_lossy().replace('\\', "/")
+        );
+        let db = Database::connect(database_connect_options(database_url))
+            .await
+            .expect("connect to temporary SQLite database");
+
+        ensure_music_schema(&db).await.expect("create music schema");
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            "INSERT INTO music_albums (id, library_id, title, normalized_title, track_count, created_at, updated_at) VALUES ('album', 'library', 'Album', 'album', 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')".to_owned(),
+        ))
+        .await
+        .expect("insert music album");
+
+        ensure_music_schema(&db)
+            .await
+            .expect("preserve existing music schema");
+        let rows = db
+            .query_all(Statement::from_string(
+                DbBackend::Sqlite,
+                "SELECT id FROM music_albums WHERE id = 'album'".to_owned(),
+            ))
+            .await
+            .expect("query preserved music album");
+        assert_eq!(rows.len(), 1);
+
+        db.close().await.expect("close temporary SQLite database");
+        let mut removed = false;
+        for _ in 0..10 {
+            if fs::remove_file(&database_path).is_ok() {
+                removed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(removed, "remove temporary SQLite database");
     }
 }

@@ -1,0 +1,14 @@
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "0.1.0",
+  "description": "验证外部 Cordis 插件包可安全调用 Mengnex Rust API 健康检查。",
+  "kind": "integration",
+  "dependencies": ["agent-runtime"],
+  "provides": ["hello-world.health"],
+  "permissions": ["rust-api"],
+  "origin": "local",
+  "configurable": false,
+  "default_installed": false,
+  "entry": "./index.js"
+}

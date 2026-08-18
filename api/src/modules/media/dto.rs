@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::infra::entities::{media_file, media_item};
@@ -38,6 +39,23 @@ pub struct MediaFileResponse {
     pub created_at: DateTime<Utc>,
     #[schema(value_type = String, format = DateTime)]
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ImportExternalMediaRequest {
+    pub library_id: String,
+    pub title: String,
+    pub source: String,
+    pub external_id: String,
+    pub source_url: Option<String>,
+    pub year: Option<i32>,
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ImportExternalMediaResponse {
+    pub item: MediaItemResponse,
+    pub created: bool,
 }
 
 impl From<media_item::Model> for MediaItemResponse {

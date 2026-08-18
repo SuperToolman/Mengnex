@@ -277,7 +277,7 @@ pub async fn metadata_candidates(title: &str, artist: Option<&str>) -> Vec<Metad
             candidates.append(&mut items);
         }
     }
-    candidates.sort_by(|left, right| right.score.cmp(&left.score));
+    candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.score));
     candidates
 }
 

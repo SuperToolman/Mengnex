@@ -7,13 +7,16 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use chrono::Utc;
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
+    Set, TransactionTrait, sea_query::Expr,
 };
 use serde::Deserialize;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 use tokio_util::io::ReaderStream;
+use uuid::Uuid;
 
 use crate::{
     core::{app::AppState, error::ApiError},
@@ -21,13 +24,118 @@ use crate::{
     modules::photos::service::resolve_derivative_path,
     modules::{
         auth::service::CurrentUser,
-        media::dto::{MediaFileResponse, MediaItemResponse},
+        media::dto::{
+            ImportExternalMediaRequest, ImportExternalMediaResponse, MediaFileResponse,
+            MediaItemResponse,
+        },
         sources,
     },
 };
 
 const DERIVATIVE_CACHE_CONTROL: &str = "private, max-age=604800, immutable";
 const ORIGINAL_CACHE_CONTROL: &str = "private, max-age=3600";
+
+#[utoipa::path(
+    post,
+    path = "/api/media/import",
+    request_body = ImportExternalMediaRequest,
+    responses((status = 200, body = ImportExternalMediaResponse)),
+    tag = "media"
+)]
+pub async fn import_external_media(
+    Extension(current): Extension<CurrentUser>,
+    State(state): State<AppState>,
+    Json(payload): Json<ImportExternalMediaRequest>,
+) -> Result<Json<ImportExternalMediaResponse>, ApiError> {
+    let library_id = payload.library_id.trim();
+    let title = payload.title.trim();
+    let source = payload.source.trim();
+    let external_id = payload.external_id.trim();
+    if library_id.is_empty() || title.is_empty() || source.is_empty() || external_id.is_empty() {
+        return Err(ApiError::BadRequest(
+            "library_id, title, source and external_id are required".to_owned(),
+        ));
+    }
+    if !current.can_access_library(library_id) {
+        return Err(ApiError::NotFound("media library"));
+    }
+    let library = media_library::Entity::find_by_id(library_id)
+        .one(&state.db)
+        .await?
+        .ok_or(ApiError::NotFound("media library"))?;
+    let source_locator = format!("external:{source}:{external_id}");
+    let now = Utc::now();
+    let metadata_json = payload.metadata.map(|value| value.to_string());
+    let original_path = payload.source_url.unwrap_or_else(|| source_locator.clone());
+    let txn = state.db.begin().await?;
+
+    if let Some(file) = media_file::Entity::find()
+        .filter(media_file::Column::LibraryId.eq(library_id))
+        .filter(media_file::Column::SourceLocator.eq(source_locator.clone()))
+        .one(&txn)
+        .await?
+    {
+        let item = media_item::Entity::find_by_id(file.item_id)
+            .one(&txn)
+            .await?
+            .ok_or(ApiError::NotFound("media item"))?;
+        let mut active: media_item::ActiveModel = item.into();
+        active.title = Set(title.to_owned());
+        active.sort_title = Set(Some(title.to_lowercase()));
+        active.original_path = Set(original_path);
+        active.year = Set(payload.year);
+        active.metadata_json = Set(metadata_json);
+        active.deleted_at = Set(None);
+        active.source_missing_at = Set(None);
+        active.updated_at = Set(now);
+        let item = active.update(&txn).await?;
+        txn.commit().await?;
+        return Ok(Json(ImportExternalMediaResponse {
+            item: item.into(),
+            created: false,
+        }));
+    }
+
+    let item = media_item::ActiveModel {
+        id: Set(Uuid::new_v4().to_string()),
+        library_id: Set(library.id.clone()),
+        media_type: Set(library.media_type.clone()),
+        title: Set(title.to_owned()),
+        sort_title: Set(Some(title.to_lowercase())),
+        original_path: Set(original_path.clone()),
+        year: Set(payload.year),
+        metadata_json: Set(metadata_json),
+        deleted_at: Set(None),
+        source_missing_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(&txn)
+    .await?;
+    media_file::ActiveModel {
+        id: Set(Uuid::new_v4().to_string()),
+        item_id: Set(item.id.clone()),
+        library_id: Set(library.id),
+        scan_task_id: Set(None),
+        full_path: Set(original_path),
+        source_locator: Set(Some(source_locator)),
+        file_name: Set(title.to_owned()),
+        extension: Set(None),
+        mime_type: Set(None),
+        file_size: Set(0),
+        modified_at: Set(None),
+        etag: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+    .insert(&txn)
+    .await?;
+    txn.commit().await?;
+    Ok(Json(ImportExternalMediaResponse {
+        item: item.into(),
+        created: true,
+    }))
+}
 
 #[derive(Debug, Deserialize)]
 pub struct MediaContentQuery {

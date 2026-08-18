@@ -70,6 +70,17 @@ const settingSections: SettingSection[] = [
             },
         ],
     },
+    {
+        label: "Agent",
+        description: "模型供应商、执行策略与自动化能力",
+        items: [
+            {
+                href: "/settings/agent/plugins",
+                label: "插件",
+                description: "安装、启用和配置受信任的 Agent 插件",
+            },
+        ],
+    },
 ];
 
 export default function SettingsLayout({
@@ -82,7 +93,7 @@ export default function SettingsLayout({
     return (
         <ContentPageLayout title="设置" description="管理媒体库、界面偏好和访问安全。">
             <div className="flex h-full min-h-0 gap-4">
-                <aside className="w-55 overflow-y-auto space-y-4">
+                <aside className="w-55 overflow-y-auto space-y-4 overflow-hidden rounded-3xl">
                     {settingSections.map((section) => (
                         <Card.Root key={section.label}>
                             <Card.Content>

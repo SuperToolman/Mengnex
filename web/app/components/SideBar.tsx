@@ -261,7 +261,7 @@ export default function SideBar() {
     return (
         <aside
             className={`flex h-full min-h-0 shrink-0 flex-col justify-between overflow-hidden py-2 transition-[width] duration-300 ${
-                expanded ? "w-[168px]" : "w-[64px]"
+                expanded ? "w-[130px]" : "w-[64px]"
             }`}
         >
             <div className={`min-h-0 flex-1 ${expanded ? "w-full" : "w-fit"}`}>

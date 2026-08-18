@@ -4,7 +4,7 @@ import { ArrowRotateRight, BackwardStep, ForwardStep, Pause, PlayFill, Shuffle }
 import { Button, Slider, Tooltip } from "@heroui/react";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { MusicTrackResponse } from "@/src/api/generated/types.gen";
-import { getMusicLyrics, updateMusicPlayback } from "@/src/api/client";
+import { getMusicLyrics, updateMusicPlayback } from "@/src/features/music/api";
 
 type MusicPlayerContextValue = {
     current: MusicTrackResponse | null;

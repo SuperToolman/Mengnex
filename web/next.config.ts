@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: `${process.env.API_PROXY_TARGET ?? "http://127.0.0.1:3001"}/api/:path*`,
+        destination: `${process.env.API_PROXY_TARGET ?? "http://127.0.0.1:7587"}/api/:path*`,
       },
     ];
   },
@@ -19,12 +19,12 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "127.0.0.1",
-        port: "3001",
+        port: "7587",
       },
       {
         protocol: "http",
         hostname: "localhost",
-        port: "3001",
+        port: "7587",
       },
     ],
   },

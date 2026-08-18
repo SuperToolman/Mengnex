@@ -1,0 +1,34 @@
+{
+  "id": "knowledge-base",
+  "name": "Knowledge Base",
+  "version": "0.1.0",
+  "description": "索引受信任本地 Markdown 和文本资料，并向 Agent 提供检索工具。",
+  "kind": "integration",
+  "dependencies": ["agent-runtime"],
+  "provides": ["knowledge.search"],
+  "permissions": ["filesystem:read:agent/knowledge"],
+  "origin": "local",
+  "configurable": true,
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "paths": {
+        "type": "array",
+        "title": "资料目录",
+        "description": "相对于 Agent knowledge 目录的受信任资料文件夹。",
+        "default": ["."],
+        "items": { "type": "string", "title": "目录", "format": "path" }
+      }
+    }
+  },
+  "ui": {
+    "settings": {
+      "label": "知识库",
+      "description": "选择要索引的本地 Markdown 与文本资料目录。",
+      "icon": "book"
+    }
+  },
+  "default_installed": false,
+  "entry": "./index.js"
+}

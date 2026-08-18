@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{Arc, OnceLock},
@@ -153,9 +155,8 @@ pub async fn find_running_library_background_task(
 }
 
 pub async fn recover_interrupted_tasks(db: &DatabaseConnection) -> Result<u64, ApiError> {
-    let now = Utc::now();
     let tasks = app_task::Entity::find()
-        .filter(app_task::Column::Status.is_in(["queued", "running", "paused"]))
+        .filter(app_task::Column::Status.is_in(["queued", "running"]))
         .filter(app_task::Column::FinishedAt.is_null())
         .all(db)
         .await?;
@@ -166,11 +167,10 @@ pub async fn recover_interrupted_tasks(db: &DatabaseConnection) -> Result<u64, A
             db,
             &task_id,
             UpdateAppTaskParams {
-                status: Some("failed".to_owned()),
-                error_message: Some(Some(
-                    "task was interrupted by an application restart; start it again".to_owned(),
-                )),
-                finished_at: Some(Some(now)),
+                status: Some("queued".to_owned()),
+                detail: Some(Some("应用重启后等待恢复执行".to_owned())),
+                error_message: Some(None),
+                finished_at: Some(None),
                 ..Default::default()
             },
         )
@@ -179,20 +179,107 @@ pub async fn recover_interrupted_tasks(db: &DatabaseConnection) -> Result<u64, A
             && let Some(scan) = scan_task::Entity::find_by_id(task_id).one(db).await?
         {
             let mut active: scan_task::ActiveModel = scan.into();
-            active.status = Set("failed".to_owned());
-            active.error_message = Set(Some(
-                "task was interrupted by an application restart; start it again".to_owned(),
-            ));
-            active.finished_at = Set(Some(now));
-            active.updated_at = Set(now);
+            active.status = Set("queued".to_owned());
+            active.error_message = Set(None);
+            active.finished_at = Set(None);
+            active.updated_at = Set(Utc::now());
             active.update(db).await?;
         }
         recovered += 1;
     }
     if recovered > 0 {
-        tracing::warn!(recovered, "marked interrupted background tasks as failed");
+        tracing::info!(recovered, "requeued interrupted background tasks");
     }
     Ok(recovered)
+}
+
+/// Starts the single-process worker used by the local desktop deployment. Task state is
+/// persisted before dispatch, so a process restart returns in-flight work to the queue.
+pub fn start_background_worker(db: DatabaseConnection) {
+    tokio::spawn(async move {
+        loop {
+            if let Err(error) = dispatch_queued_tasks(&db).await {
+                tracing::error!(?error, "background task dispatcher failed");
+            }
+            sleep(Duration::from_millis(250)).await;
+        }
+    });
+}
+
+async fn dispatch_queued_tasks(db: &DatabaseConnection) -> Result<(), ApiError> {
+    let tasks = app_task::Entity::find()
+        .filter(app_task::Column::Status.eq("queued"))
+        .filter(app_task::Column::FinishedAt.is_null())
+        .order_by_asc(app_task::Column::CreatedAt)
+        .all(db)
+        .await?;
+
+    for task in tasks {
+        let Some(library_id) = task.library_id.clone() else {
+            continue;
+        };
+        let Some(library) = crate::infra::entities::media_library::Entity::find_by_id(library_id)
+            .one(db)
+            .await?
+        else {
+            let _ = update_app_task(
+                db,
+                &task.id,
+                UpdateAppTaskParams {
+                    status: Some("failed".to_owned()),
+                    error_message: Some(Some("media library not found".to_owned())),
+                    finished_at: Some(Some(Utc::now())),
+                    ..Default::default()
+                },
+            )
+            .await?;
+            continue;
+        };
+
+        let Some(claimed) = update_app_task(
+            db,
+            &task.id,
+            UpdateAppTaskParams {
+                status: Some("running".to_owned()),
+                detail: Some(Some("任务已由后台执行器领取".to_owned())),
+                ..Default::default()
+            },
+        )
+        .await?
+        else {
+            continue;
+        };
+        let task_db = db.clone();
+        tokio::spawn(async move {
+            let _permit = acquire_global_background_permit().await;
+            let result = match claimed.kind.as_str() {
+                "scan_library" => {
+                    crate::modules::scanner::handlers::execute_scan_task(
+                        &task_db,
+                        library,
+                        claimed.id.clone(),
+                    )
+                    .await
+                }
+                "generate_cache" => {
+                    crate::modules::libraries::cache::run_cache_generation(
+                        &task_db,
+                        &library,
+                        &claimed.id,
+                    )
+                    .await
+                }
+                _ => Err(ApiError::BadRequest(
+                    "unsupported background task kind".to_owned(),
+                )),
+            };
+            if let Err(error) = result {
+                tracing::error!(task_id = %claimed.id, ?error, "background task execution failed");
+            }
+        });
+    }
+
+    Ok(())
 }
 
 pub async fn get_app_task(

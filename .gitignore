@@ -39,6 +39,10 @@ tools/ffmpeg-full_build/
 !.env.example
 !.env.local.example
 
+# Agent runtime state and TypeScript build output
+agent/data/
+agent/dist/
+
 # SQLite data
 api/data/*.db
 api/data/*.db-shm

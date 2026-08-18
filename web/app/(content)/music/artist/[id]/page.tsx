@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import { useMusicPlayer } from "@/app/components/MusicPlayerProvider";
-import { getMusicArtist } from "@/src/api/client";
+import { getMusicArtist } from "@/src/features/music/api";
 import type { MusicArtistDetailResponse, MusicTrackResponse } from "@/src/api/generated/types.gen";
 
 export default function MusicArtistPage() {

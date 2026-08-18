@@ -1,0 +1,20 @@
+{
+  "name": "mengnex-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "node --test dist/policy.test.js dist/runtime.test.js dist/tools.test.js dist/sessions.test.js dist/approvals.test.js dist/settings.test.js dist/agent-loop.test.js dist/plugin-manager.test.js dist/plugin-loader.test.js dist/plugin-ui.test.js dist/events.test.js"
+  },
+  "dependencies": {
+    "cordis": "4.0.0-rc.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

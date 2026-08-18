@@ -112,6 +112,21 @@ export type HealthResponse = {
     status: string;
 };
 
+export type ImportExternalMediaRequest = {
+    external_id: string;
+    library_id: string;
+    metadata?: unknown;
+    source: string;
+    source_url?: string | null;
+    title: string;
+    year?: number | null;
+};
+
+export type ImportExternalMediaResponse = {
+    created: boolean;
+    item: MediaItemResponse;
+};
+
 export type LibraryCoversResponse = {
     photos: Array<PhotoAssetResponse>;
     videos: Array<VideoAssetResponse>;
@@ -260,6 +275,35 @@ export type MusicFavoriteResponse = {
     track_id: string;
 };
 
+export type MusicFolderResponse = {
+    path: string;
+    track_count: number;
+};
+
+export type MusicLibraryStatsResponse = {
+    album_count: number;
+    artist_count: number;
+    genres: Array<string>;
+    total_duration_seconds: number;
+    track_count: number;
+    years: Array<number>;
+};
+
+export type MusicLyricsResponse = {
+    content?: string | null;
+    source?: string | null;
+    track_id: string;
+};
+
+export type MusicMetadataCandidateResponse = {
+    album?: string | null;
+    artist?: string | null;
+    provider: string;
+    score: number;
+    title: string;
+    year?: number | null;
+};
+
 export type MusicPlaybackResponse = {
     completed: boolean;
     last_played_at: string;
@@ -281,12 +325,12 @@ export type MusicPlaylistResponse = {
 };
 
 export type MusicTrackResponse = {
+    album_artist?: string | null;
     album_id?: string | null;
     album_title?: string | null;
     artist?: string | null;
-    album_artist?: string | null;
-    bitrate_kbps?: number | null;
     bit_depth?: number | null;
+    bitrate_kbps?: number | null;
     codec?: string | null;
     disc_number?: number | null;
     duration_seconds?: number | null;
@@ -301,6 +345,7 @@ export type MusicTrackResponse = {
     stream_src: string;
     title: string;
     track_number?: number | null;
+    year?: number | null;
 };
 
 export type NovelBookResponse = {
@@ -452,7 +497,7 @@ export type ScanTaskResponse = {
     updated_files: number;
 };
 
-export type ScanTaskStatus = 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
+export type ScanTaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'canceled' | 'failed';
 
 export type SetupRequest = {
     display_name: string;
@@ -1186,6 +1231,19 @@ export type GetMediaFileContentResponses = {
     200: unknown;
 };
 
+export type ImportExternalMediaData = {
+    body: ImportExternalMediaRequest;
+    path?: never;
+    query?: never;
+    url: '/api/media/import';
+};
+
+export type ImportExternalMediaResponses = {
+    200: ImportExternalMediaResponse;
+};
+
+export type ImportExternalMediaResponse2 = ImportExternalMediaResponses[keyof ImportExternalMediaResponses];
+
 export type ListMediaItemsData = {
     body?: never;
     path?: never;
@@ -1303,6 +1361,21 @@ export type ListFavoritesResponses = {
 
 export type ListFavoritesResponse = ListFavoritesResponses[keyof ListFavoritesResponses];
 
+export type ListFoldersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string;
+    };
+    url: '/api/music/folders';
+};
+
+export type ListFoldersResponses = {
+    200: Array<MusicFolderResponse>;
+};
+
+export type ListFoldersResponse = ListFoldersResponses[keyof ListFoldersResponses];
+
 export type ListPlaylistsData = {
     body?: never;
     path?: never;
@@ -1403,6 +1476,21 @@ export type ListRecentResponses = {
 
 export type ListRecentResponse = ListRecentResponses[keyof ListRecentResponses];
 
+export type GetStatsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        library_id?: string;
+    };
+    url: '/api/music/stats';
+};
+
+export type GetStatsResponses = {
+    200: MusicLibraryStatsResponse;
+};
+
+export type GetStatsResponse = GetStatsResponses[keyof GetStatsResponses];
+
 export type ListTracksData = {
     body?: never;
     path?: never;
@@ -1436,6 +1524,36 @@ export type UpdateFavoriteResponses = {
 
 export type UpdateFavoriteResponse = UpdateFavoriteResponses[keyof UpdateFavoriteResponses];
 
+export type GetLyricsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/tracks/{id}/lyrics';
+};
+
+export type GetLyricsResponses = {
+    200: MusicLyricsResponse;
+};
+
+export type GetLyricsResponse = GetLyricsResponses[keyof GetLyricsResponses];
+
+export type MetadataCandidatesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/music/tracks/{id}/metadata-candidates';
+};
+
+export type MetadataCandidatesResponses = {
+    200: Array<MusicMetadataCandidateResponse>;
+};
+
+export type MetadataCandidatesResponse = MetadataCandidatesResponses[keyof MetadataCandidatesResponses];
+
 export type UpdatePlaybackData = {
     body: UpdateMusicPlaybackRequest;
     path: {
@@ -1450,6 +1568,25 @@ export type UpdatePlaybackResponses = {
 };
 
 export type UpdatePlaybackResponse = UpdatePlaybackResponses[keyof UpdatePlaybackResponses];
+
+export type StreamTrackData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        format?: string;
+        bitrate_kbps?: number;
+    };
+    url: '/api/music/tracks/{id}/stream';
+};
+
+export type StreamTrackResponses = {
+    /**
+     * Transcoded audio stream
+     */
+    200: unknown;
+};
 
 export type ListBooksData = {
     body?: never;

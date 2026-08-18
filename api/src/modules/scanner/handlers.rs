@@ -86,7 +86,7 @@ pub async fn start_scan(
     let task = scan_task::ActiveModel {
         id: Set(Uuid::new_v4().to_string()),
         library_id: Set(library.id.clone()),
-        status: Set(ScanTaskStatus::Running.to_string()),
+        status: Set(ScanTaskStatus::Queued.to_string()),
         discovered_files: Set(0),
         processed_files: Set(0),
         inserted_items: Set(0),
@@ -108,7 +108,7 @@ pub async fn start_scan(
             kind: TaskKind::ScanLibrary.to_string(),
             title: "扫描媒体库".to_owned(),
             library_id: Some(library.id.clone()),
-            status: ScanTaskStatus::Running.to_string(),
+            status: ScanTaskStatus::Queued.to_string(),
             progress_percent: 0,
             processed_items: 0,
             total_items: 0,
@@ -121,28 +121,33 @@ pub async fn start_scan(
     )
     .await?;
 
-    let task_id = task.id.clone();
-    let state_for_task = state.clone();
-
-    tokio::spawn(async move {
-        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
-        let result =
-            service::scan_library(&state_for_task.db, &library, task_id.clone(), |progress| {
-                let db = state_for_task.db.clone();
-                let task_id = task_id.clone();
-                let progress = progress.clone();
-
-                Box::pin(async move { update_scan_task_progress(&db, &task_id, &progress).await })
-            })
-            .await;
-
-        if let Err(error) = complete_scan_task(&state_for_task.db, &library, &task_id, result).await
-        {
-            tracing::error!(task_id, ?error, "scan task failed to finalize");
-        }
-    });
-
     Ok(Json(ScanTaskResponse::from(task)))
+}
+
+pub(crate) async fn execute_scan_task(
+    db: &sea_orm::DatabaseConnection,
+    library: media_library::Model,
+    task_id: String,
+) -> Result<(), ApiError> {
+    if let Some(task) = scan_task::Entity::find_by_id(task_id.clone())
+        .one(db)
+        .await?
+    {
+        let mut active_task: scan_task::ActiveModel = task.into();
+        active_task.status = Set(ScanTaskStatus::Running.to_string());
+        active_task.error_message = Set(None);
+        active_task.finished_at = Set(None);
+        active_task.updated_at = Set(Utc::now());
+        active_task.update(db).await?;
+    }
+    let result = service::scan_library(db, &library, task_id.clone(), |progress| {
+        let db = db.clone();
+        let task_id = task_id.clone();
+        let progress = progress.clone();
+        Box::pin(async move { update_scan_task_progress(&db, &task_id, &progress).await })
+    })
+    .await;
+    complete_scan_task(db, &library, &task_id, result).await
 }
 
 async fn update_scan_task_progress(

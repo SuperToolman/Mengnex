@@ -846,6 +846,36 @@
         }
       }
     },
+    "/api/media/import": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "import_external_media",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportExternalMediaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportExternalMediaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/items": {
       "get": {
         "tags": [
@@ -1476,6 +1506,39 @@
         }
       }
     },
+    "/api/music/tracks/{id}/metadata-candidates": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "metadata_candidates",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MusicMetadataCandidateResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/music/tracks/{id}/playback": {
       "put": {
         "tags": [
@@ -1512,6 +1575,47 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/music/tracks/{id}/stream": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "operationId": "stream_track",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bitrate_kbps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transcoded audio stream"
           }
         }
       }
@@ -3352,6 +3456,58 @@
           }
         }
       },
+      "ImportExternalMediaRequest": {
+        "type": "object",
+        "required": [
+          "library_id",
+          "title",
+          "source",
+          "external_id"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "library_id": {
+            "type": "string"
+          },
+          "metadata": {},
+          "source": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ImportExternalMediaResponse": {
+        "type": "object",
+        "required": [
+          "item",
+          "created"
+        ],
+        "properties": {
+          "created": {
+            "type": "boolean"
+          },
+          "item": {
+            "$ref": "#/components/schemas/MediaItemResponse"
+          }
+        }
+      },
       "LibraryCoversResponse": {
         "type": "object",
         "required": [
@@ -4047,6 +4203,46 @@
           },
           "track_id": {
             "type": "string"
+          }
+        }
+      },
+      "MusicMetadataCandidateResponse": {
+        "type": "object",
+        "required": [
+          "provider",
+          "title",
+          "score"
+        ],
+        "properties": {
+          "album": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -4881,6 +5077,7 @@
       "ScanTaskStatus": {
         "type": "string",
         "enum": [
+          "queued",
           "running",
           "paused",
           "completed",

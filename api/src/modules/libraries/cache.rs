@@ -62,14 +62,6 @@ pub async fn start_cache_generation(
     )
     .await?;
 
-    let task_db = db.clone();
-    tokio::spawn(async move {
-        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
-        if let Err(error) = run_cache_generation(&task_db, &library, &task_id).await {
-            tracing::error!(task_id, ?error, "browse cache task failed to finalize");
-        }
-    });
-
     Ok(task)
 }
 
@@ -99,21 +91,10 @@ pub async fn retry_cache_generation(
     )
     .await?
     .ok_or(ApiError::NotFound("task"))?;
-    let task_db = db.clone();
-    tokio::spawn(async move {
-        let _permit = crate::modules::tasks::service::acquire_global_background_permit().await;
-        if let Err(error) = run_cache_generation(&task_db, &library, &task_id).await {
-            tracing::error!(
-                task_id,
-                ?error,
-                "media information retry failed to finalize"
-            );
-        }
-    });
     Ok(task)
 }
 
-async fn run_cache_generation(
+pub(crate) async fn run_cache_generation(
     db: &DatabaseConnection,
     library: &media_library::Model,
     task_id: &str,

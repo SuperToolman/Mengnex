@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddPlaylistTrackData, AddPlaylistTrackResponses, CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreatePlaylistData, CreatePlaylistResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeletePlaylistData, DeletePlaylistResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAlbumCoverData, GetAlbumCoverResponses, GetAlbumData, GetAlbumResponses, GetArtistData, GetArtistResponses, GetAuthorData, GetAuthorResponses, GetBookData, GetBookErrors, GetBookResponses, GetChapterData, GetChapterErrors, GetChapterResponses, GetCoverData, GetCoverErrors, GetCoverResponses, GetCurrentUserAvatarData, GetCurrentUserAvatarResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPlaylistData, GetPlaylistResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetReadingStateData, GetReadingStateResponses, GetSeriesData, GetSeriesResponses, GetUserAvatarData, GetUserAvatarResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ListAlbumsData, ListAlbumsResponses, ListArtistsData, ListArtistsResponses, ListAuthorsData, ListAuthorsResponses, ListBooksData, ListBooksResponses, ListData, ListFavoritesData, ListFavoritesResponses, ListFolderContentsData, ListFolderContentsResponses, ListLibrariesData, ListLibrariesResponses, ListLibraryCoversData, ListLibraryCoversResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListPlaylistsData, ListPlaylistsResponses, ListRecentData, ListRecentResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListTracksData, ListTracksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, RemovePlaylistTrackData, RemovePlaylistTrackResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, RetryTaskData, RetryTaskResponses, SetupData, SetupResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, TaskSummaryData, TaskSummaryResponses, UpdateCurrentUserData, UpdateCurrentUserResponses, UpdateFavoriteData, UpdateFavoriteResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlayback2Data, UpdatePlayback2Responses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateReadingStateData, UpdateReadingStateErrors, UpdateReadingStateResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses, UploadCurrentUserAvatarData, UploadCurrentUserAvatarResponses } from './types.gen';
+import type { AddPlaylistTrackData, AddPlaylistTrackResponses, CancelTaskData, CancelTaskErrors, CancelTaskResponses, ClearCompletedTasksData, ClearCompletedTasksResponses, ClearTagsData, ClearTagsResponses, CreateData, CreateLibraryData, CreateLibraryResponses, CreatePlaylistData, CreatePlaylistResponses, CreateResponses, CreateTagData, CreateTagResponses, CreateUserData, CreateUserResponses, DeleteCoversData, DeleteCoversResponses, DeleteLibraryData, DeleteLibraryErrors, DeleteLibraryPreviewAssetsData, DeleteLibraryPreviewAssetsErrors, DeleteLibraryPreviewAssetsResponses, DeleteLibraryResponses, DeletePhotoData, DeletePhotoResponses, DeletePlaylistData, DeletePlaylistResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DeleteTaskData, DeleteTaskResponses, GenerateLibraryPreviewAssetsData, GenerateLibraryPreviewAssetsErrors, GenerateLibraryPreviewAssetsResponses, GetAlbumCoverData, GetAlbumCoverResponses, GetAlbumData, GetAlbumResponses, GetArtistData, GetArtistResponses, GetAuthorData, GetAuthorResponses, GetBookData, GetBookErrors, GetBookResponses, GetChapterData, GetChapterErrors, GetChapterResponses, GetCoverData, GetCoverErrors, GetCoverResponses, GetCurrentUserAvatarData, GetCurrentUserAvatarResponses, GetLibraryData, GetLibraryErrors, GetLibraryPreviewGenerationTaskData, GetLibraryPreviewGenerationTaskErrors, GetLibraryPreviewGenerationTaskResponses, GetLibraryResponses, GetLyricsData, GetLyricsResponses, GetMediaFileContentData, GetMediaFileContentErrors, GetMediaFileContentResponses, GetPlaylistData, GetPlaylistResponses, GetPosterData, GetPosterErrors, GetPosterResponses, GetPreferencesData, GetPreferencesResponses, GetReaderData, GetReaderResponses, GetReadingStateData, GetReadingStateResponses, GetSeriesData, GetSeriesResponses, GetStatsData, GetStatsResponses, GetUserAvatarData, GetUserAvatarResponses, GetVideoData, GetVideoErrors, GetVideoResponses, HealthData, HealthResponses, ImportExternalMediaData, ImportExternalMediaResponses, ListAlbumsData, ListAlbumsResponses, ListArtistsData, ListArtistsResponses, ListAuthorsData, ListAuthorsResponses, ListBooksData, ListBooksResponses, ListData, ListFavoritesData, ListFavoritesResponses, ListFolderContentsData, ListFolderContentsResponses, ListFoldersData, ListFoldersResponses, ListLibrariesData, ListLibrariesResponses, ListLibraryCoversData, ListLibraryCoversResponses, ListMediaFilesData, ListMediaFilesResponses, ListMediaItemsData, ListMediaItemsResponses, ListPhotosData, ListPhotosResponses, ListPlaylistsData, ListPlaylistsResponses, ListRecentData, ListRecentResponses, ListRecycleBinData, ListRecycleBinResponses, ListResourceTagsData, ListResourceTagsErrors, ListResourceTagsResponses, ListResponses, ListRolePermissionsData, ListRolePermissionsResponses, ListScanTasksData, ListScanTasksResponses, ListSeriesData, ListSeriesResponses, ListTagResourcesData, ListTagResourcesResponses, ListTagsData, ListTagsResponses, ListTasksData, ListTasksResponses, ListTracksData, ListTracksResponses, ListUsersData, ListUsersResponses, ListVideoCatalogData, ListVideoCatalogResponses, ListVideosData, ListVideosResponses, LoginData, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MetadataCandidatesData, MetadataCandidatesResponses, PauseTaskData, PauseTaskErrors, PauseTaskResponses, PurgeItemData, PurgeItemResponses, RemovePlaylistTrackData, RemovePlaylistTrackResponses, ReplaceResourceTagsData, ReplaceResourceTagsErrors, ReplaceResourceTagsResponses, RestoreItemData, RestoreItemResponses, ResumeTaskData, ResumeTaskErrors, ResumeTaskResponses, RetryTaskData, RetryTaskResponses, SetupData, SetupResponses, StartScanData, StartScanErrors, StartScanResponses, StatusData, StatusResponses, StreamTrackData, StreamTrackResponses, TaskSummaryData, TaskSummaryResponses, UpdateCurrentUserData, UpdateCurrentUserResponses, UpdateFavoriteData, UpdateFavoriteResponses, UpdateLibraryData, UpdateLibraryErrors, UpdateLibraryPreviewConfigData, UpdateLibraryPreviewConfigErrors, UpdateLibraryPreviewConfigResponses, UpdateLibraryResponses, UpdatePlayback2Data, UpdatePlayback2Responses, UpdatePlaybackData, UpdatePlaybackResponses, UpdatePreferencesData, UpdatePreferencesResponses, UpdateReadingStateData, UpdateReadingStateErrors, UpdateReadingStateResponses, UpdateTagData, UpdateTagErrors, UpdateTagResponses, UploadCurrentUserAvatarData, UploadCurrentUserAvatarResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -225,6 +225,16 @@ export const getMediaFileContent = <ThrowOnError extends boolean = false>(option
     ...options
 });
 
+export const importExternalMedia = <ThrowOnError extends boolean = false>(options: Options<ImportExternalMediaData, ThrowOnError>): RequestResult<ImportExternalMediaResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).post<ImportExternalMediaResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/media/import',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const listMediaItems = <ThrowOnError extends boolean = false>(options?: Options<ListMediaItemsData, ThrowOnError>): RequestResult<ListMediaItemsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListMediaItemsResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/media/items',
@@ -264,6 +274,12 @@ export const getArtist = <ThrowOnError extends boolean = false>(options: Options
 export const listFavorites = <ThrowOnError extends boolean = false>(options?: Options<ListFavoritesData, ThrowOnError>): RequestResult<ListFavoritesResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListFavoritesResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/music/favorites',
+    ...options
+});
+
+export const listFolders = <ThrowOnError extends boolean = false>(options?: Options<ListFoldersData, ThrowOnError>): RequestResult<ListFoldersResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListFoldersResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/folders',
     ...options
 });
 
@@ -317,6 +333,12 @@ export const listRecent = <ThrowOnError extends boolean = false>(options?: Optio
     ...options
 });
 
+export const getStats = <ThrowOnError extends boolean = false>(options?: Options<GetStatsData, ThrowOnError>): RequestResult<GetStatsResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<GetStatsResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/stats',
+    ...options
+});
+
 export const listTracks = <ThrowOnError extends boolean = false>(options?: Options<ListTracksData, ThrowOnError>): RequestResult<ListTracksResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListTracksResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/music/tracks',
@@ -333,6 +355,18 @@ export const updateFavorite = <ThrowOnError extends boolean = false>(options: Op
     }
 });
 
+export const getLyrics = <ThrowOnError extends boolean = false>(options: Options<GetLyricsData, ThrowOnError>): RequestResult<GetLyricsResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<GetLyricsResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks/{id}/lyrics',
+    ...options
+});
+
+export const metadataCandidates = <ThrowOnError extends boolean = false>(options: Options<MetadataCandidatesData, ThrowOnError>): RequestResult<MetadataCandidatesResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<MetadataCandidatesResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks/{id}/metadata-candidates',
+    ...options
+});
+
 export const updatePlayback = <ThrowOnError extends boolean = false>(options: Options<UpdatePlaybackData, ThrowOnError>): RequestResult<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).put<UpdatePlaybackResponses, unknown, ThrowOnError, 'data'>({
     responseStyle: 'data',
     url: '/api/music/tracks/{id}/playback',
@@ -341,6 +375,12 @@ export const updatePlayback = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+export const streamTrack = <ThrowOnError extends boolean = false>(options: Options<StreamTrackData, ThrowOnError>): RequestResult<StreamTrackResponses, unknown, ThrowOnError, 'data'> => (options.client ?? client).get<StreamTrackResponses, unknown, ThrowOnError, 'data'>({
+    responseStyle: 'data',
+    url: '/api/music/tracks/{id}/stream',
+    ...options
 });
 
 export const listBooks = <ThrowOnError extends boolean = false>(options?: Options<ListBooksData, ThrowOnError>): RequestResult<ListBooksResponses, unknown, ThrowOnError, 'data'> => (options?.client ?? client).get<ListBooksResponses, unknown, ThrowOnError, 'data'>({

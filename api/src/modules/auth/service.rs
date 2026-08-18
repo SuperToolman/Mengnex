@@ -63,6 +63,9 @@ fn required_permission(method: &str, path: &str) -> &'static str {
     if path.starts_with("/api/auth/me") {
         return "media.read";
     }
+    if path.starts_with("/api/media/import") {
+        return "media.write";
+    }
     if method == "PUT" && path.starts_with("/api/videos/") && path.ends_with("/playback") {
         return "media.read";
     }

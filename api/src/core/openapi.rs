@@ -32,7 +32,10 @@ use crate::{
             handlers as manga_handlers,
         },
         media::{
-            dto::{MediaFileResponse, MediaItemResponse},
+            dto::{
+                ImportExternalMediaRequest, ImportExternalMediaResponse, MediaFileResponse,
+                MediaItemResponse,
+            },
             handlers as media_handlers,
         },
         music::{
@@ -129,6 +132,7 @@ use crate::{
         webdav_handlers::list,
         webdav_handlers::create,
         media_handlers::list_media_items,
+        media_handlers::import_external_media,
         media_handlers::list_media_files,
         media_handlers::get_media_file_content,
         music_handlers::list_albums,
@@ -220,6 +224,8 @@ use crate::{
         WebdavConnectionResponse,
         MediaItemResponse,
         MediaFileResponse,
+        ImportExternalMediaRequest,
+        ImportExternalMediaResponse,
         MusicAlbumDetailResponse,
         MusicAlbumResponse,
         MusicArtistDetailResponse,

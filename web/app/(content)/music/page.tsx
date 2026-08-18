@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ContentPageLayout, { ContentPageEmptyState } from "@/app/components/ContentPageLayout";
 import ContentZoomSlider from "@/app/components/ContentZoomSlider";
-import { browseMusicTracks, getMediaLibraries, getMusicAlbum, getMusicAlbums, getMusicArtists, getMusicFolders, getMusicFavorites, getMusicPlaylists, getMusicRecent, getMusicStats, updateMusicFavorite, type LibraryResponse, type MusicFolder, type MusicLibraryStats } from "@/src/api/client";
+import { getMediaLibraries, type LibraryResponse } from "@/src/api/client";
+import { browseMusicTracks, getMusicAlbum, getMusicAlbums, getMusicArtists, getMusicFolders, getMusicFavorites, getMusicPlaylists, getMusicRecent, getMusicStats, updateMusicFavorite, type MusicFolder, type MusicLibraryStats } from "@/src/features/music/api";
 import type { MusicAlbumDetailResponse, MusicAlbumResponse, MusicArtistResponse, MusicPlaylistResponse, MusicTrackResponse } from "@/src/api/generated/types.gen";
 import { useMusicPlayer } from "@/app/components/MusicPlayerProvider";
 
