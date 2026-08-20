@@ -34,7 +34,7 @@ export default function TagCard({
 
     return (
         <Button variant="ghost" className="group h-auto w-full min-w-0 p-0 text-left" onPress={onPress}>
-        <Card.Root className="relative aspect-[2] w-full overflow-hidden transition-transform group-hover:-translate-y-0.5">
+        <Card.Root variant="secondary" className="relative aspect-[2] w-full overflow-hidden border border-[color:var(--surface-component-border)] bg-[var(--surface-component)] shadow-sm transition-transform group-hover:-translate-y-0.5">
             <div className="absolute inset-0 bg-cover bg-center" style={backgroundStyle} />
             {avatarSrc ? <div className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${avatarSrc})` }} /> : null}
             <Card.Content className="absolute inset-x-0 bottom-0 z-10 flex flex-row items-end justify-start gap-3 p-3">

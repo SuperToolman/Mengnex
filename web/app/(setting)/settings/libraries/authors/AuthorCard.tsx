@@ -16,7 +16,7 @@ export default function AuthorCard({ author, onPress }: { author: AuthorResponse
 
     return (
         <Button variant="ghost" className="group h-auto w-full min-w-0 p-0 text-left" onPress={onPress}>
-            <Card.Root className="relative aspect-video w-full overflow-hidden transition-transform group-hover:-translate-y-0.5">
+            <Card.Root variant="secondary" className="relative aspect-video w-full overflow-hidden border border-[color:var(--surface-component-border)] bg-[var(--surface-component)] shadow-sm transition-transform group-hover:-translate-y-0.5">
                 {author.avatar_src ? <div className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${author.avatar_src})` }} /> : null}
                 <Card.Content className="absolute inset-x-0 bottom-0 z-10 flex flex-row items-end justify-start gap-3 p-4">
                     <Avatar aria-label={author.name} size="lg" className="h-[68px] w-[68px] shrink-0 overflow-hidden rounded-lg [&_img]:rounded-lg">

@@ -173,14 +173,34 @@ export function rollbackAgentPlugin(id: string, revisionId: string) {
     return request<AgentPlugin>(`/v1/plugins/${id}/rollback/${revisionId}`, { method: "POST", body: "{}" });
 }
 
-export type AgentChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type AgentToolCall = {
+    toolName: string;
+    args: Record<string, unknown>;
+    status: "running" | "completed" | "approval_required";
+    result?: unknown;
+    approvalId?: string;
+    createdAt: string;
+    completedAt?: string;
+};
+
+export type AgentContentBlock =
+    | { type: "text"; text: string }
+    | { type: "reasoning"; text: string }
+    | { type: "tool-call"; callId: string; name: string; args: Record<string, unknown>; status: "running" | "completed" | "approval_required"; result?: unknown; approvalId?: string; startedAt: string; completedAt?: string };
+
+export type AgentTurn = {
+    id: string;
+    createdAt: string;
+    user: { content: Array<{ type: "text"; text: string }> };
+    assistant: { content: AgentContentBlock[]; model: string; status: "completed" | "approval_required" };
+};
 
 export type AgentSession = {
     id: string;
     title: string;
     createdAt: string;
     updatedAt: string;
-    messages: AgentChatMessage[];
+    turns: AgentTurn[];
 };
 
 export type AgentApproval = {
@@ -192,13 +212,24 @@ export type AgentApproval = {
     createdAt: string;
 };
 
-export type AgentChatResponse = {
+export type AgentRunSnapshot = {
     status: "completed" | "approval_required";
     content: string;
     model: string;
     approval?: AgentApproval;
     sessionId?: string;
+    blocks: AgentContentBlock[];
 };
+
+export type AgentStreamEvent =
+    | { type: "agent:turn"; turn: number; toolCount: number }
+    | { type: "reasoning-delta"; text: string }
+    | { type: "text-delta"; text: string }
+    | { type: "tool/call"; callId: string; name: string; args: Record<string, unknown> }
+    | { type: "tool/result"; callId: string; name: string; result: unknown; status: "completed" | "approval_required" }
+    | { type: "done"; status: "completed" | "approval_required"; model: string }
+    | { type: "snapshot"; result: AgentRunSnapshot }
+    | { type: "error"; message: string };
 
 export function getAgentSessions() {
     return request<{ sessions: AgentSession[] }>("/v1/sessions");
@@ -208,18 +239,38 @@ export function createAgentSession(title?: string) {
     return request<AgentSession>("/v1/sessions", { method: "POST", body: JSON.stringify({ title }) });
 }
 
-export function sendAgentSessionMessage(sessionId: string, content: string) {
-    return request<AgentChatResponse>(`/v1/sessions/${sessionId}/messages`, {
+export async function streamAgentSessionMessage(sessionId: string, content: string, onEvent: (event: AgentStreamEvent) => void) {
+    const response = await fetch(`${AGENT_BASE_URL}/v1/sessions/${sessionId}/messages`, {
         method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ content }),
     });
-}
-
-export async function completeAgentChat(messages: AgentChatMessage[]) {
-    return request<AgentChatResponse>("/v1/chat", {
-        method: "POST",
-        body: JSON.stringify({ messages }),
-    });
+    if (!response.ok || !response.body) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? "Agent 流式请求失败");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let snapshot: AgentRunSnapshot | undefined;
+    while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+            const data = frame.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
+            if (!data) continue;
+            const event = JSON.parse(data) as AgentStreamEvent;
+            onEvent(event);
+            if (event.type === "error") throw new Error(event.message);
+            if (event.type === "snapshot") snapshot = event.result;
+        }
+    }
+    if (!snapshot) throw new Error("Agent 流式响应未返回最终结果");
+    return snapshot;
 }
 
 export function decideAgentApproval(id: string, decision: "approve" | "reject") {

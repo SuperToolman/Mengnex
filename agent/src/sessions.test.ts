@@ -15,15 +15,13 @@ test("sessions persist messages and remain isolated by user", async () => {
     const store = new SessionStore(firstContext, filePath);
     await store.load();
     const session = await store.create("user-a", "媒体搜索");
-    await store.append(session.id, "user-a", [{ role: "user", content: "找 EVA" }]);
-    await store.appendToolCalls(session.id, "user-a", [{ toolName: "media.search", args: { query: "eva" }, status: "completed", result: [], createdAt: new Date().toISOString() }]);
+    await store.appendTurn(session.id, "user-a", { id: "turn-1", createdAt: new Date().toISOString(), user: { content: [{ type: "text", text: "找 EVA" }] }, assistant: { content: [{ type: "text", text: "结果" }], model: "test", status: "completed" } });
 
     const secondContext = new (cordis as any).Context() as Context;
     const restored = new SessionStore(secondContext, filePath);
     await restored.load();
     assert.equal(restored.list("user-a").length, 1);
-    assert.equal(restored.getOwned(session.id, "user-a").messages[0].content, "找 EVA");
-    assert.equal(restored.getOwned(session.id, "user-a").toolCalls[0].toolName, "media.search");
+    assert.equal(restored.getOwned(session.id, "user-a").turns[0].assistant.content[0].type, "text");
     assert.equal(restored.list("user-b").length, 0);
     assert.throws(() => restored.getOwned(session.id, "user-b"), /not found/);
   } finally {

@@ -131,7 +131,7 @@ export default function AccountSecurityPage() {
             {error ? <Alert status="danger"><Alert.Content><Alert.Description>{error}</Alert.Description></Alert.Content></Alert> : null}
 
             <section><div className="mb-3 flex items-end justify-between"><div><h3 className="font-semibold text-foreground">用户</h3><p className="mt-1 text-sm text-muted">{users.length} 个有效账户</p></div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{users.map((user) => (
-                <Card.Root key={user.id}>
+                <Card.Root key={user.id} variant="secondary" className="border border-[color:var(--surface-component-border)] bg-[var(--surface-component)] shadow-sm transition-shadow hover:shadow-surface">
                     <Card.Header className="flex-row items-center gap-3">
                         <Avatar size="md"><Avatar.Image src={user.avatar_url ?? undefined} /><Avatar.Fallback>{user.display_name.slice(0, 1).toUpperCase()}</Avatar.Fallback></Avatar>
                         <div className="min-w-0 flex-1"><Card.Title className="truncate text-base">{user.display_name}</Card.Title><Card.Description className="truncate">@{user.username}</Card.Description></div>

@@ -2,6 +2,33 @@
 
 本文档记录 Mengnex 的重要变更。
 
+## 0.47 - 2026-08-20
+
+### 新增
+
+- 新增结构化 Agent 会话模型，以 `turns` 和内容块保存用户消息、推理文本、普通文本、工具调用及工具结果，移除旧的扁平 `messages`/`toolCalls` 会话结构。
+- 新增 Agent 实时事件流，支持 `agent:turn`、`reasoning-delta`、`text-delta`、`tool/call`、`tool/result`、`snapshot`、`done` 和 `error` 事件。
+- `/agent` 支持创建、切换和持久化会话，并提供按会话标题或内容搜索的会话列表。
+- `/agent` 支持用户消息和 Agent 回复的 Markdown 渲染，包括标题、列表、链接、引用、行内代码和代码块。
+- `/agent` 实时展示“正在思考”、推理内容、工具调用参数、工具结果和审批状态；Agent 回复与代码块、工具参数/结果支持复制，用户消息不显示复制按钮。
+
+### 变更
+
+- Agent Gateway、会话存储、Agent Loop、LLM 适配器和 Web API 统一切换到结构化 turn/block 契约，旧会话字段不再兼容。
+- Agent 页面统一使用 HeroUI 原生 `Card`、`Accordion`、`Button`、`SearchField`、`ScrollShadow`、`TextField`、`TextArea` 和 `Typography`，视觉状态交由主题 token 控制。
+- 会话侧栏调整为 HeroUI Card 分组布局；“新会话”按钮占满列表宽度，搜索仅过滤当前视图，不修改后端会话数据。
+- Agent 模型供应商和插件设置继续沿用受控插件动作 API，并与设置页的 HeroUI 组件和主题体系保持一致。
+
+### 修复
+
+- 修复会话数据缺少 `turns` 时前端读取 `length` 导致页面崩溃的问题。
+- 修复 Agent 页面使用自定义全局语义化 CSS 和硬编码颜色覆盖主题 token 的问题，移除 Agent 专属 `globals.css` 样式。
+- 修复流式消息更新时推理块、文本块和工具块无法按事件顺序稳定合并的问题。
+
+### 未完成
+
+- 宜搭 `query/customButtonManage/list.json` 自定义按钮接口尚未接入；当前仅确认其通过 `tableViewUuids` 绑定视图，仍需处理宜搭登录 Cookie、CSRF token 和动作执行协议。
+
 ## 0.46 - 2026-08-20
 
 #### 新增

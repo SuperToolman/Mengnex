@@ -4,6 +4,8 @@ import type { Context } from "cordis";
 import type { ChatMessage } from "./llm.js";
 import type { ToolContext } from "./types.js";
 import type { ScheduleJobInput, ScheduledJob } from "./capabilities.js";
+import type { ConversationTurn } from "./conversation.js";
+import type { AgentStreamEvent } from "./agent-loop.js";
 
 export type GatewayUser = { id: string; role: string };
 export type GatewayContext = Omit<ToolContext, "executionMode">;
@@ -26,8 +28,7 @@ export abstract class AgentGatewayFacade extends (cordis as any).Service {
   abstract listSessions(userId: string): unknown[];
   abstract createSession(userId: string, title: string): Promise<unknown>;
   abstract getSession(id: string, userId: string): unknown;
-  abstract sendMessage(id: string, userId: string, content: string, context: GatewayContext): Promise<any>;
-  abstract chat(messages: ChatMessage[], context: GatewayContext): Promise<any>;
+  abstract sendMessage(id: string, userId: string, content: string, context: GatewayContext, onEvent?: (event: AgentStreamEvent) => void): Promise<any>;
   abstract runTool(tool: string, args: Record<string, unknown>, context: GatewayContext & { libraryId?: string }): Promise<any>;
   abstract decideApproval(id: string, decision: "approve" | "reject", context: GatewayContext): Promise<any>;
 }
@@ -55,16 +56,22 @@ export class DefaultAgentGatewayFacade extends AgentGatewayFacade {
   listSessions(userId: string) { return this.ctx.sessions.list(userId); }
   createSession(userId: string, title: string) { return this.ctx.sessions.create(userId, title); }
   getSession(id: string, userId: string) { return this.ctx.sessions.getOwned(id, userId); }
-  async sendMessage(id: string, userId: string, content: string, context: GatewayContext) {
+  async sendMessage(id: string, userId: string, content: string, context: GatewayContext, onEvent?: (event: AgentStreamEvent) => void) {
     const session = this.ctx.sessions.getOwned(id, userId);
-    await this.ctx.sessions.append(id, userId, [{ role: "user", content }]);
-    const refreshed = this.ctx.sessions.getOwned(id, userId);
-    const result = await this.ctx.agentLoop.chat(refreshed.messages, context);
-    await this.ctx.sessions.appendToolCalls(session.id, userId, result.toolCalls);
-    await this.ctx.sessions.append(id, userId, [{ role: "assistant", content: result.content }]);
+    const messages: ChatMessage[] = session.turns.flatMap((turn: ConversationTurn) => [
+      { role: "user" as const, content: turn.user.content.filter((block) => block.type === "text").map((block) => block.text).join("") },
+      ...turn.assistant.content.filter((block) => block.type === "text").map((block) => ({ role: "assistant" as const, content: block.text })),
+    ]);
+    messages.push({ role: "user", content });
+    const result = await this.ctx.agentLoop.chat(messages, context, onEvent);
+    await this.ctx.sessions.appendTurn(session.id, userId, {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      user: { content: [{ type: "text", text: content }] },
+      assistant: { content: result.blocks, model: result.model, status: result.status },
+    } satisfies ConversationTurn);
     return result;
   }
-  chat(messages: ChatMessage[], context: GatewayContext) { return this.ctx.agentLoop.chat(messages, context); }
   runTool(tool: string, args: Record<string, unknown>, context: GatewayContext & { libraryId?: string }) { return this.ctx.agent.invoke(tool, args, context); }
   decideApproval(id: string, decision: "approve" | "reject", context: GatewayContext) { return this.ctx.agent.decideApproval(id, decision, context); }
 }

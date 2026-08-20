@@ -8,6 +8,7 @@ export type BaseColor = string;
 export type FontFamily = "geist" | "inter" | "system" | "serif";
 export type RadiusSize = "none" | "small" | "medium" | "large";
 export type ThemePreset = "mengnex" | "heroui" | "custom";
+export type SurfaceVariant = "default" | "secondary" | "tertiary" | "transparent";
 
 export type AppearanceSettings = {
     accent: AccentColor;
@@ -18,6 +19,7 @@ export type AppearanceSettings = {
     radius: RadiusSize;
     radiusForm: RadiusSize;
     preset: ThemePreset;
+    surfaceVariant: SurfaceVariant;
 };
 
 const THEME_STORAGE_KEY = "mengnex.theme";
@@ -32,6 +34,7 @@ export const defaultAppearance: AppearanceSettings = {
     radius: "medium",
     radiusForm: "large",
     preset: "mengnex",
+    surfaceVariant: "secondary",
 };
 
 const heroUIDefaultAppearance: AppearanceSettings = {
@@ -43,6 +46,7 @@ const heroUIDefaultAppearance: AppearanceSettings = {
     radius: "medium",
     radiusForm: "large",
     preset: "heroui",
+    surfaceVariant: "secondary",
 };
 
 const legacyAccentColors: Record<string, string> = {
@@ -140,6 +144,8 @@ function createThemeVariables(theme: "light" | "dark", appearance: AppearanceSet
         "--surface-secondary-foreground": getAccentForeground(palette.surfaceSecondary),
         "--surface-tertiary": palette.surfaceTertiary,
         "--surface-tertiary-foreground": getAccentForeground(palette.surfaceTertiary),
+        "--surface-component": appearance.surfaceVariant === "default" ? palette.surface : appearance.surfaceVariant === "tertiary" ? palette.surfaceTertiary : appearance.surfaceVariant === "transparent" ? "transparent" : palette.surfaceSecondary,
+        "--surface-component-border": appearance.surfaceVariant === "transparent" ? border : "transparent",
         "--overlay": palette.surface,
         "--overlay-foreground": surfaceForeground,
         "--muted": muted,
@@ -181,6 +187,7 @@ function isAppearanceSettings(value: unknown): value is AppearanceSettings {
         && typeof item.fontFamily === "string" && item.fontFamily in fontTokens
         && typeof item.radius === "string" && item.radius in radiusTokens
         && typeof item.radiusForm === "string" && item.radiusForm in radiusTokens
+        && (item.surfaceVariant === undefined || ["default", "secondary", "tertiary", "transparent"].includes(item.surfaceVariant))
         && ["mengnex", "heroui", "custom"].includes(item.preset ?? "");
 }
 
@@ -203,6 +210,7 @@ function getStoredAppearance(): AppearanceSettings {
                 : appearance.base,
             foregroundLight: normalizeColor(appearance.foregroundLight, defaultAppearance.foregroundLight),
             foregroundDark: normalizeColor(appearance.foregroundDark, defaultAppearance.foregroundDark),
+            surfaceVariant: appearance.surfaceVariant ?? defaultAppearance.surfaceVariant,
         };
     } catch {
         return defaultAppearance;
@@ -223,6 +231,7 @@ function applyTheme(theme: "light" | "dark", appearance: AppearanceSettings) {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.dataset.theme = theme;
+    root.style.setProperty("--surface-component-border", appearance.surfaceVariant === "transparent" ? "var(--border)" : "transparent");
     const variables = createThemeVariables(theme, appearance);
     for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
 }
@@ -233,7 +242,7 @@ const themeInitScript = `(() => {
     const appearanceKey = ${JSON.stringify(APPEARANCE_STORAGE_KEY)};
     const mode = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
     const stored = JSON.parse(localStorage.getItem(appearanceKey) || "null");
-    const appearance = stored && typeof stored.accent === "string" && typeof stored.base === "string" && ${JSON.stringify(Object.keys(fontTokens))}.includes(stored.fontFamily) && ${JSON.stringify(Object.keys(radiusTokens))}.includes(stored.radius) && ${JSON.stringify(Object.keys(radiusTokens))}.includes(stored.radiusForm) ? stored : ${JSON.stringify(defaultAppearance)};
+    const appearance = stored && typeof stored.accent === "string" && typeof stored.base === "string" && ${JSON.stringify(Object.keys(fontTokens))}.includes(stored.fontFamily) && ${JSON.stringify(Object.keys(radiusTokens))}.includes(stored.radius) && ${JSON.stringify(Object.keys(radiusTokens))}.includes(stored.radiusForm) && ["default", "secondary", "tertiary", "transparent"].includes(stored.surfaceVariant) ? stored : ${JSON.stringify(defaultAppearance)};
     const theme = modes.includes(mode) && mode !== "system" ? mode : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");

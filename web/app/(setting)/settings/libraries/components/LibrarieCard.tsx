@@ -585,7 +585,7 @@ export default function LibrarieCard({
     ];
 
     return (
-        <Card className="group overflow-hidden transition-shadow duration-300 hover:shadow-xl">
+        <Card className="group overflow-hidden border border-[color:var(--surface-component-border)] bg-[var(--surface-component)] shadow-sm transition-shadow duration-300 hover:shadow-xl">
             <div className={`relative h-52 bg-gradient-to-br overflow-hidden rounded-2xl ${style.gradient}`}>
                 {library.media_type === "photo" ? (
                     <PhotoCover

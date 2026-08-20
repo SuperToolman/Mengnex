@@ -1,12 +1,13 @@
 "use client";
 
 import { ChevronDown, Display, Moon, Sun } from "@gravity-ui/icons";
-import { Label, ListBox, Select, Tabs } from "@heroui/react";
+import { Label, ListBox, Select, Surface, Tabs } from "@heroui/react";
 import {
     useTheme,
     type AppearanceSettings,
     type FontFamily,
     type RadiusSize,
+    type SurfaceVariant,
     type ThemeMode,
     type ThemePreset,
 } from "@/app/components/ThemeProvider";
@@ -41,6 +42,13 @@ const presetOptions: Array<{ id: ThemePreset; label: string }> = [
     { id: "mengnex", label: "Mengnex" },
     { id: "heroui", label: "HeroUI 默认" },
     { id: "custom", label: "自定义" },
+];
+
+const surfaceVariantOptions: Array<{ id: SurfaceVariant; label: string }> = [
+    { id: "default", label: "Default" },
+    { id: "secondary", label: "Secondary" },
+    { id: "tertiary", label: "Tertiary" },
+    { id: "transparent", label: "Transparent" },
 ];
 
 function OptionSelect<T extends string>({
@@ -130,6 +138,20 @@ export default function PreferencesPage() {
                         <div className="min-w-64 flex-1 basis-64"><ColorPickerField label="基础色" value={appearance.base} swatches={baseSwatches} onChange={(value) => updateAppearance("base", value)} /></div>
                         <div className="min-w-64 flex-1 basis-64"><ColorPickerField label="亮色字体颜色" value={appearance.foregroundLight} swatches={foregroundSwatches} onChange={(value) => updateAppearance("foregroundLight", value)} /></div>
                         <div className="min-w-64 flex-1 basis-64"><ColorPickerField label="暗色字体颜色" value={appearance.foregroundDark} swatches={foregroundSwatches} onChange={(value) => updateAppearance("foregroundDark", value)} /></div>
+                    </div>
+
+                    <div className="border-t border-border pt-5">
+                        <div className="mb-4">
+                            <h4 className="text-sm font-semibold text-foreground">Surface 层级</h4>
+                            <p className="mt-1 text-xs leading-5 text-muted">选择设置卡片使用的 HeroUI Surface 变体。</p>
+                        </div>
+                        <OptionSelect label="设置卡片变体" value={appearance.surfaceVariant} options={surfaceVariantOptions} onChange={(value) => updateAppearance("surfaceVariant", value)} className="w-full max-w-64" />
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <Surface className="flex min-h-28 flex-col gap-2 rounded-2xl p-4" variant="default"><p className="text-xs font-medium text-muted">Default</p><p className="text-sm text-foreground">bg-surface</p></Surface>
+                            <Surface className="flex min-h-28 flex-col gap-2 rounded-2xl p-4" variant="secondary"><p className="text-xs font-medium text-muted">Secondary</p><p className="text-sm text-foreground">bg-surface-secondary</p></Surface>
+                            <Surface className="flex min-h-28 flex-col gap-2 rounded-2xl p-4" variant="tertiary"><p className="text-xs font-medium text-muted">Tertiary</p><p className="text-sm text-foreground">bg-surface-tertiary</p></Surface>
+                            <Surface className="flex min-h-28 flex-col gap-2 rounded-2xl border border-border p-4" variant="transparent"><p className="text-xs font-medium text-muted">Transparent</p><p className="text-sm text-foreground">无背景，适用于覆盖层和自定义背景卡片</p></Surface>
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap items-end gap-x-4 gap-y-5">

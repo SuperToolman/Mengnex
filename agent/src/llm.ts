@@ -36,11 +36,11 @@ async function completeChat(settings: ProviderSettings, messages: ChatMessage[],
     body: JSON.stringify({ model: settings.model, messages, temperature: 0.4, ...(tools.length ? { tools, tool_choice: "auto" } : {}) }),
   });
   const payload = await response.json() as {
-    choices?: Array<{ message?: { content?: string | null; tool_calls?: ChatToolCall[] } }>;
+    choices?: Array<{ message?: { content?: string | null; reasoning_content?: string | null; reasoning?: string | null; tool_calls?: ChatToolCall[] } }>;
     error?: { message?: string };
   };
   if (!response.ok) throw new Error(payload.error?.message ?? `model provider request failed (${response.status})`);
   const message = payload.choices?.[0]?.message;
-  if (!message || (!message.content && !message.tool_calls?.length)) throw new Error("model provider returned no assistant message");
-  return { content: message.content ?? "", tool_calls: message.tool_calls ?? [], model: settings.model };
+  if (!message || (!message.content && !message.reasoning_content && !message.reasoning && !message.tool_calls?.length)) throw new Error("model provider returned no assistant message");
+  return { content: message.content ?? "", reasoning: message.reasoning_content ?? message.reasoning ?? "", tool_calls: message.tool_calls ?? [], model: settings.model };
 }

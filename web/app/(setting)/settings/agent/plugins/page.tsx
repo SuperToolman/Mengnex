@@ -33,6 +33,6 @@ export default function AgentPluginsPage() {
     return <SettingsPage group="Agent" title="插件" description="管理 Agent 已发现的受信任插件包。启用会挂载 Cordis 插件，停用会卸载运行时服务；不会删除本地插件文件。" contentClassName="max-w-none">
         {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
         {loading ? <p className="text-sm text-muted">正在加载插件...</p> : null}
-        {!loading ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{plugins.map((plugin) => <PluginCard key={plugin.id} plugin={plugin} working={workingId === plugin.id} onToggle={() => void toggle(plugin)} onUpdate={() => void update(plugin)} onConfigure={() => router.push(`/settings/agent/extensions/${plugin.id}`)} />)}</div> : null}
+        {!loading ? <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">{plugins.map((plugin) => <PluginCard key={plugin.id} plugin={plugin} working={workingId === plugin.id} onToggle={() => void toggle(plugin)} onUpdate={() => void update(plugin)} onConfigure={() => router.push(`/settings/agent/extensions/${plugin.id}`)} />)}</div> : null}
     </SettingsPage>;
 }

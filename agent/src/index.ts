@@ -2,7 +2,7 @@ import * as cordis from "cordis";
 import type { Context } from "cordis";
 import { createServer } from "node:http";
 import { RustApiClient } from "./rust-api.js";
-import type { ChatMessage } from "./llm.js";
+import type { AgentStreamEvent } from "./agent-loop.js";
 import { PluginManagerService } from "./plugin-manager.js";
 import { PluginUiRegistryService } from "./plugin-ui.js";
 import { corePluginDefinitions } from "./plugins/core-plugins.js";
@@ -35,6 +35,16 @@ function send(request: import("node:http").IncomingMessage, response: import("no
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
   response.end(JSON.stringify(value));
+}
+
+function beginStream(request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse) {
+  const origin = request.headers.origin === "http://127.0.0.1:7589" ? "http://127.0.0.1:7589" : "http://localhost:7589";
+  response.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" });
+  response.write(`: connected\n\n`);
+}
+
+function streamEvent(response: import("node:http").ServerResponse, event: AgentStreamEvent) {
+  response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
 async function body(request: import("node:http").IncomingMessage) {
@@ -140,16 +150,20 @@ const server = createServer(async (request, response) => {
       const input = await body(request);
       const content = typeof input.content === "string" ? input.content.trim() : "";
       if (!content) return send(request, response, 400, { message: "message content is required" });
+      if ((request.headers.accept ?? "").includes("text/event-stream")) {
+        beginStream(request, response);
+        try {
+          const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie }, (event) => streamEvent(response, event));
+          streamEvent(response, { type: "snapshot", result });
+          response.end();
+        } catch (error) {
+          streamEvent(response, { type: "error", message: error instanceof Error ? error.message : "agent request failed" });
+          response.end();
+        }
+        return;
+      }
       const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie });
       return send(request, response, result.status === "approval_required" ? 202 : 200, { ...result, sessionId: messageMatch[1] });
-    }
-    if (request.method === "POST" && url.pathname === "/v1/chat") {
-      const current = await requireAuthenticated(request);
-      const input = await body(request);
-      const messages = Array.isArray(input.messages) ? input.messages as ChatMessage[] : [];
-      if (!messages.length) return send(request, response, 400, { message: "messages are required" });
-      const result = await gateway.chat(messages, { userId: current.user.id, sessionCookie: request.headers.cookie });
-      return send(request, response, result.status === "approval_required" ? 202 : 200, result);
     }
     if (request.method === "POST" && url.pathname === "/v1/runs") {
       const current = await requireAuthenticated(request);

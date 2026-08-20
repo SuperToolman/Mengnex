@@ -2,8 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import * as cordis from "cordis";
 import type { Context } from "cordis";
-import type { ChatMessage } from "./llm.js";
-import type { ToolCallRecord } from "./agent-loop.js";
+import type { ConversationTurn } from "./conversation.js";
 
 export type AgentSession = {
   id: string;
@@ -11,8 +10,7 @@ export type AgentSession = {
   title: string;
   createdAt: string;
   updatedAt: string;
-  messages: ChatMessage[];
-  toolCalls: ToolCallRecord[];
+  turns: ConversationTurn[];
 };
 
 const sessionsPath = join(process.cwd(), "data", "sessions.json");
@@ -35,7 +33,8 @@ export class SessionStore extends (cordis as any).Service {
   async load() {
     try {
       const entries = JSON.parse(await readFile(this.filePath, "utf8")) as AgentSession[];
-      this.sessions = new Map(entries.map((entry) => [entry.id, { ...entry, toolCalls: entry.toolCalls ?? [] }]));
+      if (entries.some((entry) => !Array.isArray(entry.turns))) throw new Error("agent session data uses an obsolete schema; remove agent/data/sessions.json");
+      this.sessions = new Map(entries.map((entry) => [entry.id, entry]));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
@@ -49,7 +48,7 @@ export class SessionStore extends (cordis as any).Service {
 
   async create(userId: string, title = "新对话") {
     const now = new Date().toISOString();
-    const session: AgentSession = { id: crypto.randomUUID(), userId, title, createdAt: now, updatedAt: now, messages: [], toolCalls: [] };
+    const session: AgentSession = { id: crypto.randomUUID(), userId, title, createdAt: now, updatedAt: now, turns: [] };
     this.sessions.set(session.id, session);
     await this.persist();
     return session;
@@ -61,18 +60,9 @@ export class SessionStore extends (cordis as any).Service {
     return session;
   }
 
-  async append(id: string, userId: string, messages: ChatMessage[]) {
+  async appendTurn(id: string, userId: string, turn: ConversationTurn) {
     const session = this.getOwned(id, userId);
-    session.messages.push(...messages);
-    session.updatedAt = new Date().toISOString();
-    await this.persist();
-    return session;
-  }
-
-  async appendToolCalls(id: string, userId: string, toolCalls: ToolCallRecord[]) {
-    if (!toolCalls.length) return this.getOwned(id, userId);
-    const session = this.getOwned(id, userId);
-    session.toolCalls.push(...toolCalls);
+    session.turns.push(turn);
     session.updatedAt = new Date().toISOString();
     await this.persist();
     return session;

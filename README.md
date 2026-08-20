@@ -14,7 +14,7 @@ Mengnex 是一个本地优先的个人媒体管理项目。它以 Rust API、Nex
 - 音乐标签解析、专辑/艺人聚合、播放队列、歌词、收藏、歌单与按需转码。
 - EPUB/TXT 小说扫描、章节阅读、封面和阅读进度。
 - Owner、Admin、Editor、Viewer 角色及媒体库级访问授权。
-- 基于 Cordis 的 Agent Gateway、会话、工具调用、执行策略、审批持久化与插件管理。
+- 基于 Cordis 的 Agent Gateway、结构化会话、实时事件流、工具调用、执行策略、审批持久化与插件管理。
 
 当前不将下列能力视为已完成：可靠任务队列、插件安全沙盒、任意第三方插件上传、完整 RAG 知识库、自动化调度、可恢复 Agent 长任务，以及生产级多实例部署。
 
@@ -239,10 +239,15 @@ Agent 层按 Cordis 的插件化主旨实现：
 ### 对话、模型与审批
 
 - `/agent` 使用现有 Mengnex 登录身份创建和读取用户隔离会话。
+- 会话以 `turns` 和内容块保存用户消息、推理、文本、工具调用及工具结果；旧的扁平消息结构不再兼容。
+- Agent Gateway 通过 SSE/WebSocket 语义事件实时推送 `agent:turn`、`reasoning-delta`、`text-delta`、`tool/call`、`tool/result`、`snapshot`、`done` 和 `error`，Web 端据此展示正在思考、正在调用和执行结果。
+- `/agent` 支持 Markdown 消息、代码块复制、思考过程展开、工具参数/结果查看，以及会话创建、切换和搜索。用户消息支持 Markdown，但不显示复制按钮。
 - 会话消息、工具调用和待决审批保存在 `agent/data/`；Gateway 重启不会丢失审批记录。
 - 模型供应商通过 Agent 设置中的插件配置管理，支持启停和设置默认供应商。启用的默认供应商必须具备模型名和有效 API Key。
 - 执行策略包括 `request_approval`（每次工具执行确认）、`approve_high_risk`（高风险确认）和 `full_access`（可直接执行）。关键风险能力仍保留审批约束。
 - 当前工具覆盖媒体搜索、任务列表、创建扫描、外部媒体导入和 Hello World 健康检查。
+
+宜搭自定义按钮目前尚未接入 Mengnex。宜搭的 `query/customButtonManage/list.json` 可以返回按钮的 `actionConfig`、`actionType` 和 `tableViewUuids`，但正式接入仍需要可复用的登录 Cookie、CSRF token 获取方式，以及对内链、外链和权限条件的动作执行适配。
 
 外部导入工具调用 Rust `POST /api/media/import`。它要求当前用户拥有目标媒体库写入权限，并以 `library_id + source + external_id` 作为幂等键创建或更新外部媒体占位记录。
 
@@ -282,6 +287,7 @@ pnpm api:sync
 | `GET/POST` | `/v1/sessions` | 列出或新建当前用户会话 |
 | `GET` | `/v1/sessions/:id` | 获取当前用户会话 |
 | `POST` | `/v1/sessions/:id/messages` | 发送消息并运行 Agent Loop |
+| `GET`/`SSE` | `/v1/sessions/:id/events` | 订阅当前会话的 turn、推理、文本、工具和完成事件 |
 | `POST` | `/v1/runs` | 直接调用受控工具 |
 | `POST` | `/v1/approvals/:id` | 审批或拒绝待决执行 |
 | `GET/PUT` | `/v1/plugins`、`/v1/plugins/:id` | Owner/Admin 管理插件 |
