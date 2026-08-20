@@ -32,8 +32,8 @@ function AuthorDrawer({ authorId, drawer, onAvatarUploaded }: { authorId: string
         <Drawer.Root state={drawer}>
             <Drawer.Trigger aria-label="打开作者信息抽屉" className="sr-only"><span /></Drawer.Trigger>
             <Drawer.Backdrop>
-                <Drawer.Content placement="right" className="w-[min(48rem,100vw)] max-w-none">
-                    <Drawer.Dialog>
+                <Drawer.Content placement="right">
+                    <Drawer.Dialog className="w-[min(48rem,100vw)] max-w-none">
                         <Drawer.Header className="flex items-center justify-between">
                             <Drawer.Heading>作者信息</Drawer.Heading>
                             <Drawer.CloseTrigger aria-label="关闭" />

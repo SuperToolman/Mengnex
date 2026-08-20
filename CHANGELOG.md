@@ -25,6 +25,17 @@
 - 修复 Agent 页面使用自定义全局语义化 CSS 和硬编码颜色覆盖主题 token 的问题，移除 Agent 专属 `globals.css` 样式。
 - 修复流式消息更新时推理块、文本块和工具块无法按事件顺序稳定合并的问题。
 
+### 设置与主题
+
+- 设置路由从 `(setting)` 路由组迁移至 `app/settings`，保留原有 URL 与页面布局。
+- 新增基于 HeroUI 的 `InfoTooltip` 公共组件，仅需传入图标尺寸和提示内容。
+- 新增 `OptionMenu` 公共选择组件：以 HeroUI `Select`、`ListBox` 和 `Surface` 组合展示网格选项；支持选项自身定义 Surface 变体、预览样式和类名，并提供轻量阴影悬停反馈。
+- 主题设置的 Surface、字体、组件圆角、表单圆角和预设主题统一接入 `OptionMenu`；媒体库新建与编辑表单的媒体类型、媒体源也复用该组件。
+- 主题外观设置新增 `xl` 与 `2xl` 圆角 token，Inter 字体通过 Next.js 字体加载接入主题字体 token。
+- 新增全局界面过渡动画开关，默认关闭；关闭时禁用页面、浮层和组件进入/退出过渡，减少低性能设备上的交互卡顿。
+- 修复设置页抽屉宽度应用在错误容器时定位到左上角的问题。
+- 修复 OptionMenu 及媒体库选择控件缺少可访问名称而重复输出 HeroUI/React Aria 警告的问题。
+
 ### 未完成
 
 - 宜搭 `query/customButtonManage/list.json` 自定义按钮接口尚未接入；当前仅确认其通过 `tableViewUuids` 绑定视图，仍需处理宜搭登录 Cookie、CSRF token 和动作执行协议。

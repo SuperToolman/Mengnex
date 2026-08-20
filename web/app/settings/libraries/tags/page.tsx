@@ -111,8 +111,8 @@ export default function TagLibraryPage() {
             <Drawer.Root state={detailDrawer}>
                 <Drawer.Trigger aria-label="打开标签详情抽屉" className="sr-only"><span /></Drawer.Trigger>
                 <Drawer.Backdrop>
-                    <Drawer.Content placement="right" className="w-[min(32rem,100vw)] max-w-none">
-                        <Drawer.Dialog>
+                    <Drawer.Content placement="right">
+                        <Drawer.Dialog className="w-[min(32rem,100vw)] max-w-none">
                             <Drawer.Header className="flex items-center justify-between">
                                 <Drawer.Heading>标签详情</Drawer.Heading>
                                 <Drawer.CloseTrigger aria-label="关闭" />

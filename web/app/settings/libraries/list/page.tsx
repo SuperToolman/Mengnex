@@ -31,6 +31,7 @@ import {
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { Key } from "@heroui/react";
 import type { ComponentType, ReactNode, SVGProps } from "react";
+import OptionMenu from "@/app/components/OptionMenu";
 import {
     createMediaLibrary,
     deleteLibraryPreviews,
@@ -83,8 +84,6 @@ type SelectOption<T extends string> = {
 
 const fieldLabelClass =
     "mb-2 block text-sm font-medium text-muted";
-const fieldTextClass =
-    "w-full rounded-field border border-border bg-field px-4 py-3 text-sm text-field-foreground outline-none transition focus:border-focus [&_input]:text-field-foreground [&_input]:placeholder:text-muted";
 const selectTriggerClass =
     "flex h-12 w-full items-center justify-between rounded-field border border-border bg-field px-4 text-sm text-field-foreground outline-none transition focus:border-focus";
 const modalSurfaceClass =
@@ -305,6 +304,7 @@ function SelectField<T extends string>({
         <label className="block">
             <span className={fieldLabelClass}>{label}</span>
             <Select.Root
+                aria-label={label}
                 selectedKey={selectedKey}
                 isDisabled={isDisabled}
                 onSelectionChange={(key) => {
@@ -367,7 +367,7 @@ function TextInputField({
         <label className="block">
             <span className={fieldLabelClass}>{label}</span>
             <TextField.Root value={value} onChange={onChange}>
-                <Input placeholder={placeholder} className={fieldTextClass} />
+                <Input placeholder={placeholder} className="w-full" />
             </TextField.Root>
         </label>
     );
@@ -474,13 +474,13 @@ function LibraryFormFields({
             <div><h3 className="text-sm font-semibold text-foreground">基本设置</h3><p className="mt-1 text-xs leading-5 text-muted">设置媒体库的名称、内容类型与媒体来源。</p></div>
             <div className="grid gap-4 md:grid-cols-2">
                 <TextInputField label="媒体库名称" value={form.name} placeholder="例如：家庭照片" onChange={(value) => onChange("name", value)} />
-                <SelectField label="媒体类型" selectedKey={form.mediaType} options={mediaTypeOptions} optionLayout="grid" isDisabled={!isMediaTypeEditable} onSelectionChange={onMediaTypeChange} />
+                <OptionMenu label="媒体类型" value={form.mediaType} options={mediaTypeOptions.map((item) => ({ id: item.value, label: item.label, description: item.description }))} isDisabled={!isMediaTypeEditable} onChange={onMediaTypeChange} className="w-full" renderOption={(option) => { const item = mediaTypeOptions.find((entry) => entry.value === option.id); const Icon = item?.icon; return <div className="flex w-full flex-col items-center gap-1.5 text-center">{Icon ? <Icon className="h-6 w-6 shrink-0 text-muted" /> : null}<div className="min-w-0"><div className="text-sm font-medium leading-5">{option.label}</div>{option.description ? <div className="mt-0.5 text-xs leading-5 text-muted">{option.description}</div> : null}</div></div>; }} />
             </div>
             {form.sourceType === "local" ? <div className="grid gap-4 md:grid-cols-2">
-                <SelectField label="媒体源" selectedKey={form.sourceType} options={sourceTypeOptions} onSelectionChange={(value) => onChange("sourceType", value)} />
+                <OptionMenu label="媒体源" value={form.sourceType} options={sourceTypeOptions.map((item) => ({ id: item.value, label: item.label, description: item.description }))} onChange={(value) => onChange("sourceType", value)} className="w-full" renderOption={(option) => { const item = sourceTypeOptions.find((entry) => entry.value === option.id); const Icon = item?.icon; return <div className="flex w-full flex-col items-center gap-1.5 text-center">{Icon ? <Icon className="h-5 w-5 shrink-0 text-muted" /> : null}<div className="min-w-0"><div className="text-sm font-medium leading-5">{option.label}</div>{option.description ? <div className="mt-0.5 text-xs leading-5 text-muted">{option.description}</div> : null}</div></div>; }} />
                 <TextInputField label="本地绝对路径" value={form.rootPath} placeholder="例如：D:\\Media\\Photos" onChange={(value) => onChange("rootPath", value)} />
             </div> : <div className="space-y-4"><div className="grid gap-4 md:grid-cols-3">
-                <SelectField label="媒体源" selectedKey={form.sourceType} options={sourceTypeOptions} onSelectionChange={(value) => onChange("sourceType", value)} />
+                <OptionMenu label="媒体源" value={form.sourceType} options={sourceTypeOptions.map((item) => ({ id: item.value, label: item.label, description: item.description }))} onChange={(value) => onChange("sourceType", value)} className="w-full" renderOption={(option) => { const item = sourceTypeOptions.find((entry) => entry.value === option.id); const Icon = item?.icon; return <div className="flex w-full flex-col items-center gap-1.5 text-center">{Icon ? <Icon className="h-5 w-5 shrink-0 text-muted" /> : null}<div className="min-w-0"><div className="text-sm font-medium leading-5">{option.label}</div>{option.description ? <div className="mt-0.5 text-xs leading-5 text-muted">{option.description}</div> : null}</div></div>; }} />
                 <SelectField label="WebDAV 连接" selectedKey={form.webdavServerId} options={webdavConnections.map((connection) => ({ value: connection.id, label: connection.name, description: connection.url, icon: CloudGear }))} onSelectionChange={(value) => onChange("webdavServerId", value)} />
                 <TextInputField label="WebDAV 路径" value={form.webdavPath} placeholder="例如：/media/photos" onChange={(value) => onChange("webdavPath", value)} />
             </div><p className="text-xs leading-5 text-muted">路径相对于所选连接的地址拼接；填写 <code>/</code> 扫描连接根目录。</p></div>}

@@ -6,7 +6,7 @@ export type ThemeMode = "light" | "dark" | "system";
 export type AccentColor = string;
 export type BaseColor = string;
 export type FontFamily = "geist" | "inter" | "system" | "serif";
-export type RadiusSize = "none" | "small" | "medium" | "large";
+export type RadiusSize = "none" | "small" | "medium" | "large" | "xl" | "2xl";
 export type ThemePreset = "mengnex" | "heroui" | "custom";
 export type SurfaceVariant = "default" | "secondary" | "tertiary" | "transparent";
 
@@ -20,6 +20,7 @@ export type AppearanceSettings = {
     radiusForm: RadiusSize;
     preset: ThemePreset;
     surfaceVariant: SurfaceVariant;
+    animationsEnabled: boolean;
 };
 
 const THEME_STORAGE_KEY = "mengnex.theme";
@@ -35,6 +36,7 @@ export const defaultAppearance: AppearanceSettings = {
     radiusForm: "large",
     preset: "mengnex",
     surfaceVariant: "secondary",
+    animationsEnabled: false,
 };
 
 const heroUIDefaultAppearance: AppearanceSettings = {
@@ -47,6 +49,7 @@ const heroUIDefaultAppearance: AppearanceSettings = {
     radiusForm: "large",
     preset: "heroui",
     surfaceVariant: "secondary",
+    animationsEnabled: false,
 };
 
 const legacyAccentColors: Record<string, string> = {
@@ -107,7 +110,7 @@ function createSurfacePalette(base: string, theme: "light" | "dark"): SurfacePal
 
 const fontTokens: Record<FontFamily, string> = {
     geist: "var(--font-geist-sans), Arial, sans-serif",
-    inter: "Inter, ui-sans-serif, system-ui, sans-serif",
+    inter: "var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif",
     system: "ui-sans-serif, system-ui, sans-serif",
     serif: "Georgia, Cambria, 'Times New Roman', serif",
 };
@@ -117,6 +120,8 @@ const radiusTokens: Record<RadiusSize, string> = {
     small: "0.25rem",
     medium: "0.5rem",
     large: "0.75rem",
+    xl: "1rem",
+    "2xl": "1.5rem",
 };
 
 function createThemeVariables(theme: "light" | "dark", appearance: AppearanceSettings): Record<string, string> {
@@ -176,6 +181,7 @@ function createThemeVariables(theme: "light" | "dark", appearance: AppearanceSet
         "--overlay-shadow": isDark ? "0 16px 32px 0 rgba(0, 0, 0, 0.36)" : "0 14px 28px 0 rgba(0, 0, 0, 0.16)",
         "--field-shadow": isDark ? "0 0 0 0 transparent" : "0 1px 2px 0 rgba(0, 0, 0, 0.06)",
         "--app-canvas": canvas,
+        "--motion-duration": appearance.animationsEnabled ? "150ms" : "0ms",
     };
 }
 
@@ -188,6 +194,7 @@ function isAppearanceSettings(value: unknown): value is AppearanceSettings {
         && typeof item.radius === "string" && item.radius in radiusTokens
         && typeof item.radiusForm === "string" && item.radiusForm in radiusTokens
         && (item.surfaceVariant === undefined || ["default", "secondary", "tertiary", "transparent"].includes(item.surfaceVariant))
+        && (item.animationsEnabled === undefined || typeof item.animationsEnabled === "boolean")
         && ["mengnex", "heroui", "custom"].includes(item.preset ?? "");
 }
 
@@ -211,6 +218,7 @@ function getStoredAppearance(): AppearanceSettings {
             foregroundLight: normalizeColor(appearance.foregroundLight, defaultAppearance.foregroundLight),
             foregroundDark: normalizeColor(appearance.foregroundDark, defaultAppearance.foregroundDark),
             surfaceVariant: appearance.surfaceVariant ?? defaultAppearance.surfaceVariant,
+            animationsEnabled: appearance.animationsEnabled ?? defaultAppearance.animationsEnabled,
         };
     } catch {
         return defaultAppearance;
@@ -231,6 +239,7 @@ function applyTheme(theme: "light" | "dark", appearance: AppearanceSettings) {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.dataset.theme = theme;
+    root.dataset.motion = appearance.animationsEnabled ? "full" : "reduced";
     root.style.setProperty("--surface-component-border", appearance.surfaceVariant === "transparent" ? "var(--border)" : "transparent");
     const variables = createThemeVariables(theme, appearance);
     for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
@@ -254,6 +263,7 @@ const themeInitScript = `(() => {
     root.style.setProperty("--font-sans", ${JSON.stringify(fontTokens)}[appearance.fontFamily]);
     root.style.setProperty("--radius", ${JSON.stringify(radiusTokens)}[appearance.radius]);
     root.style.setProperty("--field-radius", ${JSON.stringify(radiusTokens)}[appearance.radiusForm]);
+    root.dataset.motion = appearance.animationsEnabled ? "full" : "reduced";
   } catch {}
 })();`;
 
