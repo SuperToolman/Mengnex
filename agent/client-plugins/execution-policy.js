@@ -1,8 +1,14 @@
 export function register(ctx) {
-  ctx.registerSettingsView(async (root) => {
-    const policy = await ctx.action('get');
-    root.innerHTML = `<form class="space-y-5"><fieldset><legend class="text-sm font-medium">批准方式</legend><div class="mt-3 space-y-3 text-sm"><label class="flex gap-3"><input type="radio" name="mode" value="request_approval" ${policy.executionMode === 'request_approval' ? 'checked' : ''}>每次执行前请求批准</label><label class="flex gap-3"><input type="radio" name="mode" value="approve_high_risk" ${policy.executionMode === 'approve_high_risk' ? 'checked' : ''}>仅高风险操作请求批准</label><label class="flex gap-3"><input type="radio" name="mode" value="full_access" ${policy.executionMode === 'full_access' ? 'checked' : ''}>完全访问执行</label></div></fieldset><label class="block text-sm font-medium">允许能力<textarea name="caps" class="mt-2 min-h-24 w-full rounded-md border border-border bg-surface p-3 text-sm">${policy.allowedCapabilities.join(', ')}</textarea></label><div class="flex justify-end"><button class="rounded-md bg-accent px-3 py-2 text-sm text-white">保存执行策略</button></div></form>`;
-    root.querySelector('form').onsubmit = async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); await ctx.action('update', { execution_mode: form.get('mode'), allowed_capabilities: String(form.get('caps')).split(',').map((item) => item.trim()).filter(Boolean) }); };
-    return () => { root.innerHTML = ''; };
+  const { React, components } = ctx.ui;
+  const { Button, Card, Input, Label, Switch, TextField } = components;
+  ctx.registerSettingsView(async () => {
+    const initial = await ctx.action('get');
+    function PolicyView() {
+      const [mode, setMode] = React.useState(initial.executionMode);
+      const [caps, setCaps] = React.useState(initial.allowedCapabilities.join(', '));
+      const save = async (event) => { event.preventDefault(); await ctx.action('update', { execution_mode: mode, allowed_capabilities: caps.split(',').map((item) => item.trim()).filter(Boolean) }); };
+      return React.createElement('form', { className: 'space-y-5', onSubmit: save }, React.createElement(Card.Root, null, React.createElement(Card.Content, { className: 'space-y-4 p-5' }, React.createElement('h2', { className: 'font-medium' }, '批准方式'), ['request_approval', 'approve_high_risk', 'full_access'].map((item) => React.createElement(Switch, { key: item, isSelected: mode === item, onChange: () => setMode(item) }, React.createElement(Switch.Content, null, item === 'request_approval' ? '每次执行前请求批准' : item === 'approve_high_risk' ? '仅高风险操作请求批准' : '完全访问执行'), React.createElement(Switch.Control, null, React.createElement(Switch.Thumb, null))))), React.createElement(TextField.Root, { value: caps, onChange: setCaps }, React.createElement(Label, null, '允许能力（逗号分隔）'), React.createElement(Input, null)), React.createElement('div', { className: 'flex justify-end' }, React.createElement(Button, { type: 'submit' }, '保存执行策略')));
+    }
+    return React.createElement(PolicyView);
   });
 }

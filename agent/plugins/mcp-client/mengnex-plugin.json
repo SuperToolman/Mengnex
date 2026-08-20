@@ -45,6 +45,6 @@
       "icon": "plug"
     }
   },
-  "default_installed": false,
+  "default_enabled": false,
   "entry": "./index.js"
 }

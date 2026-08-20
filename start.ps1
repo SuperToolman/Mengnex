@@ -154,9 +154,6 @@ try {
     Stop-ListenerOnPort -Port $docsPort -ServiceName 'API Docs'
     Stop-ListenerOnPort -Port $frontendPort -ServiceName 'Frontend'
     Stop-ListenerOnPort -Port $agentPort -ServiceName 'Agent'
-    if ($backendPort -ne 3001) { Stop-ListenerOnPort -Port 3001 -ServiceName 'Legacy Backend' }
-    if ($frontendPort -ne 3000) { Stop-ListenerOnPort -Port 3000 -ServiceName 'Legacy Frontend' }
-    if ($agentPort -ne 3010) { Stop-ListenerOnPort -Port 3010 -ServiceName 'Legacy Agent' }
     Write-Host ""
 
     # -- 后端 ------------------------------------------------

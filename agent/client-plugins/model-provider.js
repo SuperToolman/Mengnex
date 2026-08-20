@@ -1,23 +1,24 @@
 export function register(ctx) {
-  ctx.registerSettingsView(async (root) => {
-    root.innerHTML = `<div class="space-y-4"><div class="flex items-center justify-between gap-3"><p class="text-sm text-muted">模型连接由此插件管理，密钥仅保存在本机 Agent 数据目录。</p><button data-add class="rounded-md bg-accent px-3 py-2 text-sm text-white">添加供应商</button></div><div data-list class="space-y-3"></div></div>`;
-    const list = root.querySelector('[data-list]');
-    async function render() {
-      const { providers } = await ctx.action('list');
-      list.innerHTML = providers.length ? providers.map((p) => `<section class="rounded-md border border-border p-4"><div class="flex flex-wrap items-center justify-between gap-3"><div><strong>${escapeHtml(p.name)}</strong><p class="mt-1 text-xs text-muted">${escapeHtml(p.model || '未设置模型')} · ${escapeHtml(p.baseUrl)}</p></div><div class="flex gap-2"><button data-default="${p.id}" class="rounded border border-border px-2 py-1 text-xs" ${p.isDefault || !p.enabled ? 'disabled' : ''}>${p.isDefault ? '默认' : '设为默认'}</button><button data-toggle="${p.id}" class="rounded border border-border px-2 py-1 text-xs">${p.enabled ? '停止' : '启动'}</button><button data-delete="${p.id}" class="rounded border border-danger px-2 py-1 text-xs text-danger" ${p.isDefault ? 'disabled' : ''}>删除</button></div></div></section>`).join('') : '<p class="text-sm text-muted">尚未配置模型供应商。</p>';
-      list.querySelectorAll('[data-default]').forEach((button) => button.onclick = async () => { await ctx.action('set-default', { id: button.dataset.default }); await render(); });
-      list.querySelectorAll('[data-toggle]').forEach((button) => { const p = providers.find((item) => item.id === button.dataset.toggle); button.onclick = async () => { await ctx.action('update', { ...p, id: p.id, base_url: p.baseUrl, is_default: p.isDefault, api_key: undefined, enabled: !p.enabled }); await render(); }; });
-      list.querySelectorAll('[data-delete]').forEach((button) => button.onclick = async () => { await ctx.action('delete', { id: button.dataset.delete }); await render(); });
+  const { React, components } = ctx.ui;
+  const { Button, Card, Input, Label, TextField } = components;
+  ctx.registerSettingsView(async () => {
+    function ProviderView() {
+      const [providers, setProviders] = React.useState([]);
+      const [form, setForm] = React.useState({ name: '', base_url: 'https://api.openai.com/v1', model: '', api_key: '' });
+      const refresh = React.useCallback(async () => { const result = await ctx.action('list'); setProviders(result.providers); }, []);
+      React.useEffect(() => { void refresh(); }, [refresh]);
+      const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+      const create = async (event) => { event.preventDefault(); await ctx.action('create', { ...form, enabled: true }); setForm({ name: '', base_url: 'https://api.openai.com/v1', model: '', api_key: '' }); await refresh(); };
+      return React.createElement('div', { className: 'space-y-5' },
+        React.createElement('div', { className: 'flex items-center justify-between gap-3' }, React.createElement('p', { className: 'text-sm text-muted' }, '模型连接由此插件管理，密钥仅保存在本机 Agent 数据目录。'), React.createElement('span', { className: 'text-xs text-muted' }, `${providers.length} 个连接`)),
+        React.createElement(Card.Root, null, React.createElement(Card.Content, { className: 'space-y-4 p-5' },
+          React.createElement('h2', { className: 'font-medium' }, '添加模型供应商'),
+          React.createElement('form', { className: 'grid gap-4 sm:grid-cols-2', onSubmit: create },
+            field(React, TextField, Input, Label, 'name', '供应商名称', form.name, (value) => update('name', value)), field(React, TextField, Input, Label, 'base_url', '接口地址', form.base_url, (value) => update('base_url', value)), field(React, TextField, Input, Label, 'model', '模型名称', form.model, (value) => update('model', value)), field(React, TextField, Input, Label, 'api_key', 'API 密钥', form.api_key, (value) => update('api_key', value), 'password'),
+            React.createElement(Button, { type: 'submit', className: 'sm:col-span-2' }, '添加供应商')))),
+        React.createElement('div', { className: 'space-y-3' }, providers.map((provider) => React.createElement(Card.Root, { key: provider.id }, React.createElement(Card.Content, { className: 'flex flex-wrap items-center justify-between gap-4 p-4' }, React.createElement('div', null, React.createElement('p', { className: 'font-medium' }, provider.name), React.createElement('p', { className: 'text-xs text-muted' }, `${provider.model || '未设置模型'} · ${provider.baseUrl}`)), React.createElement('div', { className: 'flex gap-2' }, React.createElement(Button, { size: 'sm', variant: 'secondary', isDisabled: provider.isDefault || !provider.enabled, onPress: async () => { await ctx.action('set-default', { id: provider.id }); await refresh(); } }, provider.isDefault ? '默认' : '设为默认'), React.createElement(Button, { size: 'sm', variant: 'secondary', onPress: async () => { await ctx.action('update', { id: provider.id, name: provider.name, base_url: provider.baseUrl, model: provider.model, is_default: provider.isDefault, enabled: !provider.enabled }); await refresh(); } }, provider.enabled ? '停止' : '启动'), React.createElement(Button, { size: 'sm', variant: 'danger', isDisabled: provider.isDefault, onPress: async () => { await ctx.action('delete', { id: provider.id }); await refresh(); } }, '删除'))))), providers.length ? null : React.createElement('p', { className: 'py-8 text-center text-sm text-muted' }, '尚未配置模型供应商。')));
     }
-    root.querySelector('[data-add]').onclick = async () => {
-      const name = prompt('供应商名称'); if (!name) return;
-      const base_url = prompt('接口地址', 'https://api.openai.com/v1'); if (!base_url) return;
-      const model = prompt('模型名称'); if (!model) return;
-      const api_key = prompt('API 密钥'); if (!api_key) return;
-      await ctx.action('create', { name, base_url, model, api_key, enabled: true }); await render();
-    };
-    await render();
-    return () => { root.innerHTML = ''; };
+    return React.createElement(ProviderView);
   });
 }
-function escapeHtml(value) { const node = document.createElement('span'); node.textContent = String(value); return node.innerHTML; }
+function field(React, TextField, Input, Label, key, title, value, onChange, type) { return React.createElement(TextField.Root, { key, value, onChange }, React.createElement(Label, null, title), React.createElement(Input, { type })); }

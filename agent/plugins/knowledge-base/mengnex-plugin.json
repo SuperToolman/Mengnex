@@ -29,6 +29,6 @@
       "icon": "book"
     }
   },
-  "default_installed": false,
+  "default_enabled": false,
   "entry": "./index.js"
 }

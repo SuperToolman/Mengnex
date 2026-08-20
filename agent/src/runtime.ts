@@ -1,6 +1,6 @@
 import * as cordis from "cordis";
 import type { Context } from "cordis";
-import type { AgentTool, Approval, ExecutionMode, ToolContext } from "./types.js";
+import type { Approval, ToolContext } from "./types.js";
 import type { ExecutionPolicy } from "./execution-policy.js";
 import { requiresApproval } from "./policy.js";
 
@@ -12,18 +12,11 @@ declare module "cordis" {
 
 export class AgentRuntime extends (cordis as any).Service {
   protected declare readonly ctx: Context;
-  private readonly policy?: ExecutionPolicy;
-  private readonly fallback?: { executionMode: ExecutionMode; capabilities: Set<string> };
+  private readonly policy: ExecutionPolicy;
 
-  constructor(ctx: Context, options?: ExecutionPolicy | { policy?: ExecutionPolicy; fallback?: { executionMode: ExecutionMode; capabilities: Set<string> } } | { executionMode: ExecutionMode; capabilities: Set<string> }) {
+  constructor(ctx: Context, policy: ExecutionPolicy) {
     super(ctx, "agent");
-    if (options && "view" in options) this.policy = options;
-    else if (options && "executionMode" in options) {
-      this.fallback = options;
-    } else {
-      this.policy = options?.policy;
-      this.fallback = options?.fallback;
-    }
+    this.policy = policy;
   }
 
   listTools() { return this.ctx.tools.list(); }
@@ -31,7 +24,7 @@ export class AgentRuntime extends (cordis as any).Service {
   async invoke(toolName: string, args: Record<string, unknown>, context: Omit<ToolContext, "executionMode"> = {}) {
     const tool = this.ctx.tools.get(toolName);
     if (!tool) throw new Error(`unknown agent tool: ${toolName}`);
-    const policy = this.policy?.view() ?? { executionMode: this.fallback?.executionMode ?? "approve_high_risk", allowedCapabilities: [...(this.fallback?.capabilities ?? [])] };
+    const policy = this.policy.view();
     const missing = tool.capabilities.filter((capability) => !policy.allowedCapabilities.includes(capability));
     if (missing.length) throw new Error(`capability denied: ${missing.join(", ")}`);
     const toolContext = { ...context, executionMode: policy.executionMode };
@@ -54,7 +47,7 @@ export class AgentRuntime extends (cordis as any).Service {
       return { status: "rejected", approval };
     }
     await this.ctx.approvals.save();
-    const executionMode = this.policy?.view().executionMode ?? this.fallback?.executionMode ?? "approve_high_risk";
+    const executionMode = this.policy.view().executionMode;
     const result = await this.ctx.tools.execute(approval.toolName, approval.args, { ...context, executionMode });
     return { status: "completed", approval, result };
   }

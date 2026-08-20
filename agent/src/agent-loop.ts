@@ -31,7 +31,7 @@ export class AgentLoopService extends (cordis as any).Service {
     const toolCalls: ToolCallRecord[] = [];
 
     for (let turn = 0; turn < 5; turn += 1) {
-      await this.ctx.events?.emit("agent:turn", { turn: turn + 1, toolCount: tools.length });
+      await this.ctx.agentEvents?.emit("agent:turn", { turn: turn + 1, toolCount: tools.length });
       const completion = await this.ctx.llm.complete(conversation, tools);
       if (!completion.tool_calls.length) return { status: "completed" as const, content: completion.content, model: completion.model, toolCalls };
       conversation.push({ role: "assistant", content: completion.content, tool_calls: completion.tool_calls });

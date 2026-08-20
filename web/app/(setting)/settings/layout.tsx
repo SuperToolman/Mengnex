@@ -22,6 +22,11 @@ const settingSections: SettingSection[] = [
         description: "媒体源、扫描与元数据配置",
         items: [
             {
+                href: "/settings/agent/models",
+                label: "模型供应商",
+                description: "配置模型连接、默认模型和运行状态",
+            },
+            {
                 href: "/settings/libraries/list",
                 label: "媒体库列表",
                 description: "管理媒体库与扫描入口",

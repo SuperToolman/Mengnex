@@ -2,6 +2,89 @@
 
 本文档记录 Mengnex 的重要变更。
 
+## 0.46 - 2026-08-20
+
+#### 新增
+
+- 新增 Agent 模型供应商独立设置页 `/settings/agent/models`，为本地媒体库用户提供面向业务的模型连接管理入口。
+- 新增 DeepSeek、OpenAI 和 Ollama 的 OpenAI-compatible 快速配置预设，并支持自定义兼容服务地址。
+- 新增模型供应商实例的卡片列表，展示当前模型、接口地址、启用状态、默认状态和密钥配置状态。
+- 新增供应商实例的添加、编辑、启用/停用、设置默认和删除操作，继续通过 `openai-compatible-provider` 插件动作 API 执行。
+
+#### 变更
+
+- Agent 设置导航增加“模型供应商”入口，模型连接配置从通用插件扩展页中独立出来。
+- 明确区分模型协议插件与模型供应商实例：插件页负责 Cordis 插件生命周期，模型页负责连接地址、模型、凭据和默认选择。
+- 前端新增类型化模型供应商 API 封装，统一复用 Agent Gateway 的认证、错误处理和插件动作通道。
+- 模型编辑时 API Key 默认保持已保存值，不回显到浏览器；只有输入新值时才更新密钥。
+
+#### 优化
+
+- 模型配置表单使用 HeroUI 控件和 Card 布局，与 Mengnex 设置页的交互和视觉体系保持一致。
+- 常用供应商通过预设自动填充名称、Base URL 和模型名，减少首次配置步骤，同时保留完全自定义能力。
+- 页面说明明确 Ollama、本地模型、远程 OpenAI-compatible 服务和协议插件之间的职责边界。
+
+#### 修复
+
+- 修复模型供应商配置隐藏在插件扩展页、客户难以发现和管理的问题。
+- 修复前端模型供应商操作可能绕过 Agent 插件动作层的问题，所有管理操作统一走 `openai-compatible-provider` 的受控接口。
+
+## 0.45 - 2026-08-20
+
+#### 新增
+
+- 新增媒体领域 capability seam：媒体目录、媒体库访问、扫描、任务、元数据和外部导入均有独立 Cordis 服务契约。
+- 新增 `rust-media-capabilities` 插件，将 Rust API 封装为可替换的媒体领域 adapter。
+- 新增 seam 替换和媒体库权限拒绝测试。
+- 新增 Agent 模型供应商管理页面 `/settings/agent/models`，支持 DeepSeek、OpenAI、Ollama 快速填充、自定义 OpenAI-compatible 连接、编辑、启停、设为默认和删除。
+
+#### 变更
+
+- `core-tools` 不再直接依赖 `RustApiClient`，所有媒体工具改由领域 capability 调用。
+- 扫描和外部导入的库权限检查集中到 `libraryAccess`，能力白名单改为领域命名。
+- 模型供应商页面与插件生命周期页面分离：前者管理供应商实例，后者管理协议插件的挂载和配置。
+
+#### 修复
+
+- 修复媒体 capability 服务直接 `new` 导致 Cordis 服务生命周期和依赖注入不完整的问题，统一通过 `ctx.plugin()` 安装和反向卸载。
+
+## 0.44 - 2026-08-19
+
+#### 新增
+
+- 新增可替换的 `gateway` capability。HTTP Gateway 通过统一门面访问会话、聊天、工具、审批、插件与观测服务，不再直接依赖多个具体 Cordis 服务名。
+- 新增持久化单机 scheduler：作业状态、执行次数、错误、指数退避重试与运行历史保存到 `agent/data/jobs.json`；重启时中断的 running 作业会重新排队，等待所属插件注册 handler 后继续。
+- 新增 Scheduler HTTP 观测接口，支持当前用户查看、创建和取消作业；调度器通过 typed events 广播 queued、started、retrying、completed、failed 与 cancelled 状态。
+- 新增可替换的本地进程 sandbox：禁用 shell、使用每次独立工作目录、命令白名单、环境收敛、运行超时和输出上限，并记录执行结果事件。
+- 新增版本化事件信封和 JSONL 审计记录，事件包含 UUID、版本、来源、时间戳和 payload；支持按类型/来源回放，监听器失败不会中断其他监听器。
+- 新增插件包版本发现，支持扁平目录及 `plugins/<plugin-id>/<version>/` 仓库目录；同一插件会选择最高已发现版本。
+- 新增插件安装版本、来源、更新可用状态及最近 10 个配置/启停快照；设置页支持更新到已发现版本和回滚历史快照。
+- 新增 scheduler、sandbox 与事件总线测试，验证调度重试、持久化历史、工作目录隔离、命令拒绝、事件版本化、持久化及监听器失败隔离。
+
+#### 变更
+
+- 插件浏览器 UI 从原生 DOM 脚本迁移为宿主托管的 React/HeroUI runtime；插件通过 `ctx.ui.React` 和 `ctx.ui.components` 注册视图，宿主统一负责挂载、主题上下文与卸载。
+- 模型供应商和执行策略的复杂设置页改为 HeroUI Card、TextField、Switch、Select、Button 组件；声明式插件 schema 也统一由 HeroUI 控件渲染。
+
+- 移除 `builtins.ts` 兼容入口；入口直接注册 `core-plugins.ts` 中的核心 Cordis 插件定义。
+- 本地 sandbox 和 scheduler 从占位 capability 调整为可运行实现，同时继续通过 `sandbox`、`jobs` 独占 slot 支持容器、远程执行器或分布式调度器替换。
+- 插件依赖支持 `plugin@version-range` 形式的基础版本约束，安装时校验已发现依赖版本。
+- 插件状态统一为 `enabled`、核心插件默认字段统一为 `defaultEnabled`，本地包 manifest 统一使用 `default_enabled`；旧 `installed` 状态格式不再读取或迁移。
+- 模型供应商与执行策略只读取独立的 `providers.json` 和 `policy.json`，不再回退读取旧 `settings.json` 或环境变量策略。
+
+#### 优化
+
+- 插件、会话、模型、策略、循环与工具实现现在均处于 Gateway Facade 之后；替换实现只需满足 capability 契约，不再要求修改 HTTP 路由。
+- 插件管理页面展示已安装版本，并在检测到本地已发现新版本时提供更新操作；扩展设置页展示可回滚历史。
+
+#### 修复
+
+- 移除 Agent 插件设置中的 `innerHTML`、`querySelector`、`prompt` 及原生表单控件路径，避免插件 UI 与主 Web 主题、交互规范不一致。
+- 修复 Agent typed event 服务错误占用 Cordis 内部 `events` 名称、导致 Gateway 启动时 `root.events.load is not a function` 的问题；服务名调整为独立的 `agentEvents` capability。
+- 移除一键启动脚本对旧版 `3000`、`3001`、`3010` 端口的兼容清理提示，避免正常启动时产生误导性的 Legacy 端口输出。
+- 修复事件审计文件使用字面量 `\\n` 而无法作为 JSONL 正确回放的问题。
+- 修复事件监听器抛出异常会影响后续监听器执行的问题；失败会被独立记录为 `event:listener_failed`。
+
 ## 0.43 - 2026-08-18
 
 ### 新增
@@ -60,6 +143,7 @@
 - Agent Gateway 对来自 `7589` 的浏览器请求提供凭据 CORS 支持，并为其他来源采用固定本地默认源，保证本地三服务联调时会话能够正确转发。
 - 模型供应商状态维护默认项唯一性：设置新的默认供应商会自动撤销旧默认项；停用或删除默认项前必须先选择其他可用供应商。
 - Provider 配置文件写入采用串行队列与仅所有者可读写权限，降低并发设置请求覆盖状态的概率。
+
 - 插件状态写入采用串行队列；插件启动、停止与工具执行通过串行 typed events 广播，便于后续审计、指标和扩展监听器接入。
 - 插件启动会先递归启动依赖并检测循环依赖；停用或替换基础插件时按依赖逆序卸载，避免残留已失效服务引用。
 - 浏览器端复杂插件以受认证的 JavaScript 模块按需加载，并由宿主提供有限的 `register()` 接口，而不是将动态 UI 逻辑混入通用设置页。

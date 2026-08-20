@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card } from "@heroui/react";
+import { Button, Card, Input, Label, ListBox, Select, Switch, TextArea, TextField } from "@heroui/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import SettingsPage from "../../../components/SettingsPage";
@@ -8,6 +8,7 @@ import {
     getAgentPlugins,
     getAgentPluginSettings,
     updateAgentPlugin,
+    rollbackAgentPlugin,
     type AgentPlugin,
     type AgentPluginConfigField,
     type AgentPluginConfigSchema,
@@ -24,6 +25,7 @@ export default function PluginSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [rollingBack, setRollingBack] = useState<string | null>(null);
 
     useEffect(() => {
         void Promise.all([getAgentPlugins(), getAgentPluginSettings()])
@@ -55,6 +57,18 @@ export default function PluginSettingsPage() {
         } finally { setSaving(false); }
     }
 
+    async function rollback(revisionId: string) {
+        if (!plugin) return;
+        setRollingBack(revisionId); setError(null);
+        try {
+            const updated = await rollbackAgentPlugin(plugin.id, revisionId);
+            setPlugin(updated);
+            setConfig(updated.configSchema ? withDefaults(updated.configSchema, updated.config) : updated.config);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "回滚插件配置失败");
+        } finally { setRollingBack(null); }
+    }
+
     return <SettingsPage group="Agent 插件" title={title} description={description} contentClassName="max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <Button size="sm" variant="secondary" onPress={() => router.push("/settings/agent/plugins")}>返回插件</Button>
@@ -67,18 +81,18 @@ export default function PluginSettingsPage() {
             {Object.entries(schema.properties).map(([key, field]) => <ConfigField key={key} field={field} required={schema.required?.includes(key)} value={config[key]} onChange={(value) => setConfig((current) => ({ ...current, [key]: value }))} />)}
             <div className="flex justify-end border-t border-border pt-4"><Button type="submit" isDisabled={saving}>{saving ? "保存中..." : "保存设置"}</Button></div>
         </form> : null}
+        {plugin && plugin.revisions.length ? <section className="mt-8 border-t border-border pt-5"><h2 className="text-sm font-medium">历史版本</h2><div className="mt-3 space-y-2">{plugin.revisions.map((revision) => <div key={revision.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border p-3 text-xs"><span className="text-muted">v{revision.version} · {new Date(revision.createdAt).toLocaleString()}</span><Button size="sm" variant="secondary" isDisabled={Boolean(rollingBack)} onPress={() => void rollback(revision.id)}>{rollingBack === revision.id ? "回滚中..." : "回滚到此版本"}</Button></div>)}</div></section> : null}
     </SettingsPage>;
 }
 
 function ConfigField({ field, value, required, onChange }: { field: AgentPluginConfigField; value: unknown; required?: boolean; onChange: (value: unknown) => void }) {
     const label = <><span>{field.title}</span>{required ? <span className="text-danger"> *</span> : null}</>;
-    if (field.type === "boolean") return <label className="flex items-start gap-3 rounded-md border border-border p-4 text-sm"><input className="mt-0.5" type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} /><span><span className="font-medium">{label}</span>{field.description ? <span className="mt-1 block text-xs leading-5 text-muted">{field.description}</span> : null}</span></label>;
+    if (field.type === "boolean") return <Switch isSelected={Boolean(value)} onChange={onChange}><Switch.Content><span className="font-medium">{label}</span>{field.description ? <span className="mt-1 block text-xs leading-5 text-muted">{field.description}</span> : null}</Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch>;
     if (field.type === "array") return <ArrayField field={field} value={Array.isArray(value) ? value : []} onChange={onChange} />;
     if (field.type === "object") return <ObjectField field={field} value={asObject(value)} onChange={onChange} />;
-    const inputClass = "mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm outline-none focus:border-accent";
-    return <label className="block text-sm font-medium">{label}{field.description ? <span className="mt-1 block text-xs font-normal leading-5 text-muted">{field.description}</span> : null}
-        {field.enum ? <select className={inputClass} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)}>{field.enum.map((item) => <option key={item} value={item}>{item}</option>)}</select> : field.format === "textarea" ? <textarea className="mt-2 min-h-28 w-full rounded-md border border-border bg-surface p-3 text-sm outline-none focus:border-accent" value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} /> : <input className={inputClass} type={field.format === "password" ? "password" : field.type === "number" ? "number" : "text"} value={String(value ?? "")} onChange={(event) => onChange(field.type === "number" ? Number(event.target.value) : event.target.value)} />}
-    </label>;
+    if (field.enum) return <Select.Root aria-label={field.title} selectedKey={String(value ?? field.enum[0] ?? "")} onSelectionChange={(key) => key && onChange(String(key))}><Select.Trigger className="w-full"><Select.Value /></Select.Trigger><Select.Popover><ListBox>{field.enum.map((item) => <ListBox.Item key={item} id={item} textValue={item}>{item}</ListBox.Item>)}</ListBox></Select.Popover></Select.Root>;
+    if (field.format === "textarea") return <TextField.Root value={String(value ?? "")} onChange={(next) => onChange(next)}><Label>{label}</Label><TextArea className="min-h-28" /></TextField.Root>;
+    return <TextField.Root value={String(value ?? "")} onChange={(next) => onChange(field.type === "number" ? Number(next) : next)}><Label>{label}</Label><Input type={field.format === "password" ? "password" : field.type === "number" ? "number" : "text"} />{field.description ? <span className="text-xs text-muted">{field.description}</span> : null}</TextField.Root>;
 }
 
 function ArrayField({ field, value, onChange }: { field: AgentPluginConfigField; value: unknown[]; onChange: (value: unknown[]) => void }) {
@@ -96,7 +110,7 @@ function ObjectField({ field, value, onChange }: { field: AgentPluginConfigField
 function KeyValueField({ field, value, onChange }: { field: AgentPluginConfigField; value: Config; onChange: (value: Config) => void }) {
     const [text, setText] = useState(() => JSON.stringify(value, null, 2));
     useEffect(() => setText(JSON.stringify(value, null, 2)), [value]);
-    return <label className="block text-sm font-medium">{field.title}{field.description ? <span className="mt-1 block text-xs font-normal leading-5 text-muted">{field.description}</span> : null}<textarea className="mt-2 min-h-28 w-full rounded-md border border-border bg-surface p-3 font-mono text-xs outline-none focus:border-accent" value={text} onChange={(event) => setText(event.target.value)} onBlur={() => { try { const next = JSON.parse(text); if (next && !Array.isArray(next) && typeof next === "object") onChange(next); } catch { /* Keep the draft visible until valid JSON is entered. */ } }} /></label>;
+    return <TextField.Root value={text} onChange={setText} onBlur={() => { try { const next = JSON.parse(text); if (next && !Array.isArray(next) && typeof next === "object") onChange(next); } catch { /* Keep the draft visible until valid JSON is entered. */ } }}><Label>{field.title}</Label><TextArea className="min-h-28 font-mono text-xs" />{field.description ? <span className="text-xs text-muted">{field.description}</span> : null}</TextField.Root>;
 }
 
 function asObject(value: unknown): Config { return value && !Array.isArray(value) && typeof value === "object" ? value as Config : {}; }

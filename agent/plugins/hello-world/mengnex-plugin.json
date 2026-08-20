@@ -9,6 +9,6 @@
   "permissions": ["rust-api"],
   "origin": "local",
   "configurable": false,
-  "default_installed": false,
+  "default_enabled": false,
   "entry": "./index.js"
 }

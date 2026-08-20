@@ -13,5 +13,5 @@ export function parseExecutionMode(value: string | undefined): ExecutionMode {
 }
 
 export function parseCapabilities(value: string | undefined): Set<string> {
-  return new Set((value ?? "media.search,tasks.read").split(",").map((item) => item.trim()).filter(Boolean));
+  return new Set((value ?? "media.catalog.read,media.tasks.read").split(",").map((item) => item.trim()).filter(Boolean));
 }

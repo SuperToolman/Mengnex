@@ -46,7 +46,7 @@ export type PluginDefinition = {
   slots?: string[];
   permissions: string[];
   origin: "builtin" | "local";
-  defaultInstalled?: boolean;
+  defaultEnabled?: boolean;
   required?: boolean;
   configurable: boolean;
   /** Declarative config and settings contribution consumed by the trusted Web host. */
@@ -57,9 +57,10 @@ export type PluginDefinition = {
   create: (config: Record<string, unknown>) => unknown | Promise<unknown>;
 };
 
-type PluginState = { installed: boolean; config: Record<string, unknown> };
-/** `installed` is retained only in the on-disk compatibility format; packages are always locally discovered. */
-export type PublicPlugin = Omit<PluginDefinition, "create" | "client"> & { enabled: boolean; config: Record<string, unknown>; active: boolean; hasClientModule: boolean };
+type PluginState = { enabled: boolean; config: Record<string, unknown> };
+export type PluginRevision = { id: string; version: string; enabled: boolean; config: Record<string, unknown>; createdAt: string };
+type StoredPluginState = PluginState & { version?: string; source?: "builtin" | "local"; revisions?: PluginRevision[] };
+export type PublicPlugin = Omit<PluginDefinition, "create" | "client"> & { enabled: boolean; config: Record<string, unknown>; active: boolean; hasClientModule: boolean; installedVersion: string; availableVersion: string; updateAvailable: boolean; revisions: PluginRevision[] };
 
 declare module "cordis" {
   interface Context {
@@ -80,9 +81,11 @@ export class PluginManagerService extends (cordis as any).Service {
 
   async load() {
     try {
-      const saved = JSON.parse(await readFile(this.filePath, "utf8")) as Record<string, PluginState>;
+      const saved = JSON.parse(await readFile(this.filePath, "utf8")) as Record<string, StoredPluginState>;
       for (const [id, state] of Object.entries(saved)) {
-        this.states.set(id, { installed: state.installed === true, config: state.config ?? {} });
+        // The early-development state format is intentionally non-compatible.
+        if (typeof state.enabled !== "boolean") continue;
+        this.states.set(id, { enabled: state.enabled === true, config: state.config ?? {}, version: state.version, source: state.source, revisions: state.revisions ?? [] } as PluginState);
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -96,35 +99,37 @@ export class PluginManagerService extends (cordis as any).Service {
     }
     this.definitions.set(definition.id, definition);
     (this.ctx as any).pluginUi?.register(definition);
-    if (!this.states.has(definition.id)) this.states.set(definition.id, { installed: definition.defaultInstalled !== false, config: {} });
+    if (!this.states.has(definition.id)) this.states.set(definition.id, { enabled: definition.defaultEnabled === true, config: {}, version: definition.version, source: definition.origin, revisions: [] } as PluginState);
   }
 
   list(): PublicPlugin[] {
     return [...this.definitions.values()].map(({ create: _create, client, ...definition }) => {
-      const state = this.states.get(definition.id) ?? { installed: false, config: {} };
-      return { ...definition, enabled: state.installed, config: state.config, active: this.fibers.has(definition.id), hasClientModule: Boolean(client) };
+      const state = this.states.get(definition.id) ?? { enabled: false, config: {} };
+      const stored = state as PluginState & { version?: string; source?: "builtin" | "local"; revisions?: PluginRevision[] };
+      const installedVersion = stored.version ?? definition.version;
+      return { ...definition, enabled: state.enabled, config: state.config, active: this.fibers.has(definition.id), hasClientModule: Boolean(client), installedVersion, availableVersion: definition.version, updateAvailable: installedVersion !== definition.version, revisions: stored.revisions ?? [] };
     });
   }
 
-  async startInstalled() {
-    for (const plugin of this.definitions.values()) if (this.states.get(plugin.id)?.installed) await this.install(plugin.id);
+  async startEnabled() {
+    for (const plugin of this.definitions.values()) if (this.states.get(plugin.id)?.enabled) await this.enable(plugin.id);
   }
 
   applyComposition(overrides: Record<string, { enabled?: boolean; config?: Record<string, unknown> }>) {
     for (const [id, override] of Object.entries(overrides)) {
       if (!this.definitions.has(id)) throw new Error(`composition references unknown plugin: ${id}`);
       const current = this.states.get(id)!;
-      this.states.set(id, { installed: override.enabled ?? current.installed, config: override.config ?? current.config });
+      this.states.set(id, { enabled: override.enabled ?? current.enabled, config: override.config ?? current.config });
     }
   }
 
-  async install(id: string, visiting = new Set<string>()) {
+  async enable(id: string, visiting = new Set<string>()) {
     if (visiting.has(id)) throw new Error(`plugin dependency cycle: ${[...visiting, id].join(" -> ")}`);
     const definition = this.definition(id);
     visiting.add(id);
-    for (const dependency of definition.dependencies) await this.install(dependency, visiting);
+    for (const dependency of definition.dependencies) await this.enable(this.resolveDependency(dependency), visiting);
     visiting.delete(id);
-    const state = this.states.get(id) ?? { installed: false, config: {} };
+    const state = this.states.get(id) ?? { enabled: false, config: {} };
     const pausedDependents: string[] = [];
     for (const slot of definition.slots ?? []) {
       const current = this.list().find((plugin) => plugin.id !== id && plugin.enabled && plugin.slots?.includes(slot));
@@ -132,17 +137,17 @@ export class PluginManagerService extends (cordis as any).Service {
         if (current.required) throw new Error(`slot ${slot} is owned by required plugin ${current.id}`);
         pausedDependents.push(...await this.pauseDependents(current.id));
         await this.unload(current.id);
-        this.states.set(current.id, { ...this.states.get(current.id)!, installed: false });
+        this.states.set(current.id, { ...this.states.get(current.id)!, enabled: false });
       }
     }
     if (!this.fibers.has(id)) {
-      await (this.ctx as any).events?.emit("plugin:starting", { pluginId: id });
+      await (this.ctx as any).agentEvents?.emit("plugin:starting", { pluginId: id });
       const fiber = await ((this.ctx as any).root as any).plugin(await definition.create(state.config));
       this.fibers.set(id, fiber);
-      await (this.ctx as any).events?.emit("plugin:started", { pluginId: id });
+      await (this.ctx as any).agentEvents?.emit("plugin:started", { pluginId: id });
     }
-    this.states.set(id, { ...state, installed: true });
-    for (const dependent of pausedDependents) await this.install(dependent);
+    this.states.set(id, { ...state, enabled: true });
+    for (const dependent of pausedDependents) await this.enable(dependent);
     await this.persist();
     return this.publicPlugin(id);
   }
@@ -150,25 +155,63 @@ export class PluginManagerService extends (cordis as any).Service {
   async update(id: string, config: Record<string, unknown>, enabled: boolean) {
     const definition = this.definition(id);
     if (definition.required && !enabled) throw new Error("required plugin cannot be disabled");
-    this.states.set(id, { installed: enabled, config: validatePluginConfig(definition, config) });
+    const current = this.states.get(id) as StoredPluginState | undefined;
+    if (current) this.snapshot(id, current);
+    this.states.set(id, { enabled, config: validatePluginConfig(definition, config), version: definition.version, source: definition.origin, revisions: current?.revisions ?? [] } as PluginState);
     if (this.fibers.has(id)) await this.stopCascade(id);
     await this.persist();
-    return enabled ? this.install(id) : this.publicPlugin(id);
+    return enabled ? this.enable(id) : this.publicPlugin(id);
   }
 
-  async uninstall(id: string) {
+  async disable(id: string) {
     const definition = this.definition(id);
-    if (definition.required) throw new Error("required plugin cannot be uninstalled");
+    if (definition.required) throw new Error("required plugin cannot be disabled");
     await this.stopCascade(id);
-    const state = this.states.get(id) ?? { installed: false, config: {} };
-    this.states.set(id, { ...state, installed: false });
+    const state = this.states.get(id) ?? { enabled: false, config: {} };
+    this.states.set(id, { ...state, enabled: false });
     await this.persist();
+  }
+
+  async updatePackage(id: string) {
+    const definition = this.definition(id);
+    const current = (this.states.get(id) ?? { enabled: false, config: {} }) as StoredPluginState;
+    this.snapshot(id, current);
+    this.states.set(id, { ...current, version: definition.version, source: definition.origin } as PluginState);
+    if (this.fibers.has(id)) await this.stopCascade(id);
+    await this.persist();
+    return current.enabled ? this.enable(id) : this.publicPlugin(id);
+  }
+
+  async rollback(id: string, revisionId: string) {
+    const definition = this.definition(id);
+    const current = (this.states.get(id) ?? { enabled: false, config: {} }) as StoredPluginState;
+    const revision = current.revisions?.find((entry) => entry.id === revisionId);
+    if (!revision) throw new Error("plugin revision not found");
+    if (this.fibers.has(id)) await this.stopCascade(id);
+    this.states.set(id, { ...current, enabled: revision.enabled, config: validatePluginConfig(definition, revision.config), version: revision.version } as PluginState);
+    await this.persist();
+    return revision.enabled ? this.enable(id) : this.publicPlugin(id);
   }
 
   private definition(id: string) {
     const definition = this.definitions.get(id);
     if (!definition) throw new Error("plugin not found");
     return definition;
+  }
+
+  private resolveDependency(spec: string) {
+    const separator = spec.indexOf("@");
+    const id = separator > 0 ? spec.slice(0, separator) : spec;
+    const range = separator > 0 ? spec.slice(separator + 1) : undefined;
+    const definition = this.definition(id);
+    if (range && !satisfies(definition.version, range)) throw new Error("plugin dependency " + spec + " is not satisfied by " + definition.version);
+    return id;
+  }
+
+  private snapshot(id: string, state: StoredPluginState) {
+    const revisions = state.revisions ?? [];
+    revisions.unshift({ id: crypto.randomUUID(), version: state.version ?? this.definition(id).version, enabled: state.enabled, config: structuredClone(state.config), createdAt: new Date().toISOString() });
+    state.revisions = revisions.slice(0, 10);
   }
 
   clientModule(id: string) { return this.definition(id).client; }
@@ -182,9 +225,9 @@ export class PluginManagerService extends (cordis as any).Service {
   private async unload(id: string) {
     const fiber = this.fibers.get(id);
     if (fiber) {
-      await (this.ctx as any).events?.emit("plugin:stopping", { pluginId: id });
+      await (this.ctx as any).agentEvents?.emit("plugin:stopping", { pluginId: id });
       await fiber.dispose();
-      await (this.ctx as any).events?.emit("plugin:stopped", { pluginId: id });
+      await (this.ctx as any).agentEvents?.emit("plugin:stopped", { pluginId: id });
     }
     this.fibers.delete(id);
   }
@@ -212,7 +255,7 @@ export class PluginManagerService extends (cordis as any).Service {
     for (const dependent of [...dependents].reverse()) {
       await this.unload(dependent);
       const state = this.states.get(dependent)!;
-      this.states.set(dependent, { ...state, installed: false });
+      this.states.set(dependent, { ...state, enabled: false });
     }
     await this.unload(definition.id);
   }
@@ -254,4 +297,24 @@ function validateField(field: PluginConfigField, value: unknown, path: string): 
     for (const [key, nested] of Object.entries(field.properties ?? {})) if (object[key] !== undefined) validateField(nested, object[key], `${path}.${key}`);
   }
   if (field.enum && !field.enum.includes(String(value))) throw new Error(`${path} must be one of: ${field.enum.join(", ")}`);
+}
+
+function satisfies(version: string, range: string) {
+  if (range === "*" || range === "") return true;
+  if (range.startsWith("^")) {
+    const [major] = version.split(".").map(Number);
+    const [requiredMajor] = range.slice(1).split(".").map(Number);
+    return major === requiredMajor && compareVersion(version, range.slice(1)) >= 0;
+  }
+  if (range.startsWith(">=")) return compareVersion(version, range.slice(2)) >= 0;
+  return compareVersion(version, range) === 0;
+}
+
+function compareVersion(left: string, right: string) {
+  const a = left.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const b = right.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let index = 0; index < 3; index += 1) {
+    if ((a[index] ?? 0) !== (b[index] ?? 0)) return (a[index] ?? 0) - (b[index] ?? 0);
+  }
+  return 0;
 }

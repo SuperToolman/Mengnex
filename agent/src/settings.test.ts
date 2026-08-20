@@ -14,9 +14,8 @@ test("provider registry and execution policy persist through replaceable seams",
   const policyPath = join(directory, "policy.json");
   try {
     const app = new (cordis as any).Context() as Context;
-    const legacyPath = join(directory, "legacy.json");
-    const providers = new FileProviderRegistry(app, providerPath, legacyPath);
-    const policy = new FileExecutionPolicy(app, policyPath, legacyPath);
+    const providers = new FileProviderRegistry(app, providerPath);
+    const policy = new FileExecutionPolicy(app, policyPath);
     await providers.load(); await policy.load();
     const first = await providers.create({ name: "Primary", baseUrl: "https://example.test/v1", model: "model-a", enabled: true, apiKey: "secret" });
     const second = await providers.create({ name: "Backup", baseUrl: "https://backup.test/v1", model: "model-b", enabled: true });
@@ -24,11 +23,11 @@ test("provider registry and execution policy persist through replaceable seams",
     assert.equal("apiKey" in first, false);
     await providers.setDefault(second.id);
     assert.equal(providers.configured().id, second.id);
-    await policy.update({ executionMode: "full_access", allowedCapabilities: ["media.search"] });
+    await policy.update({ executionMode: "full_access", allowedCapabilities: ["media.catalog.read"] });
 
     const restored = new (cordis as any).Context() as Context;
-    const restoredProviders = new FileProviderRegistry(restored, providerPath, legacyPath);
-    const restoredPolicy = new FileExecutionPolicy(restored, policyPath, legacyPath);
+    const restoredProviders = new FileProviderRegistry(restored, providerPath);
+    const restoredPolicy = new FileExecutionPolicy(restored, policyPath);
     await restoredProviders.load(); await restoredPolicy.load();
     assert.equal(restoredProviders.list().find((provider) => provider.id === first.id)?.hasApiKey, true);
     assert.equal(restoredProviders.configured().id, second.id);

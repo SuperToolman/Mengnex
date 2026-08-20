@@ -50,6 +50,8 @@ API Docs (:7588)
 
 Rust API 是数据和授权的唯一权威。Agent Gateway 会转发浏览器已有的 Mengnex 会话 Cookie 给 Rust API，以现有用户、角色和媒体库权限执行工具；它不会直接连接 SQLite，也不会直接读取媒体文件或 WebDAV 密钥。
 
+Agent 的媒体能力采用领域 capability seam：`mediaCatalog`、`libraryAccess`、`mediaScanner`、`mediaTasks`、`mediaMetadata` 和 `externalMediaSources` 由 Cordis 插件提供。当前 `rust-media-capabilities` 只是这些 seam 的 Rust HTTP adapter，核心工具不再直接依赖 Rust API 客户端；扫描和外部导入统一先经过 `libraryAccess` 权限检查。
+
 ## 目录结构
 
 ```text
@@ -210,23 +212,29 @@ Agent 层按 Cordis 的插件化主旨实现：
 2. 模型、工具、技能、会话、存储、Agent Loop、知识库、MCP、沙盒、调度和界面均以 capability seam 和插件契约协作。
 3. `agent/cordis.json` 的 profile/overlay 可叠加插件启停和配置，支持替换或扩展能力而不修改 Gateway 入口代码。
 
-当前能力边界已经建立，但并非每种能力都已有完整业务实现。会话、存储、模型、工具和循环已可运行；技能、知识库和 MCP 为可安装本地插件包；沙盒和调度当前只有 capability/插件类型边界，尚无可投入使用的实现。
+当前能力边界已经建立，但并非每种能力都具有多节点生产实现。会话、存储、模型、工具和循环已可运行；技能、知识库和 MCP 为可安装本地插件包；调度与沙盒已有可运行的单机实现，也都保留可替换 slot。
 
 ### 当前插件与能力
 
 | 插件/能力 | 当前状态 | 用途 |
 | --- | --- | --- |
-| `agent-runtime` | 内建且必需 | 工具注册、能力检查、风险分级、审批和执行 |
+| `agent-runtime` | 核心分发且必需 | 工具注册、能力检查、风险分级、审批和执行 |
 | `file-storage` | 内建且必需 | 供应商、会话、审批和插件状态的本地 JSON 持久化 |
-| `openai-compatible-provider` | 内建，可替换 slot | 调用 OpenAI 兼容 Chat Completions 模型 |
+| `openai-compatible-provider` | 内建，可替换 slot | 提供 OpenAI-compatible 模型协议；供应商实例在 `/settings/agent/models` 管理 |
 | `agent-loop` | 内建且必需 | 受限的模型/工具调用循环 |
-| `core-tools` | 内建且必需 | 通过 Rust API 搜索媒体、读取任务、创建扫描与外部导入 |
+| `rust-media-capabilities` | 内建且必需 | 将 Rust API 适配为媒体目录、库权限、扫描、任务、元数据和外部导入 capability |
+| `core-tools` | 内建且必需 | 通过媒体 capability 提供搜索媒体、读取任务、创建扫描与外部导入工具 |
 | `hello-world` | 本地示例 | 最小可卸载工具插件 |
 | `skills` | 本地插件包 | 将配置中的技能指令加入 Agent 上下文 |
 | `knowledge-base` | 本地插件包 | 搜索 `agent/knowledge` 内的受信任文档 |
 | `mcp-client` | 本地插件包 | 发现已配置的 stdio MCP 服务工具 |
+| `local-jobs` | 核心分发 | 持久化作业、指数退避重试、重启恢复与运行历史 |
+| `local-sandbox` | 核心分发 | 无 shell、本地独立工作目录、命令白名单、超时和输出限制的进程执行 |
+| `agent-gateway` | 核心分发且必需 | 会话、聊天、工具、插件管理和观测的稳定 HTTP 门面 |
 
-插件声明 `kind`、依赖、提供的服务、权限、配置契约及可选独占 slot。插件替换会按依赖关系暂停受影响依赖项，完成替换后恢复依赖链。浏览器端只能管理已经随本地 Agent 分发并被发现的插件包，不能上传或执行任意 TypeScript/JavaScript。
+插件声明 `kind`、依赖、提供的服务、权限、配置契约及可选独占 slot。插件替换会按依赖关系暂停受影响依赖项，完成替换后恢复依赖链。Gateway 只依赖 `gateway` capability，由该门面适配会话、聊天、工具、审批和插件管理的实际实现，不再在 HTTP 路由中耦合多个具体服务名。
+
+本地插件仓库支持扁平包目录和 `plugins/<plugin-id>/<version>/` 版本目录，启动时选择同一插件的最高版本。插件状态记录当前安装版本、来源和最近 10 个配置/启用快照；设置页可以更新到已发现版本或回滚快照。当前不下载远程代码，也不提供在线插件市场。
 
 ### 对话、模型与审批
 
@@ -248,7 +256,11 @@ Agent 层按 Cordis 的插件化主旨实现：
 
 配置页会展示当前持久化值。声明式配置使用表单；复杂插件可提供受信任的浏览器端模块，以自定义交互界面。
 
-本地插件和 MCP 进程目前都属于受信任代码：权限声明用于审阅和策略决策，尚未形成操作系统级沙盒。不要把来源不明的 MCP 命令或插件目录直接加入本地 Agent 分发目录。
+模型配置分为两层：插件页管理协议插件的启停和生命周期；“模型供应商”页管理 DeepSeek、OpenAI、Ollama 或自定义兼容端点等供应商实例，包括地址、模型、密钥、启停和默认项。供应商数据由 `openai-compatible-provider` 插件持久化，Agent 会话和工具无需感知具体供应商。
+
+本地插件和 MCP 进程目前都属于受信任代码。`local-sandbox` 会以无 shell、命令白名单、每次独立工作目录、超时和输出上限来运行显式提交的进程，但不是容器或虚拟机级安全边界。不要把来源不明的 MCP 命令或插件目录直接加入本地 Agent 分发目录。
+
+调度器将作业定义、执行次数、重试时间、错误与运行历史持久化到 `agent/data/jobs.json`；Gateway 重启后会将中断的 running 作业重新排队，等待所属插件重新注册 handler 后继续。事件总线将带 `version`、来源和时间戳的事件写入 `agent/data/events.jsonl`，支持按类型/来源回放；监听器失败会产生独立审计事件且不会中止其他监听器。
 
 ## API 与契约
 
@@ -312,7 +324,7 @@ pnpm test
 
 - [ ] 将任务创建、初次领取和可执行状态变更纳入明确事务；为任务增加 lease、heartbeat、超时回收、可配置重试和指数退避。
 - [ ] 为扫描、缓存、外部导入和媒体后处理定义幂等键与幂等恢复语义；应用重启后可安全恢复可重试任务，而非统一标记失败。
-- [ ] 将 worker 抽象为可替换任务执行 capability，并提供明确的关闭排空、错误隔离和健康状态。
+- [x] 将 Agent scheduler 抽象为可替换 capability，并提供持久化状态、重启恢复、指数退避重试和运行历史；后续仍需完成多进程 lease 与关闭排空。
 - [ ] 为 Agent 会话、工具调用、审批、插件状态和模型请求补充结构化审计日志、关联 ID、错误分类与管理界面。
 - [ ] 使用真实模型 Key 和真实登录会话完成并记录一次端到端验证：对话、工具审批、Rust API 授权、外部媒体导入和结果回读。
 - [ ] 为 Agent 配置、插件替换、任务领取、媒体外部导入和端口启动流程补齐集成测试与故障恢复测试。
@@ -320,8 +332,8 @@ pnpm test
 ### P1：Agent 能力产品化
 
 - [ ] 将供应商管理从当前模型 provider 插件配置中抽成更完整的模型 capability：多协议适配器、连接测试、模型列表发现、失败降级和按 profile 选择。
-- [ ] 完成 sandbox capability：为工具/MCP 提供进程、文件系统、网络、资源限制和运行记录，而非仅声明权限。
-- [ ] 完成 scheduler capability：持久化计划、触发器、并发策略、重试、暂停/恢复和可视化运行历史。
+- [ ] 将本地进程 sandbox 升级为容器或远程 sandbox：补齐网络策略、文件挂载、CPU/内存限制、镜像与运行记录；当前实现仅提供本地命令白名单与工作目录隔离。
+- [ ] 将 scheduler 升级为完整计划能力：cron/事件触发器、并发策略、暂停/恢复、可视化运行历史和跨进程 lease；当前实现提供一次性持久化作业与重试。
 - [ ] 将 skills 做成可导入、版本化、可启停的插件资源，支持下载包的元数据校验、依赖解析、更新和回滚。
 - [ ] 将 MCP 管理做成可视化配置、连接测试、工具发现、启停、权限映射、运行状态和错误诊断；区分 stdio、HTTP/SSE 等连接方式。
 - [ ] 将 knowledge-base 发展为完整知识库 capability：文档导入、解析、分块、索引、检索、引用来源、增量更新和删除。

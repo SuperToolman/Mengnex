@@ -21,6 +21,7 @@ test("plugin manager installs, disables, and persists registered plugins", async
     provides: ["test"],
     permissions: [],
     origin: "builtin" as const,
+    defaultEnabled: true,
     configurable: false,
     create: () => ({ name: "test-plugin", apply: () => () => { cleanups += 1; } }),
   };
@@ -30,7 +31,7 @@ test("plugin manager installs, disables, and persists registered plugins", async
     await install(PluginManagerService, filePath);
     await app.pluginManager.load();
     app.pluginManager.register(definition);
-    await app.pluginManager.startInstalled();
+    await app.pluginManager.startEnabled();
     assert.equal(app.pluginManager.list()[0].active, true);
 
     await app.pluginManager.update("test-plugin", {}, false);
@@ -59,8 +60,8 @@ test("plugin manager replaces a non-core provider in the same capability slot", 
       id, name: id, version: "1", description: id, kind: "model", dependencies: [], provides: ["llm"], slots: ["model"], permissions: [], origin: "builtin", configurable: false,
       create: () => ({ name: id, apply: () => () => {} }),
     });
-    await app.pluginManager.install("model-a");
-    await app.pluginManager.install("model-b");
+    await app.pluginManager.enable("model-a");
+    await app.pluginManager.enable("model-b");
     const plugins = app.pluginManager.list();
     assert.equal(plugins.find((plugin) => plugin.id === "model-a")?.enabled, false);
     assert.equal(plugins.find((plugin) => plugin.id === "model-b")?.active, true);
@@ -97,7 +98,7 @@ test("plugin manager disables non-required dependents before stopping a plugin",
     await install(PluginManagerService, join(directory, "plugins.json"));
     await app.pluginManager.load();
     for (const [id, dependencies] of [["base", []], ["dependent", ["base"]]] as const) app.pluginManager.register({ id, name: id, version: "1", description: id, kind: "integration", dependencies: [...dependencies], provides: [], permissions: [], origin: "builtin", configurable: false, create: () => ({ name: id, apply: () => () => {} }) });
-    await app.pluginManager.startInstalled();
+    await app.pluginManager.startEnabled();
     await app.pluginManager.update("base", {}, false);
     assert.equal(app.pluginManager.list().find((plugin) => plugin.id === "base")?.enabled, false);
     assert.equal(app.pluginManager.list().find((plugin) => plugin.id === "dependent")?.enabled, false);

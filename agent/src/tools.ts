@@ -1,7 +1,6 @@
 import * as cordis from "cordis";
 import type { Context } from "cordis";
 import type { AgentTool, ToolContext } from "./types.js";
-import { RustApiClient } from "./rust-api.js";
 
 declare module "cordis" {
   interface Context {
@@ -29,61 +28,59 @@ export class ToolRegistry extends (cordis as any).Service {
   async execute(name: string, args: Record<string, unknown>, context: ToolContext) {
     const tool = this.get(name);
     if (!tool) throw new Error(`unknown agent tool: ${name}`);
-    await this.ctx.events?.emit("tool:before", { name, args });
+    await this.ctx.agentEvents?.emit("tool:before", { name, args });
     try {
       const result = await tool.execute(args, context);
-      await this.ctx.events?.emit("tool:after", { name, args, result });
+      await this.ctx.agentEvents?.emit("tool:after", { name, args, result });
       return result;
     } catch (error) {
-      await this.ctx.events?.emit("tool:after", { name, args, error: error instanceof Error ? error.message : "tool execution failed" });
+      await this.ctx.agentEvents?.emit("tool:after", { name, args, error: error instanceof Error ? error.message : "tool execution failed" });
       throw error;
     }
   }
 }
 
-type MediaItem = { id: string; title: string; media_type: string; library_id: string };
-
-export function registerCoreTools(registry: ToolRegistry, api: RustApiClient) {
+export function registerCoreTools(registry: ToolRegistry, root: Context) {
   const cleanups = [
     registry.register({
       name: "media.search",
       description: "Search indexed media visible to the current user.",
       risk: "read",
-      capabilities: ["media.search"],
+      capabilities: ["media.catalog.read"],
       inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
       async execute(args, context) {
-        const query = String(args.query ?? "").trim().toLowerCase();
+        const query = String(args.query ?? "").trim();
         const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100);
-        const items = await api.request<MediaItem[]>(`/api/media/items?limit=${limit}`, {}, context.sessionCookie);
-        return items.filter((item) => !query || item.title.toLowerCase().includes(query));
+        const libraryId = typeof args.library_id === "string" ? args.library_id : context.libraryId;
+        if (libraryId) await root.libraryAccess.assertAccessible(libraryId, context);
+        return root.mediaCatalog.search(query, limit, context, libraryId);
       },
     }),
     registry.register({
       name: "tasks.list",
       description: "List persisted Mengnex background tasks.",
       risk: "read",
-      capabilities: ["tasks.read"],
+      capabilities: ["media.tasks.read"],
       inputSchema: { type: "object", properties: { active: { type: "boolean" } } },
       async execute(args, context) {
-        const active = args.active === undefined ? "" : `?active=${Boolean(args.active)}`;
-        return api.request(`/api/tasks${active}`, {}, context.sessionCookie);
+        return root.mediaTasks.list(typeof args.active === "boolean" ? args.active : undefined, context);
       },
     }),
     registry.register({
       name: "tasks.create_scan",
       description: "Create a media library scan task.",
       risk: "high",
-      capabilities: ["tasks.create"],
+      capabilities: ["media.scan.start"],
       inputSchema: { type: "object", properties: { library_id: { type: "string" } }, required: ["library_id"] },
       async execute(args, context) {
-        return api.request("/api/scans", { method: "POST", body: JSON.stringify({ library_id: String(args.library_id) }) }, context.sessionCookie);
+        return root.mediaScanner.enqueue(String(args.library_id), context);
       },
     }),
     registry.register({
       name: "media.import_external",
       description: "Import or update an external media placeholder in a library.",
       risk: "high",
-      capabilities: ["media.import"],
+      capabilities: ["media.external.import"],
       inputSchema: {
         type: "object",
         properties: {
@@ -98,30 +95,24 @@ export function registerCoreTools(registry: ToolRegistry, api: RustApiClient) {
         required: ["library_id", "title", "source", "external_id"],
       },
       async execute(args, context) {
-        return api.request("/api/media/import", {
-          method: "POST",
-          body: JSON.stringify({
-            library_id: String(args.library_id ?? ""),
-            title: String(args.title ?? ""),
-            source: String(args.source ?? ""),
-            external_id: String(args.external_id ?? ""),
-            source_url: typeof args.source_url === "string" ? args.source_url : undefined,
-            year: typeof args.year === "number" ? args.year : undefined,
-            metadata: typeof args.metadata === "object" && args.metadata !== null ? args.metadata : undefined,
-          }),
-        }, context.sessionCookie);
+        return root.externalMediaSources.import({
+          libraryId: String(args.library_id ?? ""), title: String(args.title ?? ""), source: String(args.source ?? ""), externalId: String(args.external_id ?? ""),
+          sourceUrl: typeof args.source_url === "string" ? args.source_url : undefined,
+          year: typeof args.year === "number" ? args.year : undefined,
+          metadata: typeof args.metadata === "object" && args.metadata !== null ? args.metadata as Record<string, unknown> : undefined,
+        }, context);
       },
     }),
   ];
   return () => cleanups.forEach((cleanup) => cleanup());
 }
 
-export function createCoreToolsPlugin(api: RustApiClient) {
+export function createCoreToolsPlugin() {
   return {
     name: "mengnex-core-tools",
-    inject: ["tools"],
+    inject: ["tools", "mediaCatalog", "libraryAccess", "mediaScanner", "mediaTasks", "externalMediaSources"],
     apply(ctx: Context) {
-      return registerCoreTools(ctx.tools, api);
+      return registerCoreTools(ctx.tools, ctx);
     },
   };
 }

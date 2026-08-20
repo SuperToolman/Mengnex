@@ -1,5 +1,4 @@
 import type { Context } from "cordis";
-import { parseCapabilities, parseExecutionMode } from "../policy.js";
 import { FileExecutionPolicy } from "../execution-policy.js";
 import { AgentContextService } from "../agent-context.js";
 import { ApprovalService } from "../approvals.js";
@@ -8,12 +7,14 @@ import { LlmProviderService } from "../llm.js";
 import { AgentRuntime } from "../runtime.js";
 import { PluginApiService } from "../plugin-api.js";
 import { AgentEventService } from "../events.js";
-import { FileKeyValueStorage, LocalJobScheduler, LocalSandboxProvider } from "../capabilities.js";
+import { FileKeyValueStorage, PersistentJobScheduler, LocalProcessSandbox } from "../capabilities.js";
 import { SessionStore } from "../sessions.js";
 import { FileProviderRegistry } from "../providers.js";
 import { join } from "node:path";
 import { RustApiClient, RustApiService } from "../rust-api.js";
+import { createRustMediaCapabilitiesPlugin } from "../media-capabilities.js";
 import { ToolRegistry, createCoreToolsPlugin } from "../tools.js";
+import { DefaultAgentGatewayFacade } from "../gateway.js";
 import type { PluginDefinition } from "../plugin-manager.js";
 
 type Fiber = { dispose: () => Promise<void> };
@@ -24,7 +25,7 @@ const disposeAll = (fibers: Fiber[]) => async () => {
   for (const fiber of fibers.reverse()) await fiber.dispose();
 };
 
-export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
+export function corePluginDefinitions(api: RustApiClient): PluginDefinition[] {
   return [
     {
       id: "agent-runtime",
@@ -37,6 +38,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       slots: ["runtime"],
       permissions: ["rust-api"],
       origin: "builtin",
+      defaultEnabled: true,
       required: true,
       configurable: false,
       create: () => ({
@@ -45,6 +47,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
           const root = rootContext(ctx);
           const fibers = [await install(root, RustApiService), await install(root, ToolRegistry), await install(root, ApprovalService), await install(root, PluginApiService), await install(root, AgentEventService)];
           await root.approvals.load();
+          await root.agentEvents.load();
           return disposeAll(fibers);
         },
       }),
@@ -60,6 +63,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       slots: ["storage"],
       permissions: ["local-storage"],
       origin: "builtin",
+      defaultEnabled: true,
       required: true,
       configurable: false,
       create: () => ({
@@ -73,12 +77,12 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       }),
     },
     {
-      id: "local-jobs", name: "Local Jobs", version: "0.1.0", description: "进程内调度器实现，可由持久化任务插件替换。", kind: "scheduler", dependencies: ["agent-runtime"], provides: ["jobs"], slots: ["jobs"], permissions: [], origin: "builtin", configurable: false,
-      create: () => ({ name: "mengnex-local-jobs", apply: async (ctx: Context) => disposeAll([await install(rootContext(ctx), LocalJobScheduler)]) }),
+      id: "local-jobs", name: "Persistent Local Scheduler", version: "0.2.0", description: "带持久化计划、重试和运行历史的单进程调度器，可由远程调度插件替换。", kind: "scheduler", dependencies: ["agent-runtime"], provides: ["jobs", "scheduler.history"], slots: ["jobs"], permissions: ["local-storage"], origin: "builtin", defaultEnabled: true, configurable: false,
+      create: () => ({ name: "mengnex-persistent-local-jobs", apply: async (ctx: Context) => { const root = rootContext(ctx); const scheduler = await install(root, PersistentJobScheduler); await root.jobs.load(); await root.jobs.start(); return disposeAll([scheduler]); } }),
     },
     {
-      id: "local-sandbox", name: "Local Sandbox", version: "0.1.0", description: "本地沙盒能力接缝实现，可由容器或远程沙盒插件替换。", kind: "sandbox", dependencies: ["agent-runtime"], provides: ["sandbox"], slots: ["sandbox"], permissions: [], origin: "builtin", configurable: false,
-      create: () => ({ name: "mengnex-local-sandbox", apply: async (ctx: Context) => disposeAll([await install(rootContext(ctx), LocalSandboxProvider)]) }),
+      id: "local-sandbox", name: "Local Process Sandbox", version: "0.2.0", description: "无 shell、独立工作目录、输出上限和超时的本地进程沙盒；容器或远程沙盒可替换该 slot。", kind: "sandbox", dependencies: ["agent-runtime"], provides: ["sandbox", "sandbox.process"], slots: ["sandbox"], permissions: ["process:spawn", "local-storage"], origin: "builtin", defaultEnabled: true, configurable: false,
+      create: () => ({ name: "mengnex-local-process-sandbox", apply: async (ctx: Context) => disposeAll([await install(rootContext(ctx), LocalProcessSandbox)]) }),
     },
     {
       id: "openai-compatible-provider",
@@ -90,6 +94,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       provides: ["llm"],
       permissions: ["network:model-provider"],
       origin: "builtin",
+      defaultEnabled: true,
       configurable: true,
       slots: ["model"],
       ui: { settings: { label: "模型供应商", description: "管理 OpenAI Chat Completions 兼容模型连接。", icon: "model" } },
@@ -115,6 +120,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       provides: ["execution.policy", "policy", "agent"],
       permissions: [],
       origin: "builtin",
+      defaultEnabled: true,
       required: true,
       configurable: true,
       ui: { settings: { label: "执行策略", description: "控制批准模式和允许 Agent 调用的能力。", icon: "shield" } },
@@ -125,7 +131,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
           const root = rootContext(ctx);
           const policy = await install(root, FileExecutionPolicy);
           await root.policy.load();
-          const runtime = await install(root, AgentRuntime, { policy: root.policy, fallback: { executionMode: parseExecutionMode(process.env.AGENT_EXECUTION_MODE), capabilities: parseCapabilities(process.env.AGENT_ALLOWED_CAPABILITIES) } });
+          const runtime = await install(root, AgentRuntime, root.policy);
           const cleanups = [root.pluginApi.register("execution-policy", "get", () => root.policy.view()), root.pluginApi.register("execution-policy", "update", (input) => root.policy.update({ executionMode: stringValue(input.execution_mode) as any, allowedCapabilities: Array.isArray(input.allowed_capabilities) ? input.allowed_capabilities.filter((value): value is string => typeof value === "string") : undefined }))];
           return disposeAll([policy, runtime, { dispose: async () => cleanups.reverse().forEach((cleanup) => cleanup()) }]);
         },
@@ -142,6 +148,7 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       slots: ["loop"],
       permissions: [],
       origin: "builtin",
+      defaultEnabled: true,
       required: true,
       configurable: false,
       create: () => ({
@@ -150,19 +157,52 @@ export function builtInPlugins(api: RustApiClient): PluginDefinition[] {
       }),
     },
     {
+      id: "rust-media-capabilities",
+      name: "Rust Media Capability Adapter",
+      version: "0.1.0",
+      description: "将媒体目录、库权限、扫描、任务、元数据和外部导入能力适配到 Mengnex Rust API。",
+      kind: "integration",
+      dependencies: ["agent-runtime"],
+      provides: ["media.catalog", "library.access", "media.scanner", "media.tasks", "media.metadata", "media.external-sources"],
+      slots: ["media-capabilities"],
+      permissions: ["rust-api"],
+      origin: "builtin",
+      defaultEnabled: true,
+      required: true,
+      configurable: false,
+      create: () => createRustMediaCapabilitiesPlugin(),
+    },
+    {
       id: "core-tools",
       name: "Core Tools",
       version: "0.1.0",
       description: "媒体搜索、任务和外部媒体导入工具。",
       kind: "tool",
-      dependencies: ["agent-runtime"],
-      provides: ["media.search", "tasks.read", "tasks.create", "media.import"],
+      dependencies: ["agent-runtime", "rust-media-capabilities"],
+      provides: ["media.catalog.read", "media.tasks.read", "media.scan.start", "media.external.import"],
       slots: ["core-tools"],
       permissions: ["rust-api"],
       origin: "builtin",
+      defaultEnabled: true,
       required: true,
       configurable: false,
-      create: () => createCoreToolsPlugin(api),
+      create: () => createCoreToolsPlugin(),
+    },
+    {
+      id: "agent-gateway",
+      name: "Agent Gateway Facade",
+      version: "0.2.0",
+      description: "稳定的会话、聊天、工具和插件管理门面，隔离 HTTP 传输与具体服务实现。",
+      kind: "runtime",
+      dependencies: ["agent-runtime", "file-storage", "execution-policy", "agent-loop"],
+      provides: ["gateway"],
+      slots: ["gateway"],
+      permissions: [],
+      origin: "builtin",
+      defaultEnabled: true,
+      required: true,
+      configurable: false,
+      create: () => ({ name: "mengnex-agent-gateway-facade", apply: async (ctx: Context) => disposeAll([await install(rootContext(ctx), DefaultAgentGatewayFacade)]) }),
     },
   ];
 }

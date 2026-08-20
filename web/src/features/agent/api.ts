@@ -19,9 +19,21 @@ export type AgentPlugin = {
     enabled: boolean;
     active: boolean;
     hasClientModule: boolean;
+    installedVersion: string;
+    availableVersion: string;
+    updateAvailable: boolean;
+    revisions: AgentPluginRevision[];
     config: Record<string, unknown>;
     configSchema?: AgentPluginConfigSchema;
     ui?: AgentPluginUiContribution;
+};
+
+export type AgentPluginRevision = {
+    id: string;
+    version: string;
+    enabled: boolean;
+    config: Record<string, unknown>;
+    createdAt: string;
 };
 
 export type AgentPluginConfigField = {
@@ -85,11 +97,80 @@ export function invokeAgentPluginAction<T>(pluginId: string, action: string, inp
     return request<T>(`/v1/plugins/${pluginId}/actions/${action}`, { method: "POST", body: JSON.stringify(input) });
 }
 
+export type AgentModelProvider = {
+    id: string;
+    name: string;
+    provider: "openai_compatible";
+    baseUrl: string;
+    model: string;
+    enabled: boolean;
+    isDefault: boolean;
+    hasApiKey: boolean;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type AgentModelProviderInput = {
+    name?: string;
+    baseUrl?: string;
+    model?: string;
+    enabled?: boolean;
+    isDefault?: boolean;
+    apiKey?: string;
+    clearApiKey?: boolean;
+};
+
+const modelProviderPluginId = "openai-compatible-provider";
+
+export function getAgentModelProviders() {
+    return invokeAgentPluginAction<{ providers: AgentModelProvider[] }>(modelProviderPluginId, "list");
+}
+
+export function createAgentModelProvider(input: AgentModelProviderInput) {
+    return invokeAgentPluginAction<AgentModelProvider>(modelProviderPluginId, "create", {
+        name: input.name,
+        base_url: input.baseUrl,
+        model: input.model,
+        enabled: input.enabled,
+        is_default: input.isDefault,
+        api_key: input.apiKey,
+    });
+}
+
+export function updateAgentModelProvider(id: string, input: AgentModelProviderInput) {
+    return invokeAgentPluginAction<AgentModelProvider>(modelProviderPluginId, "update", {
+        id,
+        name: input.name,
+        base_url: input.baseUrl,
+        model: input.model,
+        enabled: input.enabled,
+        is_default: input.isDefault,
+        api_key: input.apiKey,
+        clear_api_key: input.clearApiKey,
+    });
+}
+
+export function setDefaultAgentModelProvider(id: string) {
+    return invokeAgentPluginAction<AgentModelProvider>(modelProviderPluginId, "set-default", { id });
+}
+
+export function deleteAgentModelProvider(id: string) {
+    return invokeAgentPluginAction<void>(modelProviderPluginId, "delete", { id });
+}
+
 export function updateAgentPlugin(id: string, input: { enabled: boolean; config?: Record<string, unknown> }) {
     return request<AgentPlugin>(`/v1/plugins/${id}`, {
         method: "PUT",
         body: JSON.stringify(input),
     });
+}
+
+export function updateAgentPluginPackage(id: string) {
+    return request<AgentPlugin>(`/v1/plugins/${id}/update`, { method: "POST", body: "{}" });
+}
+
+export function rollbackAgentPlugin(id: string, revisionId: string) {
+    return request<AgentPlugin>(`/v1/plugins/${id}/rollback/${revisionId}`, { method: "POST", body: "{}" });
 }
 
 export type AgentChatMessage = { role: "system" | "user" | "assistant"; content: string };
