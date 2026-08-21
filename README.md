@@ -265,7 +265,7 @@ Agent 层按 Cordis 的插件化主旨实现：
 
 本地插件和 MCP 进程目前都属于受信任代码。`local-sandbox` 会以无 shell、命令白名单、每次独立工作目录、超时和输出上限来运行显式提交的进程，但不是容器或虚拟机级安全边界。不要把来源不明的 MCP 命令或插件目录直接加入本地 Agent 分发目录。
 
-调度器将作业定义、执行次数、重试时间、错误与运行历史持久化到 `agent/data/jobs.json`；Gateway 重启后会将中断的 running 作业重新排队，等待所属插件重新注册 handler 后继续。事件总线将带 `version`、来源和时间戳的事件写入 `agent/data/events.jsonl`，支持按类型/来源回放；监听器失败会产生独立审计事件且不会中止其他监听器。
+调度器将作业定义、执行次数、重试时间、错误与运行历史持久化到 `agent/data/jobs.json`；Gateway 重启后会将中断的 running 作业重新排队，等待所属插件重新注册 handler 后继续。事件总线将带 `schemaVersion: 2`、关联 ID、来源和时间戳的事件写入 `agent/data/events.jsonl`，支持按类型/来源回放；损坏日志会被隔离为 `.corrupt-*` 文件，旧事件格式不兼容；监听器失败会产生独立审计事件且不会中止其他监听器。
 
 ## API 与契约
 

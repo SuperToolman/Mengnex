@@ -1,4 +1,5 @@
 {
+  "manifest_version": 1,
   "id": "mcp-client",
   "name": "MCP Client",
   "version": "0.1.0",

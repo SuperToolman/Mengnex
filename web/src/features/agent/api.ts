@@ -212,6 +212,8 @@ export type AgentApproval = {
     createdAt: string;
 };
 
+export type AgentExecutionMode = "request_approval" | "approve_high_risk" | "full_access";
+
 export type AgentRunSnapshot = {
     status: "completed" | "approval_required";
     content: string;
@@ -239,12 +241,24 @@ export function createAgentSession(title?: string) {
     return request<AgentSession>("/v1/sessions", { method: "POST", body: JSON.stringify({ title }) });
 }
 
-export async function streamAgentSessionMessage(sessionId: string, content: string, onEvent: (event: AgentStreamEvent) => void) {
+export function closeAgentSession(sessionId: string) {
+    return request<AgentSession>(`/v1/sessions/${sessionId}`, { method: "DELETE" });
+}
+
+export function archiveAgentSession(sessionId: string, archived: boolean) {
+    return request<AgentSession>(`/v1/sessions/${sessionId}/archive`, { method: "POST", body: JSON.stringify({ archived }) });
+}
+
+export function getArchivedAgentSessions() {
+    return request<{ sessions: AgentSession[] }>("/v1/sessions?archived=true");
+}
+
+export async function streamAgentSessionMessage(sessionId: string, content: string, executionMode: AgentExecutionMode, onEvent: (event: AgentStreamEvent) => void) {
     const response = await fetch(`${AGENT_BASE_URL}/v1/sessions/${sessionId}/messages`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, execution_mode: executionMode }),
     });
     if (!response.ok || !response.body) {
         const payload = await response.json().catch(() => null);

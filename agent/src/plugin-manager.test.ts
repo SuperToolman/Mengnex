@@ -104,3 +104,18 @@ test("plugin manager disables non-required dependents before stopping a plugin",
     assert.equal(app.pluginManager.list().find((plugin) => plugin.id === "dependent")?.enabled, false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test("plugin manager records capability contracts, lockfile metadata, and blocked dependency health", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "mengnex-agent-"));
+  try {
+    const app = new (cordis as any).Context() as Context;
+    const install = (app as any).plugin.bind(app) as (plugin: unknown, config?: unknown) => PromiseLike<unknown>;
+    await install(PluginManagerService, join(directory, "plugins.json"));
+    await app.pluginManager.load();
+    app.pluginManager.register({ id: "contract-provider", name: "Provider", version: "1.2.3", description: "provider", kind: "integration", dependencies: [], provides: ["demo.capability"], capabilityContracts: [{ id: "demo.capability", version: "1.0.0", role: "provider" }], permissions: [], origin: "local", configurable: false, defaultEnabled: false, create: () => ({ name: "provider", apply: () => () => {} }) });
+    app.pluginManager.register({ id: "broken-consumer", name: "Broken", version: "1.0.0", description: "broken", kind: "integration", dependencies: ["missing@^1.0.0"], provides: [], consumes: ["demo.capability"], role: "consumer", permissions: [], origin: "local", configurable: false, defaultEnabled: true, create: () => ({ name: "broken", apply: () => () => {} }) });
+    await assert.rejects(() => app.pluginManager.startEnabled(), /plugin not found/);
+    assert.equal((await app.pluginManager.health("broken-consumer"))[0].status, "blocked");
+    assert.equal(app.pluginManager.lockfile()["contract-provider"].capabilities[0].role, "provider");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

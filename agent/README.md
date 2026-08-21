@@ -53,4 +53,4 @@ Endpoints:
 
 The browser forwards its existing Mengnex HttpOnly session cookie to the local gateway. The Rust API therefore remains responsible for user, role, and media-library authorization. The initial tools are media search, task listing, scan-task creation, external-media import, and the `hello-world.health` Cordis plugin example. The execution mode is persisted through the Agent settings page. Critical tools always require approval.
 
-Conversations and their tool-call records are stored in `agent/data/sessions.json`, isolated by the authenticated Mengnex user id. Approvals are stored in `agent/data/approvals.json`, so an Agent Gateway restart does not lose pending user decisions.
+Conversations and their tool-call records are stored as replayable JSONL under `agent/data/sessions/<session-id>/session.jsonl`, isolated by the authenticated Mengnex user id. Approvals are stored in `agent/data/approvals.json`, so an Agent Gateway restart does not lose pending user decisions.

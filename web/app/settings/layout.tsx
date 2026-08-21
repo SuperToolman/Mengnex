@@ -84,6 +84,11 @@ const settingSections: SettingSection[] = [
                 label: "插件",
                 description: "安装、启用和配置受信任的 Agent 插件",
             },
+            {
+                href: "/settings/agent/archives",
+                label: "归档会话",
+                description: "查看、恢复或彻底关闭已归档的 Agent 会话",
+            },
         ],
     },
 ];

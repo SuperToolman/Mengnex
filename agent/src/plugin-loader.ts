@@ -1,9 +1,10 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { PluginConfigField, PluginConfigSchema, PluginDefinition, PluginUiContribution } from "./plugin-manager.js";
+import { createHash } from "node:crypto";
+import type { PluginConfigField, PluginConfigSchema, PluginDefinition, PluginUiContribution, CapabilityContract, PluginRole, PluginSource } from "./plugin-manager.js";
 
-type PackageManifest = Omit<PluginDefinition, "create" | "defaultEnabled" | "client"> & { entry: string; client?: { entry: string }; default_enabled?: boolean };
+type PackageManifest = Omit<PluginDefinition, "create" | "defaultEnabled" | "client" | "packageSource"> & { manifest_version?: number; entry: string; client?: { entry: string }; default_enabled?: boolean; capabilityContracts?: CapabilityContract[]; capability_contracts?: CapabilityContract[]; consumes?: string[]; role?: PluginRole };
 const pluginId = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const pluginKinds = new Set(["runtime", "model", "tool", "storage", "loop", "skill", "sandbox", "scheduler", "ui", "integration"]);
 
@@ -48,6 +49,7 @@ async function definitionFromManifest(root: string, packageDirectory: string, ma
   if (!pluginId.test(manifest.id)) throw new Error("plugin id must use lowercase letters, digits, and hyphens");
   if (manifest.origin !== "local") throw new Error("local plugin manifest must declare origin: local");
   if (!manifest.name || !manifest.version || !manifest.description) throw new Error("plugin name, version and description are required");
+  if (manifest.manifest_version !== 1) throw new Error("plugin manifest_version must be 1");
   if (!pluginKinds.has(manifest.kind)) throw new Error("plugin kind is invalid");
   if (!Array.isArray(manifest.dependencies) || !manifest.dependencies.every((id) => typeof id === "string" && pluginId.test(id.split("@")[0]))) throw new Error("plugin dependencies are invalid");
   if (!Array.isArray(manifest.provides) || !manifest.provides.every((item) => typeof item === "string")) throw new Error("plugin provides are invalid");
@@ -61,8 +63,9 @@ async function definitionFromManifest(root: string, packageDirectory: string, ma
   if (!isWithin(root, entryPath) || !(await isFile(entryPath))) throw new Error("plugin entry must remain inside the local plugins directory");
   const clientEntryPath = manifest.client ? resolve(packageDirectory, manifest.client.entry) : undefined;
   if (clientEntryPath && (!isWithin(root, clientEntryPath) || !(await isFile(clientEntryPath)))) throw new Error("plugin client entry must exist inside the local plugins directory");
-  const { entry: _entry, client: _client, default_enabled, ...metadata } = manifest;
-  return { ...metadata, defaultEnabled: default_enabled === true, ...(clientEntryPath ? { client: { entryPath: clientEntryPath } } : {}), create: async (config) => { const loaded = await import(pathToFileURL(entryPath).href); const factory = loaded.createPlugin ?? loaded.default; if (typeof factory !== "function") throw new Error("plugin " + manifest.id + " must export createPlugin(config)"); return factory(config); } };
+  const { entry: _entry, client: _client, default_enabled, manifest_version: _manifestVersion, capability_contracts, ...metadata } = manifest;
+  const source: PluginSource = { kind: "local", path: packageDirectory, sha256: await sha256(join(packageDirectory, "mengnex-plugin.json")), manifestVersion: 1 };
+  return { ...metadata, capabilityContracts: manifest.capabilityContracts ?? capability_contracts, packageSource: source, defaultEnabled: default_enabled === true, ...(clientEntryPath ? { client: { entryPath: clientEntryPath } } : {}), create: async (config) => { const loaded = await import(pathToFileURL(entryPath).href); const factory = loaded.createPlugin ?? loaded.default; if (typeof factory !== "function") throw new Error("plugin " + manifest.id + " must export createPlugin(config)"); return factory(config); } };
 }
 
 function isClientManifest(value: unknown): value is { entry: string } { return Boolean(value) && typeof value === "object" && typeof (value as { entry?: unknown }).entry === "string"; }
@@ -89,3 +92,4 @@ function isUiContribution(value: unknown): value is PluginUiContribution {
 function isWithin(root: string, target: string) { const path = relative(resolve(root), target); return Boolean(path) && !path.startsWith("..") && !path.includes(":"); }
 async function isFile(path: string) { try { return (await stat(path)).isFile(); } catch { return false; } }
 function compareVersion(left: string, right: string) { const a = left.split(".").map((part) => Number.parseInt(part, 10) || 0); const b = right.split(".").map((part) => Number.parseInt(part, 10) || 0); for (let index = 0; index < 3; index += 1) if ((a[index] ?? 0) !== (b[index] ?? 0)) return (a[index] ?? 0) - (b[index] ?? 0); return 0; }
+async function sha256(path: string) { const hash = createHash("sha256"); hash.update(await readFile(path)); return hash.digest("hex"); }

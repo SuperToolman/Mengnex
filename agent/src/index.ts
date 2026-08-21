@@ -8,6 +8,7 @@ import { PluginUiRegistryService } from "./plugin-ui.js";
 import { corePluginDefinitions } from "./plugins/core-plugins.js";
 import { discoverLocalPlugins } from "./plugin-loader.js";
 import { loadComposition } from "./composition.js";
+import { parseExecutionMode } from "./policy.js";
 
 const port = Number(process.env.AGENT_PORT ?? 7590);
 const api = new RustApiClient(
@@ -118,7 +119,14 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/v1/jobs") {
       const current = await requireAuthenticated(request);
       const input = await body(request);
-      return send(request, response, 201, await gateway.scheduleJob({ owner: current.user.id, handler: String(input.handler ?? ""), payload: typeof input.payload === "object" && input.payload !== null ? input.payload as Record<string, unknown> : {}, runAt: typeof input.run_at === "string" ? input.run_at : undefined, maxAttempts: typeof input.max_attempts === "number" ? input.max_attempts : undefined }));
+      return send(request, response, 201, await gateway.scheduleJob({ owner: current.user.id, handler: String(input.handler ?? ""), payload: typeof input.payload === "object" && input.payload !== null ? input.payload as Record<string, unknown> : {}, runAt: typeof input.run_at === "string" ? input.run_at : undefined, maxAttempts: typeof input.max_attempts === "number" ? input.max_attempts : undefined, intervalMs: typeof input.interval_ms === "number" ? input.interval_ms : undefined, cron: typeof input.cron === "string" ? input.cron : undefined, sessionId: typeof input.session_id === "string" ? input.session_id : undefined, retryPolicy: typeof input.retry_policy === "object" && input.retry_policy !== null ? input.retry_policy as any : undefined }));
+    }
+    const reviewMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/review$/);
+    if (request.method === "POST" && reviewMatch) {
+      const current = await requireAuthenticated(request);
+      const job = gateway.listJobs(current.user.id).find((item) => item.id === reviewMatch[1]);
+      if (!job) return send(request, response, 404, { message: "job not found" });
+      return send(request, response, 200, await gateway.approveJobReview(reviewMatch[1]));
     }
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/);
     if (request.method === "POST" && jobMatch) {
@@ -129,9 +137,13 @@ const server = createServer(async (request, response) => {
       await requireManager(request);
       return send(request, response, 200, { events: await gateway.replayEvents(Number(url.searchParams.get("limit") ?? 100)) });
     }
+    if (request.method === "GET" && url.pathname === "/v1/metrics") {
+      await requireManager(request);
+      return send(request, response, 200, { metrics: gateway.metrics() });
+    }
     if (request.method === "GET" && url.pathname === "/v1/sessions") {
       const current = await requireAuthenticated(request);
-      return send(request, response, 200, { sessions: gateway.listSessions(current.user.id) });
+      return send(request, response, 200, { sessions: gateway.listSessions(current.user.id, url.searchParams.get("archived") === "true") });
     }
     if (request.method === "POST" && url.pathname === "/v1/sessions") {
       const current = await requireAuthenticated(request);
@@ -143,6 +155,16 @@ const server = createServer(async (request, response) => {
       const current = await requireAuthenticated(request);
       return send(request, response, 200, gateway.getSession(sessionMatch[1], current.user.id));
     }
+    if (request.method === "DELETE" && sessionMatch) {
+      const current = await requireAuthenticated(request);
+      return send(request, response, 200, await gateway.closeSession(sessionMatch[1], current.user.id));
+    }
+    const archiveMatch = url.pathname.match(/^\/v1\/sessions\/([^/]+)\/archive$/);
+    if (request.method === "POST" && archiveMatch) {
+      const current = await requireAuthenticated(request);
+      const input = await body(request);
+      return send(request, response, 200, await gateway.archiveSession(archiveMatch[1], current.user.id, input.archived !== false));
+    }
     const messageMatch = url.pathname.match(/^\/v1\/sessions\/([^/]+)\/messages$/);
     if (request.method === "POST" && messageMatch) {
       const current = await requireAuthenticated(request);
@@ -153,7 +175,8 @@ const server = createServer(async (request, response) => {
       if ((request.headers.accept ?? "").includes("text/event-stream")) {
         beginStream(request, response);
         try {
-          const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie }, (event) => streamEvent(response, event));
+          const executionMode = parseExecutionMode(typeof input.execution_mode === "string" ? input.execution_mode : undefined);
+          const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie, executionMode }, (event) => streamEvent(response, event));
           streamEvent(response, { type: "snapshot", result });
           response.end();
         } catch (error) {
@@ -162,7 +185,8 @@ const server = createServer(async (request, response) => {
         }
         return;
       }
-      const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie });
+      const executionMode = parseExecutionMode(typeof input.execution_mode === "string" ? input.execution_mode : undefined);
+      const result = await gateway.sendMessage(messageMatch[1], current.user.id, content, { userId: current.user.id, sessionCookie: request.headers.cookie, executionMode });
       return send(request, response, result.status === "approval_required" ? 202 : 200, { ...result, sessionId: messageMatch[1] });
     }
     if (request.method === "POST" && url.pathname === "/v1/runs") {

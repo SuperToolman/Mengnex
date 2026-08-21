@@ -49,12 +49,12 @@ function TextBlock({ content }: { content: string }) {
     return <>{nodes}</>;
 }
 
-export function CopyButton({ value, label = "复制" }: { value: string; label?: string }) {
+export function CopyButton({ value, label = "复制", className, triggerClassName }: { value: string; label?: string; className?: string; triggerClassName?: string }) {
     const [copied, setCopied] = useState(false);
     async function copy() { await navigator.clipboard?.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }
-    return <Tooltip><Tooltip.Trigger><Button isIconOnly size="sm" variant="ghost" aria-label={copied ? "已复制" : label} onPress={() => void copy()}>{copied ? <Check /> : <Copy />}</Button></Tooltip.Trigger><Tooltip.Content>{copied ? "已复制" : label}</Tooltip.Content></Tooltip>;
+    return <Tooltip><Tooltip.Trigger className={triggerClassName}><Button isIconOnly size="sm" variant="ghost" className={className} aria-label={copied ? "已复制" : label} onPress={() => void copy()}>{copied ? <Check /> : <Copy />}</Button></Tooltip.Trigger><Tooltip.Content>{copied ? "已复制" : label}</Tooltip.Content></Tooltip>;
 }
 
 export default function AgentMarkdown({ content }: { content: string }) {
-    return <Typography.Prose>{splitBlocks(content).map((block, index) => block.type === "code" ? <div key={index} className="my-3 overflow-hidden rounded-lg border border-default"><div className="flex items-center justify-between border-b border-default px-3 py-1 text-xs text-muted"><span>{block.language || "text"}</span><CopyButton value={block.content} label="复制代码" /></div><pre className="overflow-auto p-3 text-xs"><Typography.Code>{block.content}</Typography.Code></pre></div> : <TextBlock key={index} content={block.content} />)}</Typography.Prose>;
+    return <div className="min-w-0 max-w-full overflow-x-auto break-words [overflow-wrap:anywhere]"><Typography.Prose className="min-w-0 max-w-full break-words [overflow-wrap:anywhere] [&_code]:break-all [&_pre]:max-w-full">{splitBlocks(content).map((block, index) => block.type === "code" ? <div key={index} className="overflow-hidden rounded-lg border border-default"><div className="flex items-center justify-between border-b border-default px-3 py-1 text-xs text-muted"><span>{block.language || "text"}</span><CopyButton value={block.content} label="复制代码" /></div><pre className="max-w-full overflow-auto p-3 text-xs"><Typography.Code>{block.content}</Typography.Code></pre></div> : <TextBlock key={index} content={block.content} />)}</Typography.Prose></div>;
 }

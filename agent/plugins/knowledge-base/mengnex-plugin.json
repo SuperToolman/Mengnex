@@ -1,4 +1,5 @@
 {
+  "manifest_version": 1,
   "id": "knowledge-base",
   "name": "Knowledge Base",
   "version": "0.1.0",
